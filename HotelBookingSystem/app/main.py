@@ -1,0 +1,17 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from routes.images.image import image_router
+
+app = FastAPI()
+
+# CORS setup for React frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # change to your frontend domain for production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include routes
+app.include_router(image_router)
