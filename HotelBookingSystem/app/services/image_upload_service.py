@@ -13,10 +13,9 @@ async def save_uploaded_image(image: UploadFile, image_name: str) -> str:
         "image_name": unique_name,
     }
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=httpx.Timeout(60)) as client:
         files = {"image": (image.filename, await image.read(), image.content_type)}
         response = await client.post(EXTERNAL_API, data=form_data, files=files)
-
     if response.status_code != 200:
         raise Exception(f"External upload failed: {response.text}")
 
