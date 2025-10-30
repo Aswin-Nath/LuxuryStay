@@ -1,5 +1,5 @@
 from fastapi import APIRouter, UploadFile, Form, HTTPException
-from services.image_upload_service import save_uploaded_image
+from app.services.image_upload_service import save_uploaded_image
 
 image_router = APIRouter(prefix="/image", tags=["Image Upload"])
 

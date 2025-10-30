@@ -11,4 +11,3 @@ class StatusUtility(Base):
     status_code = Column(String(20), unique=True, nullable=False)
     is_active = Column(Boolean, server_default="true")
     description = Column(Text, nullable=True)
-    created_at = Column(DateTime, server_default=func.now())

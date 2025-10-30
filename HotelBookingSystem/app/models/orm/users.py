@@ -1,10 +1,7 @@
 from sqlalchemy import Column,Integer,String,DateTime,func,Enum,ForeignKey,Date,Boolean,Text
 from sqlalchemy.orm import relationship
-from sqlalchemy.ext.declarative import declarative_base
 import enum
 from app.database.postgres_connection import Base
-from app.models.orm.authorization import Roles
-from app.models.orm.utility import StatusUtility
 class GenderTypes(enum.Enum):
     Male="MALE"
     Female="FEMALE"
