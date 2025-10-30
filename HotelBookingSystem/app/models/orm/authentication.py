@@ -54,10 +54,6 @@ class Verifications(Base):
     verified_at = Column(DateTime, nullable=True)
     ip_address = Column(String(45), nullable=True)
 
-    # relationships
-    user = relationship("Users", back_populates="verifications")
-
-
 # ==========================================================
 # TABLE: sessions
 # ==========================================================
@@ -80,7 +76,6 @@ class Sessions(Base):
     revoked_reason = Column(Text, nullable=True)
 
     # relationships
-    user = relationship("Users", back_populates="sessions")
     blacklisted_tokens = relationship("BlacklistedTokens", back_populates="session")
 
 
@@ -100,5 +95,4 @@ class BlacklistedTokens(Base):
     revoked_at = Column(DateTime, server_default=func.now(), nullable=False)
 
     # relationships
-    user = relationship("Users", back_populates="blacklisted_tokens")
     session = relationship("Sessions", back_populates="blacklisted_tokens")

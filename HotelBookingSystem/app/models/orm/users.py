@@ -30,4 +30,3 @@ class Users(Base):
     role = relationship("Roles", back_populates="users")
     status = relationship("StatusUtility", back_populates="users")
     creator = relationship("Users", remote_side=[user_id])
-    sessions=relationship("Sessions",back_populates="user")

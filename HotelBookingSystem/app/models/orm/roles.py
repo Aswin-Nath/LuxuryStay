@@ -20,4 +20,6 @@ class Roles(Base):
 
     # Relationship: Role ↔ PermissionRoleMap
     permissions = relationship("PermissionRoleMap", back_populates="role")
+    # Relationship: Role ↔ Users
+    users = relationship("Users", back_populates="role")
 
