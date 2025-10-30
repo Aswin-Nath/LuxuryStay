@@ -153,6 +153,7 @@ async def register_super_admin(
         phone_number=payload.phone_number,
         role_id=6,  # Super Admin Role ID
         status_id=1,
+        created_by=current_user.user_id
     )
 
     return UserResponse.model_validate(user_obj)

@@ -51,7 +51,7 @@ def create_refresh_token(data: dict, expires_delta: timedelta | None = None):
 # =====================================================
 # 👤 USER CREATION
 # =====================================================
-async def create_user(db, *, full_name: str, email: str, password: str, phone_number: str | None, role_id: int, status_id: int):
+async def create_user(db, *, full_name: str, email: str, password: str, phone_number: str | None, role_id: int, status_id: int,created_by:int):
     hashed = _hash_password(password)
     user_obj = Users(
         full_name=full_name,
@@ -59,7 +59,8 @@ async def create_user(db, *, full_name: str, email: str, password: str, phone_nu
         hashed_password=hashed,
         phone_number=phone_number,
         role_id=role_id,
-        status_id=status_id
+        status_id=status_id,
+        created_by=created_by
     )
     db.add(user_obj)
     await db.commit()
