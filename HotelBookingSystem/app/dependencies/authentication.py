@@ -9,6 +9,8 @@ from app.database.postgres_connection import get_db
 from app.models.orm.users import Users
 from app.models.orm.permissions import Permissions,PermissionRoleMap
 from app.core.security import oauth2_scheme
+from app.models.orm.authentication import BlacklistedTokens
+from app.services.auth import _hash_token
 
 load_dotenv()
 
@@ -17,8 +19,8 @@ load_dotenv()
 # =========================
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 60))
-REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", 7))
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 15))
+REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", 30))
 
 
 # ======================================================
@@ -52,6 +54,19 @@ async def get_current_user(
     result = await db.execute(select(Users).where(Users.user_id == user_id))
     user = result.scalars().first()
     if not user:
+        raise credentials_exception
+
+    # Check token blacklist (protect against revoked tokens)
+    try:
+        token_hash = _hash_token(token)
+        blk_result = await db.execute(
+            select(BlacklistedTokens).where(BlacklistedTokens.token_value_hash == token_hash)
+        )
+        blk = blk_result.scalars().first()
+        if blk:
+            raise credentials_exception
+    except Exception:
+        # Any failure in blacklist check should not leak details; if DB check fails, deny
         raise credentials_exception
 
     return user
@@ -96,3 +111,16 @@ async def get_user_permissions(
         return {}
 
     return permissions_map
+
+
+async def ensure_not_basic_user(current_user: Users = Depends(get_current_user)):
+    """Dependency that rejects requests coming from the basic 'user' role (role_id == 1).
+
+    Use this dependency on routes or routers that must not be accessible to regular users.
+    """
+    if getattr(current_user, "role_id", None) == 1:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient privileges: action not available for basic users",
+        )
+    return True

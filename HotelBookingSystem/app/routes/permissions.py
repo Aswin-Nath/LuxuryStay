@@ -5,11 +5,12 @@ from typing import List
 
 from app.database.postgres_connection import get_db
 from app.models.orm.permissions import Permissions, Resources, PermissionTypes,PermissionRoleMap
+from app.dependencies.authentication import ensure_not_basic_user
 from app.models.orm.roles import Roles
 from app.models.postgres.permissions import PermissionCreate, PermissionResponse,RolePermissionAssign,RolePermissionResponse
 from sqlalchemy.exc import IntegrityError
 
-permissions_router = APIRouter(prefix="/permissions", tags=["PERMISSIONS"])
+permissions_router = APIRouter(prefix="/permissions", tags=["PERMISSIONS"], dependencies=[Depends(ensure_not_basic_user)])
 
 
 # ==============================================================

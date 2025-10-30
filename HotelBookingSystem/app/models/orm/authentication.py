@@ -61,6 +61,8 @@ class Sessions(Base):
     __tablename__ = "sessions"
 
     session_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # Unique JWT ID for the session; include this in tokens as `jti`
+    jti = Column(UUID(as_uuid=True), unique=True, nullable=False, default=uuid.uuid4)
     user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     access_token = Column(Text, nullable=False)
     refresh_token = Column(Text, nullable=False, unique=True)

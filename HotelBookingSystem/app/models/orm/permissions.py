@@ -30,7 +30,6 @@ class Resources(str, PyEnum):
     Analytics_View = "ANALYTICS_VIEW"
     Backup_Operations = "BACKUP_OPERATIONS"
     Restore_Operations = "RESTORE_OPERATIONS"
-    Super_Admin_Creation = "SUPER_ADMIN_CREATION"
 
 
 
