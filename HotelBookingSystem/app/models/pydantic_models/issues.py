@@ -54,3 +54,12 @@ class IssueChatResponse(BaseModel):
 
 	model_config = {"from_attributes": True}
 
+
+class IssueUpdate(BaseModel):
+	booking_id: Optional[int] = None
+	room_id: Optional[int] = None
+	title: Optional[str] = None
+	description: Optional[str] = None
+	# When provided, images will replace the existing images unless caller uses append semantics
+	images: Optional[List[str]] = None
+

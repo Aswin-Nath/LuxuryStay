@@ -24,3 +24,9 @@ app.include_router(roles_router)
 app.include_router(permissions_router)
 app.include_router(auth_router)
 app.include_router(room_management_router)
+# Issue management routers (admin + customer)
+from app.routes.issue_management import admin as issue_admin_routes
+from app.routes.issue_management import customer as issue_customer_routes
+
+app.include_router(issue_admin_routes.admin_router)
+app.include_router(issue_customer_routes.customer_router)

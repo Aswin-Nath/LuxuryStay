@@ -53,18 +53,13 @@ async def list_rooms(
     status_filter: Optional[str] = Query(None),
     is_freezed: Optional[bool] = Query(None),
     db: AsyncSession = Depends(get_db),
-    user_permissions: dict = Depends(get_user_permissions),
 ):
-    # Require READ on either Booking or Room_Management
-    _require_permissions(user_permissions, [Resources.Booking, Resources.Room_Management], PermissionTypes.READ, require_all=False)
     items = await svc_list_rooms(db, room_type_id=room_type_id, status_filter=status_filter, is_freezed=is_freezed)
     return [Room.model_validate(r) for r in items]
 
 
 @router.get("/{room_id}", response_model=RoomResponse)
-async def get_room(room_id: int, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
-    # Require READ on either Booking or Room_Management
-    _require_permissions(user_permissions, [Resources.Booking, Resources.Room_Management], PermissionTypes.READ, require_all=False)
+async def get_room(room_id: int, db: AsyncSession = Depends(get_db)):
     obj = await svc_get_room(db, room_id)
     return RoomResponse.model_validate(obj)
 
