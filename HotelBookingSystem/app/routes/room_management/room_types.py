@@ -24,12 +24,10 @@ router = APIRouter(prefix="/api/room-types", tags=["ROOM_TYPES"])
 @router.post("/", response_model=RoomTypeResponse, status_code=status.HTTP_201_CREATED)
 async def create_room_type(payload: RoomTypeCreate, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
     # Permission check: require ROOM_MANAGEMENT.WRITE
-    allowed = False
-    for res, perms in user_permissions.items():
-        if res == Resources.Room_Management and PermissionTypes.WRITE in perms:
-            allowed = True
-            break
-    if not allowed:
+    if not (
+        Resources.ROOM_MANAGEMENT.value in user_permissions
+        and PermissionTypes.WRITE.value in user_permissions[Resources.ROOM_MANAGEMENT.value]
+    ):
         raise ForbiddenError("Insufficient permissions to create room types")
 
     obj = await svc_create_room_type(db, payload)
@@ -50,13 +48,10 @@ async def get_room_type(room_type_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.put("/{room_type_id}", response_model=RoomTypeResponse)
 async def update_room_type(room_type_id: int, payload: RoomTypeCreate, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
-    # Permission check: require ROOM_MANAGEMENT.WRITE
-    allowed = False
-    for res, perms in user_permissions.items():
-        if res == Resources.Room_Management and PermissionTypes.WRITE in perms:
-            allowed = True
-            break
-    if not allowed:
+    if not (
+        Resources.ROOM_MANAGEMENT.value in user_permissions
+        and PermissionTypes.WRITE.value in user_permissions[Resources.ROOM_MANAGEMENT.value]
+    ):
         raise ForbiddenError("Insufficient permissions to update room types")
 
     obj = await svc_update_room_type(db, room_type_id, payload)
@@ -65,13 +60,10 @@ async def update_room_type(room_type_id: int, payload: RoomTypeCreate, db: Async
 
 @router.delete("/{room_type_id}")
 async def soft_delete_room_type(room_type_id: int, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
-    # Permission check: require ROOM_MANAGEMENT.WRITE
-    allowed = False
-    for res, perms in user_permissions.items():
-        if res == Resources.Room_Management and PermissionTypes.WRITE in perms:
-            allowed = True
-            break
-    if not allowed:
+    if not (
+        Resources.ROOM_MANAGEMENT.value in user_permissions
+        and PermissionTypes.WRITE.value in user_permissions[Resources.ROOM_MANAGEMENT.value]
+    ):
         raise ForbiddenError("Insufficient permissions to delete room types")
 
     await svc_soft_delete_room_type(db, room_type_id)

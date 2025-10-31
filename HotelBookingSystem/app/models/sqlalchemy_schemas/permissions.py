@@ -19,17 +19,21 @@ class GenderTypes(str, PyEnum):
 
 
 class Resources(str, PyEnum):
-    Booking = "BOOKING"
-    Admin_Creation = "ADMIN_CREATION"
-    Room_Management = "ROOM_MANAGEMENT"
-    Payment_Processing = "PAYMENT_PROCESSING"
-    Refund_Approval = "REFUND_APPROVAL"
-    Content_Management = "CONTENT_MANAGEMENT"
-    Issue_Resolution = "ISSUE_RESOLUTION"
-    Notification_Handling = "NOTIFICATION_HANDLING"
-    Analytics_View = "ANALYTICS_VIEW"
-    Backup_Operations = "BACKUP_OPERATIONS"
-    Restore_Operations = "RESTORE_OPERATIONS"
+    # canonical uppercase member names (match DB stored values)
+    BOOKING = "BOOKING"
+    ADMIN_CREATION = "ADMIN_CREATION"
+    ROOM_MANAGEMENT = "ROOM_MANAGEMENT"
+    PAYMENT_PROCESSING = "PAYMENT_PROCESSING"
+    REFUND_APPROVAL = "REFUND_APPROVAL"
+    CONTENT_MANAGEMENT = "CONTENT_MANAGEMENT"
+    ISSUE_RESOLUTION = "ISSUE_RESOLUTION"
+    NOTIFICATION_HANDLING = "NOTIFICATION_HANDLING"
+    ANALYTICS_VIEW = "ANALYTICS_VIEW"
+    BACKUP_OPERATIONS = "BACKUP_OPERATIONS"
+    RESTORE_OPERATIONS = "RESTORE_OPERATIONS"
+    OFFER_MANAGEMENT = "OFFER_MANAGEMENT"
+
+    # NOTE: previous mixed-case aliases removed — use uppercase underscore names (e.g. Resources.ROOM_MANAGEMENT)
 
 
 

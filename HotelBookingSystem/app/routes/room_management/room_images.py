@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.image_upload_service import save_uploaded_image
 from app.services.room_management.images_service import create_image, get_images_for_room
+from app.services.room_management.images_service import hard_delete_image
 from app.database.postgres_connection import get_db
 from app.models.pydantic_models.images import ImageResponse
 from app.dependencies.authentication import get_current_user, get_user_permissions
@@ -39,8 +40,8 @@ async def upload_image_for_room(
     # Permission check: require ROOM_MANAGEMENT.WRITE
     # ----------------------------------------------------------
     allowed = (
-        Resources.Room_Management in (user_permissions or {})
-        and PermissionTypes.WRITE in (user_permissions or {})[Resources.Room_Management]
+        Resources.ROOM_MANAGEMENT.value in (user_permissions or {})
+        and PermissionTypes.WRITE.value in (user_permissions or {})[Resources.ROOM_MANAGEMENT.value]
     )
     if not allowed:
         from app.core.exceptions import ForbiddenError
@@ -79,3 +80,10 @@ async def list_images_for_room(room_id: int, db: AsyncSession = Depends(get_db))
     """
     items = await get_images_for_room(db, room_id)
     return [ImageResponse.model_validate(i) for i in items]
+
+
+@router.delete("/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_image_for_room(room_id: int, image_id: int, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user), user_permissions: dict = Depends(get_user_permissions)):
+    """Hard-delete an image (remove DB row). The requester must be the uploader or have ROOM_MANAGEMENT.WRITE."""
+    await hard_delete_image(db, image_id, requester_id=current_user.user_id, requester_permissions=user_permissions)
+    return None

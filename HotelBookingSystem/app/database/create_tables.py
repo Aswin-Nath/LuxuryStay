@@ -5,20 +5,14 @@ from app.database.postgres_connection import engine, Base
 from app.models.sqlalchemy_schemas import (
     authentication,
     bookings,
-    tax_utility,
     images,
-    issues,
-    notifications,
     offers,
-    payments,
     permissions,
-    refunds,
-    reviews,
     roles,
     rooms,
     users,
     utility,
-    wishlist,
+    tax_utility
 )
 
 async def init_models():

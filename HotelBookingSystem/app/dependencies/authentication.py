@@ -102,9 +102,22 @@ async def get_user_permissions(
     records = result.all()
 
     # Step 3: Build a permission map
+    # Normalize to plain uppercase strings for both resource and permission type so route checks
+    # can safely compare against enum.value (which are uppercase strings in this project).
     permissions_map = {}
     for resource, perm_type in records:
-        permissions_map.setdefault(resource, set()).add(perm_type)
+        # resource and perm_type may be Enum members or plain strings depending on driver; normalize
+        if hasattr(resource, "value"):
+            resource_key = str(resource.value).upper()
+        else:
+            resource_key = str(resource).upper()
+
+        if hasattr(perm_type, "value"):
+            perm_key = str(perm_type.value).upper()
+        else:
+            perm_key = str(perm_type).upper()
+
+        permissions_map.setdefault(resource_key, set()).add(perm_key)
 
     # Step 4: Return empty map if no permissions found
     if not permissions_map:

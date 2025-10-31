@@ -143,8 +143,8 @@ async def register_admin(
     # ----------------------------------------------------------
     # Permission check (route dependency already enforces, but double-check)
     allowed = (
-        Resources.Admin_Creation in user_permissions
-        and PermissionTypes.WRITE in user_permissions[Resources.Admin_Creation]
+        Resources.ADMIN_CREATION.value in user_permissions
+        and PermissionTypes.WRITE.value in user_permissions[Resources.ADMIN_CREATION.value]
     )
     if not allowed:
         from app.core.exceptions import ForbiddenError

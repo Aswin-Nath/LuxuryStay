@@ -4,7 +4,7 @@ from datetime import date, time, datetime
 
 
 class BookingCreate(BaseModel):
-    customer_id: int
+    user_id: int
     room_count: int = Field(..., ge=1)
     check_in: date
     check_in_time: Optional[time] = time(12, 0)
@@ -20,7 +20,7 @@ class BookingCreate(BaseModel):
 
 class BookingResponse(BaseModel):
     booking_id: int
-    customer_id: int
+    user_id: int
     room_count: int
     check_in: date
     check_in_time: time

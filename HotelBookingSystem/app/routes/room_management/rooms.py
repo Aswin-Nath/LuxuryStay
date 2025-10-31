@@ -29,9 +29,13 @@ def _require_permissions(user_permissions: dict, required_resources: list, perm:
     - perm: PermissionTypes (READ/WRITE)
     - require_all: if True, user must have the permission on all required resources; if False, any one suffices
     """
+    # Normalize required resources and permission to strings (enum.value)
+    req_keys = [r.value if hasattr(r, 'value') else str(r).upper() for r in required_resources]
+    perm_key = perm.value if hasattr(perm, 'value') else str(perm).upper()
+
     satisfied = 0
-    for res, perms in user_permissions.items():
-        if res in required_resources and perm in perms:
+    for res_key, perms in user_permissions.items():
+        if res_key in req_keys and perm_key in perms:
             satisfied += 1
     if require_all and satisfied < len(required_resources):
         raise ForbiddenError("Insufficient permissions")
@@ -42,7 +46,7 @@ def _require_permissions(user_permissions: dict, required_resources: list, perm:
 @router.post("/", response_model=RoomResponse, status_code=status.HTTP_201_CREATED)
 async def create_room(payload: RoomCreate, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
     # Require WRITE on both Booking and Room_Management
-    _require_permissions(user_permissions, [Resources.Booking, Resources.Room_Management], PermissionTypes.WRITE, require_all=True)
+    _require_permissions(user_permissions, [Resources.BOOKING, Resources.ROOM_MANAGEMENT], PermissionTypes.WRITE, require_all=True)
     obj = await svc_create_room(db, payload)
     return RoomResponse.model_validate(obj).model_copy(update={"message": "Room created"})
 
@@ -67,7 +71,7 @@ async def get_room(room_id: int, db: AsyncSession = Depends(get_db)):
 @router.put("/{room_id}", response_model=RoomResponse)
 async def update_room(room_id: int, payload: RoomCreate, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
     # Require WRITE on both Booking and Room_Management
-    _require_permissions(user_permissions, [Resources.Booking, Resources.Room_Management], PermissionTypes.WRITE, require_all=True)
+    _require_permissions(user_permissions, [Resources.BOOKING, Resources.ROOM_MANAGEMENT], PermissionTypes.WRITE, require_all=True)
     obj = await svc_update_room(db, room_id, payload)
     return RoomResponse.model_validate(obj).model_copy(update={"message": "Updated successfully"})
 
@@ -75,7 +79,7 @@ async def update_room(room_id: int, payload: RoomCreate, db: AsyncSession = Depe
 @router.patch("/{room_id}/status")
 async def change_room_status(room_id: int, status: str, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
     # Require WRITE on both Booking and Room_Management
-    _require_permissions(user_permissions, [Resources.Booking, Resources.Room_Management], PermissionTypes.WRITE, require_all=True)
+    _require_permissions(user_permissions, [Resources.BOOKING, Resources.ROOM_MANAGEMENT], PermissionTypes.WRITE, require_all=True)
     await svc_change_room_status(db, room_id, status)
     return {"message": "Status updated"}
 
@@ -83,6 +87,6 @@ async def change_room_status(room_id: int, status: str, db: AsyncSession = Depen
 @router.delete("/{room_id}")
 async def delete_room(room_id: int, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
     # Require WRITE on both Booking and Room_Management
-    _require_permissions(user_permissions, [Resources.Booking, Resources.Room_Management], PermissionTypes.WRITE, require_all=True)
+    _require_permissions(user_permissions, [Resources.BOOKING, Resources.ROOM_MANAGEMENT], PermissionTypes.WRITE, require_all=True)
     await svc_delete_room(db, room_id)
     return {"message": "Room deleted"}

@@ -21,7 +21,7 @@ class Bookings(Base):
 
     booking_id = Column(Integer, primary_key=True, autoincrement=True)
     # project uses `users` as customers table; using users.user_id as FK
-    customer_id = Column(Integer, ForeignKey("users.user_id", ondelete="RESTRICT"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="RESTRICT"), nullable=False)
     room_count = Column(SmallInteger, nullable=False)
     check_in = Column(Date, nullable=False)
     check_in_time = Column(Time, server_default="12:00:00")

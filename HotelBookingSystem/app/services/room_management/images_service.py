@@ -54,3 +54,34 @@ async def get_images_for_room(db: AsyncSession, room_id: int) -> List[Images]:
     res = await db.execute(stmt)
     items = res.scalars().all()
     return items
+
+
+async def hard_delete_image(db: AsyncSession, image_id: int, requester_id: int | None = None, requester_permissions: dict | None = None) -> None:
+    """Permanently delete an image row. Only the uploader or users with ROOM_MANAGEMENT.WRITE may delete.
+
+    This removes the DB row; it does NOT attempt to delete remote file contents (external upload providers may
+    require separate deletion APIs).
+    """
+    q = await db.execute(select(Images).where(Images.image_id == image_id))
+    obj = q.scalars().first()
+    if not obj:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+
+    # If it's a room image, requester must either be uploader or have ROOM_MANAGEMENT.WRITE
+    allowed = False
+    if requester_id and obj.uploaded_by and requester_id == obj.uploaded_by:
+        allowed = True
+    if requester_permissions:
+        if (
+            "ROOM_MANAGEMENT" in requester_permissions
+            and "WRITE" in requester_permissions.get("ROOM_MANAGEMENT", set())
+        ):
+            allowed = True
+
+    if not allowed:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to delete image")
+
+    # Permanently delete the DB row
+    await db.delete(obj)
+    await db.commit()
+    return None
