@@ -2,7 +2,24 @@ import asyncio
 from app.database.postgres_connection import engine, Base
 
 # ✅ Import *all* models here to register them with Base.metadata
-from app.models.sqlalchemy_schemas import roles, roles,utility,users,authentication,rooms  # ensures Roles is registered
+from app.models.sqlalchemy_schemas import (
+    authentication,
+    bookings,
+    tax_utility,
+    images,
+    issues,
+    notifications,
+    offers,
+    payments,
+    permissions,
+    refunds,
+    reviews,
+    roles,
+    rooms,
+    users,
+    utility,
+    wishlist,
+)
 
 async def init_models():
     async with engine.begin() as conn:

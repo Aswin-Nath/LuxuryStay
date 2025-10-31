@@ -3,7 +3,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 
-from app.models.sqlalchemy_schemas.rooms import Rooms
+from app.models.sqlalchemy_schemas.rooms import Rooms, RoomTypes
 
 
 async def create_room(db: AsyncSession, payload) -> Rooms:
@@ -11,7 +11,19 @@ async def create_room(db: AsyncSession, payload) -> Rooms:
     if q.scalars().first():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Room number already exists")
 
-    obj = Rooms(**payload.model_dump())
+    # Fetch room type to derive price and occupancy limits
+    rt_res = await db.execute(select(RoomTypes).where(RoomTypes.room_type_id == payload.room_type_id))
+    room_type = rt_res.scalars().first()
+    if not room_type:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room type not found")
+
+    data = payload.model_dump()
+    # populate derived fields from room type
+    data["price_per_night"] = room_type.price_per_night
+    data["max_adult_count"] = room_type.max_adult_count
+    data["max_child_count"] = room_type.max_child_count
+
+    obj = Rooms(**data)
     db.add(obj)
     await db.commit()
     await db.refresh(obj)
@@ -54,7 +66,18 @@ async def update_room(db: AsyncSession, room_id: int, payload) -> Rooms:
     if not obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
 
-    await db.execute(update(Rooms).where(Rooms.room_id == room_id).values(**payload.model_dump()))
+    data = payload.model_dump()
+    # If room_type_id changed (or provided), fetch derived values and set them
+    if "room_type_id" in data and data["room_type_id"] is not None:
+        rt_res = await db.execute(select(RoomTypes).where(RoomTypes.room_type_id == data["room_type_id"]))
+        room_type = rt_res.scalars().first()
+        if not room_type:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room type not found")
+        data["price_per_night"] = room_type.price_per_night
+        data["max_adult_count"] = room_type.max_adult_count
+        data["max_child_count"] = room_type.max_child_count
+
+    await db.execute(update(Rooms).where(Rooms.room_id == room_id).values(**data))
     await db.commit()
     res = await db.execute(select(Rooms).where(Rooms.room_id == room_id))
     obj = res.scalars().first()

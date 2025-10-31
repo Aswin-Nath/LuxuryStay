@@ -1,5 +1,5 @@
 # ==============================================================
-# app/models/postgres/rooms.py
+# app/models/pydantic_models/room.py
 # Purpose: Pydantic models for Room Management module
 # ==============================================================
 from pydantic import BaseModel, Field
@@ -15,6 +15,7 @@ class RoomStatus(str, Enum):
     BOOKED = "BOOKED"
     MAINTENANCE = "MAINTENANCE"
     FROZEN = "FROZEN"
+
 
 class FreezeReason(str, Enum):
     NONE = "NONE"
@@ -33,7 +34,8 @@ class RoomTypeCreate(BaseModel):
     description: Optional[str] = None
     square_ft: int = Field(..., ge=0)
 
-    model_config = {"from_attributes": True,}
+    model_config = {"from_attributes": True}
+
 
 class RoomTypeResponse(RoomTypeCreate):
     room_type_id: int
@@ -42,6 +44,7 @@ class RoomTypeResponse(RoomTypeCreate):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
 
 class RoomType(BaseModel):
     room_type_id: int
@@ -59,20 +62,29 @@ class RoomType(BaseModel):
 class RoomCreate(BaseModel):
     room_no: str = Field(..., max_length=20)
     room_type_id: int
-    price_per_night: float = Field(..., ge=0)
-    max_adult_count: int = Field(..., ge=1)
-    max_child_count: int = Field(0, ge=0)
+    # price_per_night, max_adult_count and max_child_count are derived from
+    # the selected RoomType and should not be provided when creating a Room.
     room_status: Optional[RoomStatus] = RoomStatus.AVAILABLE
     freeze_reason: Optional[FreezeReason] = None
 
     model_config = {"from_attributes": True}
 
-class RoomResponse(RoomCreate):
+
+class RoomResponse(BaseModel):
     room_id: int
+    room_no: str
+    room_type_id: int
+    # these are returned (populated from DB / room type)
+    price_per_night: float
+    max_adult_count: int
+    max_child_count: int
+    room_status: RoomStatus
+    freeze_reason: Optional[FreezeReason]
     created_at: datetime
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
 
 class Room(BaseModel):
     room_id: int
@@ -94,10 +106,12 @@ class AmenityCreate(BaseModel):
 
     model_config = {"from_attributes": True}
 
+
 class AmenityResponse(AmenityCreate):
     amenity_id: int
 
     model_config = {"from_attributes": True}
+
 
 class Amenity(BaseModel):
     amenity_id: int
@@ -114,8 +128,10 @@ class RoomAmenityMapCreate(BaseModel):
 
     model_config = {"from_attributes": True}
 
+
 class RoomAmenityMapResponse(RoomAmenityMapCreate):
     model_config = {"from_attributes": True}
+
 
 class RoomAmenityMap(BaseModel):
     room_id: int
