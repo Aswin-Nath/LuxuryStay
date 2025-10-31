@@ -30,7 +30,7 @@ class Bookings(Base):
     total_price = Column(Numeric(12, 2), nullable=False)
     offer_id = Column(Integer, ForeignKey("offers.offer_id"), nullable=True)
     offer_discount_percent = Column(Numeric(5, 2), server_default="0")
-    status = Column(String(50), nullable=False, server_default="PENDING")
+    status = Column(String(50), nullable=False, server_default="Confirmed")
     is_deleted = Column(Boolean, server_default="false")
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -40,6 +40,7 @@ class Bookings(Base):
 
     # relationships
     rooms = relationship("BookingRoomMap", back_populates="booking", cascade="all, delete-orphan")
+    taxes = relationship("BookingTaxMap", backref="booking", cascade="all, delete-orphan")
 
 
 class BookingRoomMap(Base):

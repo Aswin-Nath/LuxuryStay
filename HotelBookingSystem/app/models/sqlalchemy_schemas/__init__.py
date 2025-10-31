@@ -1,3 +1,3 @@
 from .roles import Roles
-from .utility import StatusUtility
+from .status_utility import StatusUtility
 from .users import Users

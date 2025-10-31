@@ -27,14 +27,14 @@ class IssueResponse(BaseModel):
 	user_id: int
 	title: str
 	description: str
-	images: List[str]
+	# images now contains image IDs referencing the `images` table
+	images: List[int]
 	status: IssueStatus
 	reported_at: datetime
 	resolved_at: Optional[datetime] = None
 	last_updated: datetime
 	is_deleted: bool
 	resolved_by: Optional[int] = None
-
 	model_config = {"from_attributes": True}
 
 

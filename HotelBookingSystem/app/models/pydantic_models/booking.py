@@ -5,6 +5,8 @@ from datetime import date, time, datetime
 
 class BookingCreate(BaseModel):
     user_id: int
+    # During creation clients provide only room ids (ints). Detailed room-map objects are returned in responses.
+    rooms: Optional[List[int]] = []
     room_count: int = Field(..., ge=1)
     check_in: date
     check_in_time: Optional[time] = time(12, 0)
@@ -31,11 +33,13 @@ class BookingResponse(BaseModel):
     offer_discount_percent: float
     status: str
     is_deleted: bool
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None  # ✅ allow missing
+    updated_at: Optional[datetime] = None
     primary_customer_name: Optional[str]
     primary_customer_phone_number: Optional[str]
     primary_customer_dob: Optional[date]
+    rooms: Optional[List["BookingRoomMapResponse"]] = []
+    taxes: Optional[List["BookingTaxMapResponse"]] = []
 
     model_config = {"from_attributes": True}
 

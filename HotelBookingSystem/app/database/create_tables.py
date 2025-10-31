@@ -10,9 +10,10 @@ from app.models.sqlalchemy_schemas import (
     permissions,
     roles,
     rooms,
+    status_utility,
     users,
-    utility,
-    tax_utility
+    tax_utility,
+    issues
 )
 
 async def init_models():
