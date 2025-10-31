@@ -7,7 +7,9 @@ from app.database.postgres_connection import get_db
 from app.models.sqlalchemy_schemas.rooms import RoomAmenities
 from app.models.pydantic_models.room import AmenityCreate, AmenityResponse, Amenity
 from fastapi import Depends
-from app.dependencies.authentication import ensure_not_basic_user
+from app.dependencies.authentication import get_user_permissions
+from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
+from app.core.exceptions import ForbiddenError
 from app.services.room_management.amenities_service import (
     create_amenity as svc_create_amenity,
     list_amenities as svc_list_amenities,
@@ -19,7 +21,10 @@ router = APIRouter(prefix="/api/amenities", tags=["AMENITIES"])
 
 
 @router.post("/", response_model=AmenityResponse, status_code=status.HTTP_201_CREATED)
-async def create_amenity(payload: AmenityCreate, db: AsyncSession = Depends(get_db), _=Depends(ensure_not_basic_user)):
+async def create_amenity(payload: AmenityCreate, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
+    # require WRITE on Room_Management
+    if not (Resources.Room_Management in user_permissions and PermissionTypes.WRITE in user_permissions[Resources.Room_Management]):
+        raise ForbiddenError("Insufficient permissions to create amenities")
     obj = await svc_create_amenity(db, payload)
     return AmenityResponse.model_validate(obj).model_copy(update={"message": "Amenity created"})
 
@@ -37,6 +42,8 @@ async def get_amenity(amenity_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.delete("/{amenity_id}")
-async def delete_amenity(amenity_id: int, db: AsyncSession = Depends(get_db), _=Depends(ensure_not_basic_user)):
+async def delete_amenity(amenity_id: int, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
+    if not (Resources.Room_Management in user_permissions and PermissionTypes.WRITE in user_permissions[Resources.Room_Management]):
+        raise ForbiddenError("Insufficient permissions to delete amenities")
     await svc_delete_amenity(db, amenity_id)
     return {"message": "Amenity deleted"}

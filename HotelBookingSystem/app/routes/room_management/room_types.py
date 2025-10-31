@@ -7,7 +7,9 @@ from app.database.postgres_connection import get_db
 from app.models.sqlalchemy_schemas.rooms import RoomTypes
 from app.models.pydantic_models.room import RoomTypeCreate, RoomTypeResponse
 from fastapi import Depends
-from app.dependencies.authentication import ensure_not_basic_user
+from app.dependencies.authentication import get_user_permissions
+from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
+from app.core.exceptions import ForbiddenError
 from app.services.room_management.room_types_service import (
     create_room_type as svc_create_room_type,
     list_room_types as svc_list_room_types,
@@ -20,7 +22,16 @@ router = APIRouter(prefix="/api/room-types", tags=["ROOM_TYPES"])
 
 
 @router.post("/", response_model=RoomTypeResponse, status_code=status.HTTP_201_CREATED)
-async def create_room_type(payload: RoomTypeCreate, db: AsyncSession = Depends(get_db), _=Depends(ensure_not_basic_user)):
+async def create_room_type(payload: RoomTypeCreate, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
+    # Permission check: require ROOM_MANAGEMENT.WRITE
+    allowed = False
+    for res, perms in user_permissions.items():
+        if res == Resources.Room_Management and PermissionTypes.WRITE in perms:
+            allowed = True
+            break
+    if not allowed:
+        raise ForbiddenError("Insufficient permissions to create room types")
+
     obj = await svc_create_room_type(db, payload)
     return RoomTypeResponse.model_validate(obj).model_copy(update={"message": "Room type created"})
 
@@ -38,12 +49,30 @@ async def get_room_type(room_type_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.put("/{room_type_id}", response_model=RoomTypeResponse)
-async def update_room_type(room_type_id: int, payload: RoomTypeCreate, db: AsyncSession = Depends(get_db), _=Depends(ensure_not_basic_user)):
+async def update_room_type(room_type_id: int, payload: RoomTypeCreate, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
+    # Permission check: require ROOM_MANAGEMENT.WRITE
+    allowed = False
+    for res, perms in user_permissions.items():
+        if res == Resources.Room_Management and PermissionTypes.WRITE in perms:
+            allowed = True
+            break
+    if not allowed:
+        raise ForbiddenError("Insufficient permissions to update room types")
+
     obj = await svc_update_room_type(db, room_type_id, payload)
     return RoomTypeResponse.model_validate(obj).model_copy(update={"message": "Updated successfully"})
 
 
 @router.delete("/{room_type_id}")
-async def soft_delete_room_type(room_type_id: int, db: AsyncSession = Depends(get_db), _=Depends(ensure_not_basic_user)):
+async def soft_delete_room_type(room_type_id: int, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
+    # Permission check: require ROOM_MANAGEMENT.WRITE
+    allowed = False
+    for res, perms in user_permissions.items():
+        if res == Resources.Room_Management and PermissionTypes.WRITE in perms:
+            allowed = True
+            break
+    if not allowed:
+        raise ForbiddenError("Insufficient permissions to delete room types")
+
     await svc_soft_delete_room_type(db, room_type_id)
     return {"message": "Room type soft-deleted"}

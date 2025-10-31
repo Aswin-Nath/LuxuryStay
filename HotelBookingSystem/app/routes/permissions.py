@@ -5,7 +5,7 @@ from typing import List
 
 from app.database.postgres_connection import get_db
 from app.models.sqlalchemy_schemas.permissions import Permissions, Resources, PermissionTypes,PermissionRoleMap
-from app.dependencies.authentication import ensure_not_basic_user
+# removed ensure_not_basic_user usage; permission checks should be applied where appropriate
 from app.models.sqlalchemy_schemas.roles import Roles
 from app.models.pydantic_models.permissions import PermissionCreate, PermissionResponse,RolePermissionAssign,RolePermissionResponse
 from sqlalchemy.exc import IntegrityError
@@ -17,7 +17,7 @@ from app.services.permissions_service import (
     get_roles_for_permission as svc_get_roles_for_permission,
 )
 
-permissions_router = APIRouter(prefix="/permissions", tags=["PERMISSIONS"], dependencies=[Depends(ensure_not_basic_user)])
+permissions_router = APIRouter(prefix="/permissions", tags=["PERMISSIONS"])
 
 
 # ==============================================================
