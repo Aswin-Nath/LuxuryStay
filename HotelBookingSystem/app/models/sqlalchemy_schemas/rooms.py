@@ -51,7 +51,7 @@ class RoomTypes(Base):
     is_deleted = Column(Boolean, nullable=False, default=False)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
-
+    
     # Relationships
     rooms = relationship("Rooms", back_populates="room_type", cascade="all, delete-orphan")
 

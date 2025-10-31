@@ -3,10 +3,10 @@ import secrets
 from datetime import datetime, timedelta
 from jose import jwt
 import uuid
-from app.models.orm.users import Users
-from app.models.orm.authentication import Sessions
-from app.models.orm.authentication import Verifications, VerificationType
-from app.models.orm.authentication import BlacklistedTokens, TokenType, RevokedType
+from app.models.sqlalchemy_schemas.users import Users
+from app.models.sqlalchemy_schemas.authentication import Sessions
+from app.models.sqlalchemy_schemas.authentication import Verifications, VerificationType
+from app.models.sqlalchemy_schemas.authentication import BlacklistedTokens, TokenType, RevokedType
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 import smtplib

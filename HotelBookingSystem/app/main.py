@@ -5,6 +5,7 @@ from app.routes.roles.roles import roles_router
 from app.routes.permissions import permissions_router
 from app.routes.auth.auth import auth_router
 from app.routes.room_management import router as room_management_router
+from app.middlewares.error_handler import ErrorHandlerMiddleware
 app = FastAPI()
 
 # CORS setup for React frontend
@@ -15,6 +16,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Global error handling middleware for domain/service errors
+app.add_middleware(ErrorHandlerMiddleware)
 
 # Include routes
 app.include_router(image_router)
