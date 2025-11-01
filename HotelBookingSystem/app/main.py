@@ -6,6 +6,7 @@ from app.routes.auth.auth import auth_router
 from app.routes.room_management import router as room_management_router
 from app.routes.offers.offers import router as offers_router
 from app.routes.booking import customer as booking_customer_router
+from app.routes.wishlist import router as wishlist_router
 from app.middlewares.error_handler import ErrorHandlerMiddleware
 app = FastAPI()
 
@@ -28,6 +29,7 @@ app.include_router(auth_router)
 app.include_router(room_management_router)
 app.include_router(offers_router)
 app.include_router(booking_customer_router.router)
+app.include_router(wishlist_router)
 from app.routes.issue_management import customer as issue_customer_router
 from app.routes.issue_management import admin as issue_admin_router
 

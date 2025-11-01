@@ -19,8 +19,9 @@ class Payments(Base):
     booking_id = Column(Integer, ForeignKey("bookings.booking_id", ondelete="RESTRICT"), nullable=False)
     amount = Column(Numeric(12, 2), nullable=False)
     payment_date = Column(TIMESTAMP(timezone=True), server_default=func.now())
-    method = Column(String(50), nullable=False)
-    status = Column(String(50), server_default="PENDING")
+    method_id = Column(Integer, ForeignKey("payment_method_utility.method_id", ondelete="RESTRICT"), nullable=False)
+    # Payments in this system are one-time and considered successful at creation
+    status = Column(String(50), server_default="SUCCESS")
     transaction_reference = Column(String(100), unique=True, nullable=True)
     remarks = Column(Text, nullable=True)
     is_deleted = Column(Boolean, server_default="false")

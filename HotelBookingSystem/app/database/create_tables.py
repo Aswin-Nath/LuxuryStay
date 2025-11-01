@@ -13,7 +13,11 @@ from app.models.sqlalchemy_schemas import (
     status_utility,
     users,
     tax_utility,
-    issues
+    issues,
+    payment_method,
+    payments,
+    notifications,
+    refunds,
 )
 
 async def init_models():

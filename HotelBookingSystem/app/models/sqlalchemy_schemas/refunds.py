@@ -17,7 +17,7 @@ class Refunds(Base):
 
     refund_id = Column(Integer, primary_key=True, autoincrement=True)
     booking_id = Column(Integer, ForeignKey("bookings.booking_id", ondelete="RESTRICT"), nullable=False)
-    customer_id = Column(Integer, ForeignKey("users.user_id", ondelete="RESTRICT"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="RESTRICT"), nullable=False)
     type = Column(String(50), nullable=False)
     status = Column(String(50), server_default="INITIATED")
     refund_amount = Column(Numeric(12, 2), nullable=False)
@@ -26,8 +26,9 @@ class Refunds(Base):
     completed_at = Column(TIMESTAMP(timezone=True), nullable=True)
     remarks = Column(Text, nullable=True)
     is_deleted = Column(Boolean, server_default="false")
-    transaction_method = Column(String(50), nullable=False)
+    transaction_method_id = Column(Integer, ForeignKey("payment_method_utility.method_id", ondelete="RESTRICT"), nullable=False)
     transaction_number = Column(String(100), nullable=True)
+
 
 
 class RefundRoomMap(Base):
