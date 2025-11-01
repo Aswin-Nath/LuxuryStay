@@ -1,12 +1,25 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Literal
 from datetime import datetime
 
 
 class NotificationCreate(BaseModel):
 	recipient_user_id: int = Field(..., alias="resc_user_id")
-	notification_type: str
-	entity_type: Optional[str] = None
+	notification_type: Literal["SYSTEM", "PROMOTIONAL", "REMINDER", "TRANSACTIONAL", "SECURITY", "OTHER"]
+	entity_type: Optional[
+		Literal[
+			"BOOKING",
+			"PAYMENT",
+			"REFUND",
+			"ISSUE",
+			"OFFER",
+			"REVIEW",
+			"WISHLIST",
+			"USER_ACCOUNT",
+			"SYSTEM",
+			"ROOM"
+		]
+	] = None
 	entity_id: Optional[int] = None
 	title: str
 	message: str
@@ -22,6 +35,7 @@ class NotificationResponse(BaseModel):
 	message: str
 	is_read: bool
 	created_at: datetime
+	read_at: Optional[datetime] = None
 	is_deleted: bool
 
 	model_config = {"from_attributes": True}

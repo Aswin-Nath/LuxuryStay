@@ -7,6 +7,8 @@ from fastapi import HTTPException, status
 from app.models.sqlalchemy_schemas.issues import Issues
 from app.models.sqlalchemy_schemas.issues import IssueChat
 from app.services.room_management.images_service import create_image
+from app.models.pydantic_models.notifications import NotificationCreate
+from app.services.notifications_service import add_notification as svc_add_notification
 
 
 async def create_issue(db: AsyncSession, payload: dict) -> Issues:
@@ -41,6 +43,26 @@ async def create_issue(db: AsyncSession, payload: dict) -> Issues:
         res = await db.execute(select(Issues).where(Issues.issue_id == obj.issue_id))
         obj = res.scalars().first()
 
+    # Notify the issue creator that their issue was created
+    try:
+        notif = NotificationCreate(
+            recipient_user_id=obj.user_id,
+            notification_type="SYSTEM",
+            entity_type="ISSUE",
+            entity_id=obj.issue_id,
+            title="Issue created",
+            message=f"Your issue #{obj.issue_id} has been created. Title: {obj.title}",
+        )
+        # create notification without committing (so caller controls transaction)
+        await svc_add_notification(db, notif, commit=False)
+        # persist the notification (and any pending changes) now
+        await db.commit()
+    except Exception:
+        # don't fail issue creation on notification errors
+        try:
+            await db.rollback()
+        except Exception:
+            pass
     return obj
     return obj
 
@@ -94,7 +116,27 @@ async def add_chat(db: AsyncSession, issue_id: int, sender_id: int, message: str
     db.add(chat)
     await db.commit()
     res = await db.execute(select(IssueChat).where(IssueChat.chat_id == chat.chat_id))
-    return res.scalars().first()
+    chat_obj = res.scalars().first()
+
+    # Notify the issue owner if someone else sent the message
+    try:
+        issue_res = await db.execute(select(Issues).where(Issues.issue_id == issue_id))
+        issue_obj = issue_res.scalars().first()
+        if issue_obj and issue_obj.user_id and issue_obj.user_id != sender_id:
+            notif = NotificationCreate(
+                recipient_user_id=issue_obj.user_id,
+                notification_type="SYSTEM",
+                entity_type="ISSUE",
+                entity_id=issue_id,
+                title="New message on your issue",
+                message=f"New message on issue #{issue_id}: {message}",
+            )
+            await svc_add_notification(db, notif)
+    except Exception:
+        # don't fail chat creation if notification errors occur
+        pass
+
+    return chat_obj
 
 
 async def list_chats(db: AsyncSession, issue_id: int):

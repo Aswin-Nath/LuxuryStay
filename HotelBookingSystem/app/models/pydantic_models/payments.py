@@ -14,6 +14,14 @@ class PaymentCreate(BaseModel):
     remarks: Optional[str] = None
 
 
+class BookingPaymentCreate(BaseModel):
+    """Payment details accepted during booking creation (booking_id is assigned by backend)."""
+    method_id: int
+    transaction_reference: Optional[str] = None
+    remarks: Optional[str] = None
+
+
+
 class PaymentResponse(BaseModel):
     payment_id: int
     booking_id: int

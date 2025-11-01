@@ -1,11 +1,13 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import date, time, datetime
+from app.models.pydantic_models.payments import BookingPaymentCreate
 
 
 class BookingCreate(BaseModel):
     user_id: int
-    # During creation clients provide only room ids (ints). Detailed room-map objects are returned in responses.
+    # During creation clients provide only room type ids (ints).
+    # Backend will allocate actual room_ids for the requested room_type_ids and return detailed room-map objects in responses.
     rooms: Optional[List[int]] = []
     room_count: int = Field(..., ge=1)
     check_in: date
@@ -18,6 +20,8 @@ class BookingCreate(BaseModel):
     primary_customer_name: Optional[str] = None
     primary_customer_phone_number: Optional[str] = None
     primary_customer_dob: Optional[date] = None
+    # Optional payment details: when provided, backend will create a Payments row for the booking
+    payment: Optional[BookingPaymentCreate] = None
 
 
 class BookingResponse(BaseModel):

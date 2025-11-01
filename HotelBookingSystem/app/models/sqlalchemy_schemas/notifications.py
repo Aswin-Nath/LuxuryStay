@@ -1,26 +1,59 @@
 from sqlalchemy import (
 	Column,
 	Integer,
-	String,
 	Text,
 	Boolean,
 	TIMESTAMP,
 	func,
 	ForeignKey,
 )
+from sqlalchemy.dialects.postgresql import ENUM
 from app.database.postgres_connection import Base
+
+
+# ENUM definitions (must match PostgreSQL enums)
+notification_type_enum = ENUM(
+	"SYSTEM",
+	"PROMOTIONAL",
+	"REMINDER",
+	"TRANSACTIONAL",
+	"SECURITY",
+	"OTHER",
+	name="notification_type",
+	create_type=False,  # already created in DB
+)
+
+entity_type_enum = ENUM(
+	"BOOKING",
+	"PAYMENT",
+	"REFUND",
+	"ISSUE",
+	"OFFER",
+	"REVIEW",
+	"WISHLIST",
+	"USER_ACCOUNT",
+	"SYSTEM",
+	"ROOM",
+	name="entity_type_enum",
+	create_type=False,  # already created in DB
+)
 
 
 class Notifications(Base):
 	__tablename__ = "notifications"
 
 	notification_id = Column(Integer, primary_key=True, autoincrement=True)
-	recipient_user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
-	notification_type = Column(String(50), server_default="OTHER")
-	entity_type = Column(String(50), nullable=True)
+	recipient_user_id = Column(
+		Integer,
+		ForeignKey("users.user_id", ondelete="CASCADE"),
+		nullable=False,
+	)
+	notification_type = Column(notification_type_enum, server_default="OTHER", nullable=False)
+	entity_type = Column(entity_type_enum, nullable=True)
 	entity_id = Column(Integer, nullable=True)
-	title = Column(String(150), nullable=False)
+	title = Column(Text, nullable=False)
 	message = Column(Text, nullable=False)
-	is_read = Column(Boolean, server_default="false")
+	is_read = Column(Boolean, server_default="false", nullable=False)
 	created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
-	is_deleted = Column(Boolean, server_default="false")
+	read_at = Column(TIMESTAMP(timezone=True), nullable=True)
+	is_deleted = Column(Boolean, server_default="false", nullable=False)

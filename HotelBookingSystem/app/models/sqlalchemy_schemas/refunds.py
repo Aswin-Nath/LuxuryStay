@@ -26,7 +26,8 @@ class Refunds(Base):
     completed_at = Column(TIMESTAMP(timezone=True), nullable=True)
     remarks = Column(Text, nullable=True)
     is_deleted = Column(Boolean, server_default="false")
-    transaction_method_id = Column(Integer, ForeignKey("payment_method_utility.method_id", ondelete="RESTRICT"), nullable=False)
+    # transaction details are nullable because the refund transfer may be processed later
+    transaction_method_id = Column(Integer, ForeignKey("payment_method_utility.method_id", ondelete="RESTRICT"), nullable=True)
     transaction_number = Column(String(100), nullable=True)
 
 
