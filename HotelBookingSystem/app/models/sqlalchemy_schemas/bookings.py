@@ -38,6 +38,9 @@ class Bookings(Base):
     primary_customer_phone_number = Column(Text, nullable=True)
     primary_customer_dob = Column(Date, nullable=True)
 
+    is_post_edit_done = Column(Boolean, server_default="false", nullable=True)
+    is_pre_edit_done = Column(Boolean, server_default="false", nullable=True)
+    
     # relationships
     rooms = relationship("BookingRoomMap", back_populates="booking", cascade="all, delete-orphan")
     taxes = relationship("BookingTaxMap", backref="booking", cascade="all, delete-orphan")
@@ -52,11 +55,13 @@ class BookingRoomMap(Base):
     adults = Column(SmallInteger, nullable=False)
     children = Column(SmallInteger, server_default="0")
     offer_discount_percent = Column(Numeric(5, 2), server_default="0")
-    is_removed = Column(Boolean, server_default="false")
-    removed_at = Column(TIMESTAMP(timezone=True), nullable=True)
-    modified_in_edit_id = Column(Integer, nullable=True)
+    is_pre_edited_room = Column(Boolean, server_default="false", nullable=True)
+    is_post_edited_room = Column(Boolean, server_default="false", nullable=True)
+    is_room_active = Column(Boolean, server_default="true", nullable=True)
+    rating_given = Column(Integer, server_default="0", nullable=True)
 
     booking = relationship("Bookings", back_populates="rooms")
+
 
 
 class BookingTaxMap(Base):

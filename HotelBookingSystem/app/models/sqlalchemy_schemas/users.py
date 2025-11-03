@@ -25,7 +25,7 @@ class Users(Base):
     is_deleted = Column(Boolean, server_default="false")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-
+    profile_image_url=Column(String(150),unique=True,nullable=True)
     # relationships
     role = relationship("Roles", back_populates="users")
     status = relationship("StatusUtility", back_populates="users")

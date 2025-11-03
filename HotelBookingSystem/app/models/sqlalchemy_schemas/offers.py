@@ -29,6 +29,11 @@ class Offer(Base):
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     is_deleted = Column(Boolean, default=False)
 
+    # Newly added columns
+    offer_url = Column(String(255), nullable=True)
+    visibility_status = Column(String(50), server_default="AVAILABLE", nullable=False)
+
+
     # Relationships
     room_mappings = relationship(
         "OfferRoomMap",
