@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List
 from sqlalchemy import select
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,7 +9,6 @@ from decimal import Decimal
 
 from app.models.sqlalchemy_schemas.offers import Offer, OfferRoomMap
 from app.models.sqlalchemy_schemas.rooms import RoomTypes
-from app.models.sqlalchemy_schemas.users import Users
 
 
 async def create_offer(db: AsyncSession, payload, created_by: int | None = None) -> Offer:

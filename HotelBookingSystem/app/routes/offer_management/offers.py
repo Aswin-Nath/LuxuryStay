@@ -1,18 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, status, Query
 from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.postgres_connection import get_db
-from app.models.pydantic_models.offers import OfferCreate, OfferRoomMapBase, OfferResponse
-from app.models.sqlalchemy_schemas.offers import OfferRoomMap
+from app.models.pydantic_models.offers import OfferCreate, OfferResponse
 from app.services.offer_service.offers_service import create_offer as svc_create_offer, get_offer as svc_get_offer, list_offers as svc_list_offers
 from app.services.offer_service.offers_service import update_offer as svc_update_offer, soft_delete_offer as svc_soft_delete_offer
 from app.dependencies.authentication import get_user_permissions, get_current_user
 from app.models.sqlalchemy_schemas.users import Users
 from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
 from app.core.exceptions import ForbiddenError
-from pydantic import Field
-from decimal import Decimal
 
 
 router = APIRouter(prefix="/api/offers", tags=["OFFERS"])

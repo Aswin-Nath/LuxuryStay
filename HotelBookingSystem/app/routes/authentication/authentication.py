@@ -1,11 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.postgres_connection import get_db
 from app.models.sqlalchemy_schemas.users import Users
-from app.models.sqlalchemy_schemas.roles import Roles
-from app.models.sqlalchemy_schemas.authentication import Sessions, Verifications, VerificationType
-from app.models.pydantic_models.users import UserCreate, LoginRequest, UserResponse, TokenResponse
+from app.models.pydantic_models.users import UserCreate, UserResponse, TokenResponse
 
 from app.services.authentication_service.authentication_usecases import (
     signup as svc_signup,
@@ -24,7 +21,6 @@ from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
 from pydantic import BaseModel
 from typing import Optional
 from app.core.security import oauth2_scheme
-from datetime import datetime
 
 
 class OTPRequest(BaseModel):

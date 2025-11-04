@@ -1,6 +1,5 @@
 from typing import Optional
 from datetime import datetime
-from fastapi import status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 

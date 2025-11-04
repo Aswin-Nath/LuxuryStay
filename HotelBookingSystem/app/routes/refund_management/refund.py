@@ -1,10 +1,8 @@
-from fastapi import APIRouter, Depends, status
-from typing import List, Optional
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.postgres_connection import get_db
-from app.models.pydantic_models.refunds import RefundCreate, RefundResponse, RefundTransactionUpdate
-from app.models.pydantic_models.refunds import RefundRoomMapCreate
+from app.models.pydantic_models.refunds import RefundResponse, RefundTransactionUpdate
 from app.services.refunds_service.refunds_service import update_refund_transaction as svc_update_refund
 from app.dependencies.authentication import get_current_user, ensure_not_basic_user
 from app.models.sqlalchemy_schemas.users import Users

@@ -1,10 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from typing import List
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.postgres_connection import get_db
-from app.models.sqlalchemy_schemas.rooms import RoomAmenities
 from app.models.pydantic_models.room import AmenityCreate, AmenityResponse, Amenity
 from fastapi import Depends
 from app.dependencies.authentication import get_user_permissions

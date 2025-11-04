@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 
-from app.models.sqlalchemy_schemas.permissions import Permissions, PermissionRoleMap, Resources, PermissionTypes
+from app.models.sqlalchemy_schemas.permissions import Permissions, PermissionRoleMap, Resources
 from app.models.sqlalchemy_schemas.roles import Roles
 
 

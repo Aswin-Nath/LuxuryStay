@@ -1,13 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status,Query
+from fastapi import APIRouter, Depends,Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from typing import List
 
 from app.database.postgres_connection import get_db
-from app.models.sqlalchemy_schemas.permissions import Permissions, Resources, PermissionTypes,PermissionRoleMap
-from app.models.sqlalchemy_schemas.roles import Roles
-from app.models.pydantic_models.permissions import PermissionCreate, PermissionResponse,RolePermissionAssign,RolePermissionResponse
-from sqlalchemy.exc import IntegrityError
+from app.models.pydantic_models.permissions import PermissionResponse,RolePermissionAssign,RolePermissionResponse
 from app.services.roles_and_permissions_service.permissions_service import (
     assign_permissions_to_role as svc_assign_permissions_to_role,
     get_permissions_by_role as svc_get_permissions_by_role,

@@ -53,7 +53,7 @@ async def upload_image_for_room(
     """
     try:
         image_url = await save_uploaded_image(image)
-
+        
         obj = await create_image(
             db,
             entity_type="room",

@@ -1,4 +1,3 @@
-from typing import List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
@@ -6,7 +5,7 @@ from decimal import Decimal
 from datetime import datetime
 
 from app.models.sqlalchemy_schemas.refunds import Refunds, RefundRoomMap
-from app.models.sqlalchemy_schemas.bookings import Bookings, BookingRoomMap
+from app.models.sqlalchemy_schemas.bookings import Bookings
 from app.models.sqlalchemy_schemas.rooms import Rooms
 from app.models.sqlalchemy_schemas.payment_method import PaymentMethodUtility
 

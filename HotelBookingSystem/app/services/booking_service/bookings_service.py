@@ -7,10 +7,8 @@ from decimal import Decimal
 from collections import Counter
 
 from app.models.sqlalchemy_schemas.bookings import Bookings, BookingRoomMap, BookingTaxMap
-from app.models.sqlalchemy_schemas.rooms import Rooms, RoomTypes, RoomStatus
+from app.models.sqlalchemy_schemas.rooms import Rooms, RoomStatus
 from app.models.sqlalchemy_schemas.tax_utility import TaxUtility
-from app.models.pydantic_models.notifications import NotificationCreate
-from app.services.notification_service.notifications_service import add_notification as svc_add_notification
 from app.models.sqlalchemy_schemas.notifications import Notifications
 from app.models.sqlalchemy_schemas.payments import Payments as PaymentsModel
 from app.models.pydantic_models.payments import BookingPaymentCreate
