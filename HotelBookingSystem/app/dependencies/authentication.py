@@ -10,7 +10,7 @@ from app.models.sqlalchemy_schemas.users import Users
 from app.models.sqlalchemy_schemas.permissions import Permissions,PermissionRoleMap
 from app.core.security import oauth2_scheme
 from app.models.sqlalchemy_schemas.authentication import BlacklistedTokens
-from app.services.auth import _hash_token
+from app.services.authentication_service.auth import _hash_token
 
 load_dotenv()
 

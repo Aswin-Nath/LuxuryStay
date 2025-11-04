@@ -10,7 +10,7 @@ from fastapi import Depends
 from app.dependencies.authentication import get_user_permissions
 from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
 from app.core.exceptions import ForbiddenError
-from app.services.room_management.rooms_service import (
+from app.services.room_service.rooms_service import (
     create_room as svc_create_room,
     list_rooms as svc_list_rooms,
     get_room as svc_get_room,
