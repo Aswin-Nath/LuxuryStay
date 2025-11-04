@@ -4,7 +4,7 @@ from fastapi import status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.authentication_service import auth as auth_helpers
+from app.services.authentication_service import authentication_core
 from app.core.exceptions import NotFoundError, BadRequestError, UnauthorizedError, ConflictError
 from app.models.pydantic_models.users import UserCreate, TokenResponse
 from app.models.sqlalchemy_schemas.users import Users
@@ -22,7 +22,7 @@ async def signup(db: AsyncSession, payload: UserCreate, created_by: Optional[int
     if existing:
         raise ConflictError("Email already registered")
 
-    user_obj = await auth_helpers.create_user(db, full_name=payload.full_name, email=payload.email, password=payload.password, phone_number=payload.phone_number, role_id=1, status_id=1, created_by=created_by)
+    user_obj = await authentication_core.create_user(db, full_name=payload.full_name, email=payload.email, password=payload.password, phone_number=payload.phone_number, role_id=1, status_id=1, created_by=created_by)
     return user_obj
 
 
@@ -38,11 +38,11 @@ async def request_otp(db: AsyncSession, email: str, verification_type: Optional[
     except KeyError:
         raise BadRequestError("Invalid verification_type")
 
-    ver = await auth_helpers.create_verification(db, user.user_id, vtype, ip=client_host)
+    ver = await authentication_core.create_verification(db, user.user_id, vtype, ip=client_host)
 
     subject = "Your OTP Code"
     body = f"Your OTP is: {ver.otp_code}. It expires at {ver.expires_at} UTC."
-    sent = auth_helpers._send_email(user.email, subject, body)
+    sent = authentication_core._send_email(user.email, subject, body)
 
     response = {"message": "OTP created"}
     if not sent:
@@ -62,32 +62,32 @@ async def verify_otp_flow(db: AsyncSession, email: str, otp: str, verification_t
     except KeyError:
         raise BadRequestError("Invalid verification_type")
 
-    ok, res = await auth_helpers.verify_otp(db, user.user_id, otp, vtype)
+    ok, res = await authentication_core.verify_otp(db, user.user_id, otp, vtype)
     if not ok:
         raise BadRequestError(res)
 
     if vtype == VerificationType.PASSWORD_RESET and new_password:
-        await auth_helpers.update_user_password(db, user, new_password)
+        await authentication_core.update_user_password(db, user, new_password)
         return {"message": "Password reset successful"}
 
     return {"message": "OTP verified"}
 
 
 async def change_password(db: AsyncSession, current_user: Users, current_password: str, new_password: str):
-    auth_user = await auth_helpers.authenticate_user(db, email=current_user.email, password=current_password)
+    auth_user = await authentication_core.authenticate_user(db, email=current_user.email, password=current_password)
     if not auth_user:
         raise UnauthorizedError("Current password incorrect")
 
-    await auth_helpers.update_user_password(db, current_user, new_password)
+    await authentication_core.update_user_password(db, current_user, new_password)
     return {"message": "Password changed successfully"}
 
 
 async def login_flow(db: AsyncSession, username: str, password: str, device_info: Optional[str] = None, client_host: Optional[str] = None) -> TokenResponse:
-    user = await auth_helpers.authenticate_user(db, email=username, password=password)
+    user = await authentication_core.authenticate_user(db, email=username, password=password)
     if not user:
         raise UnauthorizedError("Invalid credentials")
 
-    session = await auth_helpers.create_session(db, user, device_info=device_info, ip=client_host)
+    session = await authentication_core.create_session(db, user, device_info=device_info, ip=client_host)
 
     expires_in = (
         int((session.access_token_expires_at - session.login_time).total_seconds())
@@ -106,7 +106,7 @@ async def login_flow(db: AsyncSession, username: str, password: str, device_info
 
 async def refresh_tokens(db: AsyncSession, refresh_token: str) -> TokenResponse:
     try:
-        session = await auth_helpers.refresh_access_token(db, refresh_token)
+        session = await authentication_core.refresh_access_token(db, refresh_token)
     except Exception as e:
         raise UnauthorizedError(str(e))
 
@@ -133,7 +133,7 @@ async def logout_flow(db: AsyncSession, access_token: str):
     if not session:
         raise NotFoundError("Session not found")
 
-    await auth_helpers.revoke_session(db, session=session, reason="user_logout")
+    await authentication_core.revoke_session(db, session=session, reason="user_logout")
     return {"message": "Logged out"}
 
 
@@ -144,7 +144,7 @@ async def register_admin(db: AsyncSession, payload: UserCreate, current_user_id:
     if result.scalars().first():
         raise ConflictError("Email already registered")
 
-    user_obj = await auth_helpers.create_user(
+    user_obj = await authentication_core.create_user(
         db,
         full_name=payload.full_name,
         email=payload.email,

@@ -6,15 +6,8 @@ from app.models.sqlalchemy_schemas.users import Users
 from app.models.sqlalchemy_schemas.roles import Roles
 from app.models.sqlalchemy_schemas.authentication import Sessions, Verifications, VerificationType
 from app.models.pydantic_models.users import UserCreate, LoginRequest, UserResponse, TokenResponse
-from app.services.authentication_service.auth import (
-    authenticate_user,
-    create_session,
-    create_verification,
-    verify_otp,
-    update_user_password,
-    _send_email,
-)
-from app.services.authentication_service.auth_service import (
+
+from app.services.authentication_service.authentication_usecases import (
     signup as svc_signup,
     request_otp as svc_request_otp,
     verify_otp_flow as svc_verify_otp,
@@ -31,7 +24,6 @@ from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
 from pydantic import BaseModel
 from typing import Optional
 from app.core.security import oauth2_scheme
-from app.services.authentication_service.auth import blacklist_token, revoke_session, refresh_access_token
 from datetime import datetime
 
 
