@@ -151,7 +151,7 @@ async def update_offer(db: AsyncSession, offer_id: int, payload, updated_by: int
     rooms = data.pop("rooms", [])
     if updated_by is not None:
         data["created_by"] = updated_by
-
+    
     # --- Update scalar fields (include offer_price)
     for attr in (
         "offer_name",
@@ -161,6 +161,7 @@ async def update_offer(db: AsyncSession, offer_id: int, payload, updated_by: int
         "start_date",
         "expiry_date",
         "offer_price",
+        "visibility_status"
     ):
         if attr in data:
             setattr(offer, attr, data.get(attr))
@@ -231,11 +232,11 @@ async def update_offer(db: AsyncSession, offer_id: int, payload, updated_by: int
     return hydrated_offer
 
 
-async def soft_delete_offer(db: AsyncSession, offer_id: int, deleted_by: int | None = None) -> None:
+async def soft_delete_offer(db: AsyncSession, offer_id: int, deleted_by: int | None = None):
     q = await db.execute(select(Offer).where(Offer.offer_id == offer_id))
     offer = q.scalars().first()
     if not offer:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Offer not found")
     offer.is_deleted = True
     await db.commit()
-    return None
+    return {"message":"offer deleted successfully"}

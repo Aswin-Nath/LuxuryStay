@@ -7,7 +7,7 @@ from app.routes.room_management import router as room_management_router
 from app.routes.offer_management.offers import router as offers_router
 from app.routes.booking_management.booking import router as booking_customer_router
 from app.routes.wishlist_management.wishlist import router as wishlist_router
-from app.routes.notifications.notifications import router as notifications_router
+from app.routes.notifications_management.notifications import router as notifications_router
 from app.routes.issue_management.issues import router as issue_router
 from app.routes.reviews_management.reviews import router as reviews_router
 from app.routes.refund_management.refund import router as refunds_router
