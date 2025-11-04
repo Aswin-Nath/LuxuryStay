@@ -1,13 +1,14 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Literal, Any
 from datetime import date, time, datetime
 from app.models.pydantic_models.payments import BookingPaymentCreate
 
 
+# ─────────────────────────────────────────────
+# BOOKING CREATION
+# ─────────────────────────────────────────────
 class BookingCreate(BaseModel):
     user_id: int
-    # During creation clients provide only room type ids (ints).
-    # Backend will allocate actual room_ids for the requested room_type_ids and return detailed room-map objects in responses.
     rooms: Optional[List[int]] = []
     room_count: int = Field(..., ge=1)
     check_in: date
@@ -20,10 +21,12 @@ class BookingCreate(BaseModel):
     primary_customer_name: Optional[str] = None
     primary_customer_phone_number: Optional[str] = None
     primary_customer_dob: Optional[date] = None
-    # Optional payment details: when provided, backend will create a Payments row for the booking
-    payment: Optional[BookingPaymentCreate] = None
+    payment: Optional[BookingPaymentCreate] = None  # Optional payment info
 
 
+# ─────────────────────────────────────────────
+# BOOKING RESPONSE
+# ─────────────────────────────────────────────
 class BookingResponse(BaseModel):
     booking_id: int
     user_id: int
@@ -37,7 +40,7 @@ class BookingResponse(BaseModel):
     offer_discount_percent: float
     status: str
     is_deleted: bool
-    created_at: Optional[datetime] = None  # ✅ allow missing
+    created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     primary_customer_name: Optional[str]
     primary_customer_phone_number: Optional[str]
@@ -48,6 +51,9 @@ class BookingResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ─────────────────────────────────────────────
+# ROOM MAP MODELS
+# ─────────────────────────────────────────────
 class BookingRoomMapCreate(BaseModel):
     booking_id: int
     room_id: int
@@ -58,13 +64,18 @@ class BookingRoomMapCreate(BaseModel):
 
 
 class BookingRoomMapResponse(BookingRoomMapCreate):
-    is_removed: bool
-    removed_at: Optional[datetime]
-    modified_in_edit_id: Optional[int]
+    is_pre_edited_room: Optional[bool] = False
+    is_post_edited_room: Optional[bool] = False
+    is_room_active: Optional[bool] = True
+    rating_given: Optional[int] = 0
+    edit_suggested_rooms: Optional[Any] = None  # JSONB array of room_ids suggested by admin
 
     model_config = {"from_attributes": True}
 
 
+# ─────────────────────────────────────────────
+# TAX MAP MODELS
+# ─────────────────────────────────────────────
 class BookingTaxMapCreate(BaseModel):
     booking_id: int
     tax_id: int
@@ -75,3 +86,4 @@ class BookingTaxMapResponse(BookingTaxMapCreate):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+

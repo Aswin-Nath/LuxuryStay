@@ -135,6 +135,16 @@ Customer base path: `/api/issues`
 - POST `/{issue_id}/chat` — Post chat/message to an issue (201)
 - GET `/{issue_id}/chat` — List chats for an issue
 
+## Booking Edits
+
+Base path: `/api/booking-edits`
+
+- POST `/` — Create a booking edit request (request: `BookingEditCreate`, response: `BookingEditResponse`) (201) — authenticated
+- GET `/active` — Get the current active booking-edit for the user (response: `BookingEditResponse | None`)
+- GET `/{booking_id}` — List booking-edit requests for a booking (response: list[`BookingEditResponse`])
+- POST `/{edit_id}/review` — Submit reviewer feedback for an edit request (authenticated reviewer)
+- POST `/{edit_id}/decision` — Submit decision on a booking edit (approve/deny) — permission-protected
+
 Admin base path: `/api/admin/issues`
 
 - GET `/` — List issues (admin permission: ISSUE_RESOLUTION.WRITE)

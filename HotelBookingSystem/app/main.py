@@ -43,3 +43,5 @@ app.include_router(reviews_router)
 from app.routes.refunds import router as refunds_router
 
 app.include_router(refunds_router)
+from app.routes.booking_edits import router as booking_edits_router
+app.include_router(booking_edits_router)
