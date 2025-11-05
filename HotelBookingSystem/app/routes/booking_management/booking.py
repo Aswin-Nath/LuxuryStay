@@ -3,8 +3,8 @@ from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.postgres_connection import get_db
-from app.models.pydantic_models.refunds import RefundCreate, RefundResponse
-from app.models.pydantic_models.booking import BookingCreate, BookingResponse
+from app.schemas.pydantic_models.refunds import RefundCreate, RefundResponse
+from app.schemas.pydantic_models.booking import BookingCreate, BookingResponse
 from app.services.booking_service.bookings_service import create_booking as svc_create_booking, get_booking as svc_get_booking, list_bookings as svc_list_bookings, query_bookings as svc_query_bookings
 from app.models.sqlalchemy_schemas.users import Users
 from app.dependencies.authentication import get_current_user, get_user_permissions

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.postgres_connection import get_db
-from app.models.pydantic_models.room import RoomAmenityMapCreate, RoomAmenityMapResponse
+from app.schemas.pydantic_models.room import RoomAmenityMapCreate, RoomAmenityMapResponse
 from fastapi import Depends
 from app.dependencies.authentication import get_user_permissions
 from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes

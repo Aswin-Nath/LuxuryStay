@@ -11,7 +11,7 @@ from app.models.sqlalchemy_schemas.rooms import Rooms, RoomStatus
 from app.models.sqlalchemy_schemas.tax_utility import TaxUtility
 from app.models.sqlalchemy_schemas.notifications import Notifications
 from app.models.sqlalchemy_schemas.payments import Payments as PaymentsModel
-from app.models.pydantic_models.payments import BookingPaymentCreate
+from app.schemas.pydantic_models.payments import BookingPaymentCreate
 
 
 async def create_booking(db: AsyncSession, payload) -> Bookings:

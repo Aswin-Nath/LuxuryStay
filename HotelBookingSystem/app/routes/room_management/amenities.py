@@ -3,7 +3,7 @@ from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.postgres_connection import get_db
-from app.models.pydantic_models.room import AmenityCreate, AmenityResponse, Amenity, Room
+from app.schemas.pydantic_models.room import AmenityCreate, AmenityResponse, Amenity, Room
 from app.dependencies.authentication import get_user_permissions, get_current_user
 from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
 from app.core.exceptions import ForbiddenError

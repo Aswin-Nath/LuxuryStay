@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.postgres_connection import get_db
 from app.dependencies.authentication import get_current_user, get_user_permissions
 from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
-from app.models.pydantic_models.booking_edits import BookingEditCreate, BookingEditResponse,ReviewPayload,DecisionPayload
+from app.schemas.pydantic_models.booking_edits import BookingEditCreate, BookingEditResponse,ReviewPayload,DecisionPayload
 from app.services.booking_service.booking_edit import (
     create_booking_edit_service,
     get_active_booking_edit_service,

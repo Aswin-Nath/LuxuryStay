@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.authentication_service import authentication_core
 from app.core.exceptions import NotFoundError, BadRequestError, UnauthorizedError, ConflictError
-from app.models.pydantic_models.users import UserCreate, TokenResponse
+from app.schemas.pydantic_models.users import UserCreate, TokenResponse
 from app.models.sqlalchemy_schemas.users import Users
 from app.models.sqlalchemy_schemas.authentication import VerificationType, Sessions
 

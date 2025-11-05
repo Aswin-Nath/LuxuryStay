@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from datetime import date, datetime
 from typing import Optional, List, Any
 from decimal import Decimal
-from app.models.pydantic_models.room import RoomType
+from app.schemas.pydantic_models.room import RoomType
 
 
 # ==============================================================
@@ -59,4 +59,4 @@ class OfferResponse(BaseModel):
 # ------------------------------------------------------------------
 # Room type shape used when embedding room type data into Offer responses
 # ------------------------------------------------------------------
-# Note: use the canonical RoomType pydantic model defined in `app.models.pydantic_models.room`.
+# Note: use the canonical RoomType pydantic model defined in `app.schemas.pydantic_models.room`.

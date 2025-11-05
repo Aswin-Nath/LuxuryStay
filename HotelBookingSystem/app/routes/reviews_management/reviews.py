@@ -3,8 +3,8 @@ from typing import List, Optional, Union
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.postgres_connection import get_db
-from app.models.pydantic_models.reviews import ReviewCreate, ReviewResponse, AdminResponseCreate
-from app.models.pydantic_models.reviews import ReviewUpdate
+from app.schemas.pydantic_models.reviews import ReviewCreate, ReviewResponse, AdminResponseCreate
+from app.schemas.pydantic_models.reviews import ReviewUpdate
 from app.services.reviews_service.reviews_service import (
     create_review as svc_create_review,
     get_review as svc_get_review,
@@ -16,7 +16,7 @@ from app.dependencies.authentication import get_current_user, ensure_not_basic_u
 from app.models.sqlalchemy_schemas.users import Users
 from app.services.images_service.image_upload_service import save_uploaded_image
 from app.services.room_service.images_service import create_image, hard_delete_image, get_images_for_review
-from app.models.pydantic_models.images import ImageResponse
+from app.schemas.pydantic_models.images import ImageResponse
 from app.core.cache import get_cached, set_cached, invalidate_pattern
 
 

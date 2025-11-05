@@ -7,7 +7,7 @@ import asyncio
 from app.models.sqlalchemy_schemas.issues import Issues, IssueChat
 from app.services.images_service.image_upload_service import save_uploaded_image
 from app.services.room_service.images_service import create_image
-from app.models.pydantic_models.notifications import NotificationCreate
+from app.schemas.pydantic_models.notifications import NotificationCreate
 from app.services.notification_service.notifications_service import add_notification as svc_add_notification
 
 

@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
-from app.models.pydantic_models.images import ImageResponse
+from app.schemas.pydantic_models.images import ImageResponse
 
 
 class ReviewBase(BaseModel):

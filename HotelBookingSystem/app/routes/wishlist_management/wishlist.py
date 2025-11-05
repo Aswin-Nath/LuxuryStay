@@ -3,7 +3,7 @@ from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.postgres_connection import get_db
-from app.models.pydantic_models.wishlist import WishlistCreate, WishlistResponse
+from app.schemas.pydantic_models.wishlist import WishlistCreate, WishlistResponse
 from app.services.wishlist_service.wishlist_service import add_to_wishlist as svc_add, list_user_wishlist as svc_list, remove_wishlist as svc_remove, get_wishlist_item as svc_get_item
 from app.dependencies.authentication import get_current_user
 from app.models.sqlalchemy_schemas.users import Users

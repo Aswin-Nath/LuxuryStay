@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.sqlalchemy_schemas.refunds import Refunds, RefundRoomMap
 from app.models.sqlalchemy_schemas.bookings import Bookings, BookingEdits, BookingRoomMap
 from app.models.sqlalchemy_schemas.rooms import Rooms
-from app.models.pydantic_models.booking_edits import BookingEditCreate, BookingEditResponse,ReviewPayload,DecisionPayload
+from app.schemas.pydantic_models.booking_edits import BookingEditCreate, BookingEditResponse,ReviewPayload,DecisionPayload
 from decimal import Decimal
 
 # ✅ Create Booking Edit

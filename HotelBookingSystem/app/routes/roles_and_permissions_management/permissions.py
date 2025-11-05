@@ -3,13 +3,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
 from app.database.postgres_connection import get_db
-from app.models.pydantic_models.permissions import PermissionResponse,RolePermissionAssign,RolePermissionResponse
+from app.schemas.pydantic_models.permissions import PermissionResponse,RolePermissionAssign,RolePermissionResponse
 from app.services.roles_and_permissions_service.permissions_service import (
     assign_permissions_to_role as svc_assign_permissions_to_role,
     get_permissions_by_role as svc_get_permissions_by_role,
     get_permissions_by_resources as svc_get_permissions_by_resources,
     get_roles_for_permission as svc_get_roles_for_permission,
 )
+from app.dependencies.authentication import get_user_permissions, ensure_not_basic_user
 
 permissions_router = APIRouter(prefix="/permissions", tags=["PERMISSIONS"])
 
@@ -19,7 +20,10 @@ permissions_router = APIRouter(prefix="/permissions", tags=["PERMISSIONS"])
 # 2️⃣ ASSIGN PERMISSIONS TO A ROLE
 # ==============================================================
 @permissions_router.post("/assign", response_model=RolePermissionResponse)
-async def assign_permissions_to_role(payload: RolePermissionAssign, db: AsyncSession = Depends(get_db)):
+async def assign_permissions_to_role(payload: RolePermissionAssign, db: AsyncSession = Depends(get_db), _ok: bool = Depends(ensure_not_basic_user), user_perms: dict = Depends(get_user_permissions)):
+    # Require ADMIN_CREATION:READ permission to access permissions assignment endpoints
+    if not user_perms or "ADMIN_CREATION" not in user_perms or "READ" not in user_perms.get("ADMIN_CREATION", set()):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient privileges: ADMIN_CREATION:READ required")
     res = await svc_assign_permissions_to_role(db, payload.role_id, payload.permission_ids)
     return RolePermissionResponse.model_validate(res)
 
@@ -37,6 +41,8 @@ async def get_permissions(
     role_id: int | None = Query(None, description="Role id to fetch permissions for"),
     resources: List[str] | None = Query(None, description="List of resources to filter by"),
     db: AsyncSession = Depends(get_db),
+    _ok: bool = Depends(ensure_not_basic_user),
+    user_perms: dict = Depends(get_user_permissions),
 ):
     # Require at least one filter and only one at a time to avoid ambiguous responses
     provided = sum(x is not None for x in (permission_id, role_id, resources))
@@ -44,6 +50,10 @@ async def get_permissions(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provide one of: permission_id, role_id or resources")
     if provided > 1:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provide only one of: permission_id, role_id or resources at a time")
+
+    # Require ADMIN_CREATION:READ permission to access permissions endpoints
+    if not user_perms or "ADMIN_CREATION" not in user_perms or "READ" not in user_perms.get("ADMIN_CREATION", set()):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient privileges: ADMIN_CREATION:READ required")
 
     if permission_id is not None:
         roles = await svc_get_roles_for_permission(db, permission_id)

@@ -21,7 +21,7 @@ from app.services.issue_service.issues_service import (
     add_chat as svc_add_chat,
     list_chats as svc_list_chats,
 )
-from app.models.pydantic_models.issues import IssueResponse
+from app.schemas.pydantic_models.issues import IssueResponse
 from app.core.exceptions import ForbiddenError
 from app.core.cache import get_cached, set_cached, invalidate_pattern
 

@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List, Literal, Any
 from datetime import date, time, datetime
-from app.models.pydantic_models.payments import BookingPaymentCreate
+from app.schemas.pydantic_models.payments import BookingPaymentCreate
 
 
 # ─────────────────────────────────────────────

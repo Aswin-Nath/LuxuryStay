@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.postgres_connection import get_db
 from app.models.sqlalchemy_schemas.users import Users
-from app.models.pydantic_models.users import UserCreate, UserResponse, TokenResponse
+from app.schemas.pydantic_models.users import UserCreate, UserResponse, TokenResponse
 
 from app.services.authentication_service.authentication_usecases import (
     signup as svc_signup,

@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.postgres_connection import get_db
 from app.dependencies.authentication import get_current_user
 from app.models.sqlalchemy_schemas.users import Users
-from app.models.pydantic_models.users import ProfileResponse, ProfileUpdate, ChangePasswordPayload
+from app.schemas.pydantic_models.users import ProfileResponse, ProfileUpdate, ChangePasswordPayload
 from app.services.images_service.image_upload_service import save_uploaded_image
 from app.services.authentication_service.authentication_usecases import change_password as svc_change_password
 from app.core.cache import invalidate_pattern, get_cached, set_cached
