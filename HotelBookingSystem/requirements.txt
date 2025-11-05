@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+sqlalchemy[asyncio]
+asyncpg
+motor
+python-dotenv
+pydantic
+python-jose[cryptography]
+httpx
+python-multipart
+email-validator
+passlib[bcrypt]
+bcrypt
+aiofiles
+loguru
