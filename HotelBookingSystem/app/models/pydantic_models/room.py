@@ -70,6 +70,8 @@ class RoomCreate(BaseModel):
     model_config = {"from_attributes": True}
 
 
+
+
 class RoomResponse(BaseModel):
     room_id: int
     room_no: str
@@ -136,5 +138,28 @@ class RoomAmenityMapResponse(RoomAmenityMapCreate):
 class RoomAmenityMap(BaseModel):
     room_id: int
     amenity_id: int
+
+    model_config = {"from_attributes": True}
+
+
+# ==============================================================
+# UPDATE MODELS (all fields optional to allow partial updates)
+# ==============================================================
+class RoomTypeUpdate(BaseModel):
+    type_name: Optional[str] = None
+    max_adult_count: Optional[int] = None
+    max_child_count: Optional[int] = None
+    price_per_night: Optional[float] = None
+    description: Optional[str] = None
+    square_ft: Optional[int] = None
+
+    model_config = {"from_attributes": True}
+
+
+class RoomUpdate(BaseModel):
+    room_no: Optional[str] = None
+    room_type_id: Optional[int] = None
+    room_status: Optional[RoomStatus] = None
+    freeze_reason: Optional[FreezeReason] = None
 
     model_config = {"from_attributes": True}

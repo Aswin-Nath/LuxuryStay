@@ -86,7 +86,7 @@ async def save_uploaded_image(image: UploadFile) -> str:
     github_repo = os.getenv("GITHUB_UPLOAD_REPO")
     github_path = os.getenv("GITHUB_UPLOAD_PATH", "images").lstrip("/")
     github_branch = os.getenv("GITHUB_BRANCH", "main")
-
+    print("DATA",github_branch,github_path,github_token,github_repo)
     if github_token and github_repo:
         try:
             owner, repo = github_repo.split("/", 1)

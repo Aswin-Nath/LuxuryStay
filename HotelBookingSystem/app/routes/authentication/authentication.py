@@ -8,7 +8,6 @@ from app.services.authentication_service.authentication_usecases import (
     signup as svc_signup,
     request_otp as svc_request_otp,
     verify_otp_flow as svc_verify_otp,
-    change_password as svc_change_password,
     login_flow as svc_login_flow,
     refresh_tokens as svc_refresh_tokens,
     logout_flow as svc_logout_flow,
@@ -71,14 +70,7 @@ async def verify_otp_endpoint(payload: OTPVerify, db: AsyncSession = Depends(get
     return await svc_verify_otp(db, payload.email, payload.otp, payload.verification_type, payload.new_password)
 
 
-@auth_router.post("/change-password")
-async def change_password(
-    payload: ChangePasswordRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: Users = Depends(get_current_user),
-):
-    """Authenticated endpoint to change password given current password."""
-    return await svc_change_password(db, current_user, payload.current_password, payload.new_password)
+
 
 
 @auth_router.post("/login", response_model=TokenResponse)

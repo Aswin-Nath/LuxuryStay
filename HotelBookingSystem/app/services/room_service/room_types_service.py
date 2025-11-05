@@ -41,11 +41,14 @@ async def update_room_type(db: AsyncSession, room_type_id: int, payload) -> Room
     if not obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room type not found")
 
-    await db.execute(
-        update(RoomTypes)
-        .where(RoomTypes.room_type_id == room_type_id)
-        .values(**payload.model_dump())
-    )
+    # Only update fields provided by the client to avoid overwriting existing values.
+    data = payload.model_dump(exclude_unset=True)
+    if data:
+        await db.execute(
+            update(RoomTypes)
+            .where(RoomTypes.room_type_id == room_type_id)
+            .values(**data)
+        )
     await db.commit()
     res = await db.execute(select(RoomTypes).where(RoomTypes.room_type_id == room_type_id))
     obj = res.scalars().first()

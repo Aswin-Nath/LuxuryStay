@@ -7,7 +7,6 @@ from .rooms_service import (
     list_rooms,
     get_room,
     update_room,
-    change_room_status,
     delete_room,
 )
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends,Query
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
@@ -25,34 +25,38 @@ async def assign_permissions_to_role(payload: RolePermissionAssign, db: AsyncSes
 
 
 # ==============================================================
-# 3️⃣ GET PERMISSIONS BY ROLE_ID
+# Consolidated GET endpoint for permissions
+# Supports three modes (provide exactly one):
+#  - role_id -> returns permissions assigned to a role
+#  - resources (list) -> returns permissions for the given resources
+#  - permission_id -> returns roles assigned to that permission
 # ==============================================================
-@permissions_router.get("/by-role/{role_id}", response_model=List[PermissionResponse])
-async def get_permissions_by_role(role_id: int, db: AsyncSession = Depends(get_db)):
-    permissions = await svc_get_permissions_by_role(db, role_id)
-    return [PermissionResponse.model_validate(p).model_copy(update={"message": "Fetched successfully"}) for p in permissions]
-
-
-# ==============================================================
-# 4️⃣ GET PERMISSIONS BY MULTIPLE RESOURCES
-# ==============================================================
-@permissions_router.get("/by-resources", response_model=List[PermissionResponse])
-async def get_permissions_by_resources(
-    resources: List[str] = Query(..., description="List of resources to filter by"),
-    db: AsyncSession = Depends(get_db)
+@permissions_router.get("/")
+async def get_permissions(
+    permission_id: int | None = Query(None, description="Permission id to fetch roles for"),
+    role_id: int | None = Query(None, description="Role id to fetch permissions for"),
+    resources: List[str] | None = Query(None, description="List of resources to filter by"),
+    db: AsyncSession = Depends(get_db),
 ):
-    permissions = await svc_get_permissions_by_resources(db, resources)
+    # Require at least one filter and only one at a time to avoid ambiguous responses
+    provided = sum(x is not None for x in (permission_id, role_id, resources))
+    if provided == 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provide one of: permission_id, role_id or resources")
+    if provided > 1:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provide only one of: permission_id, role_id or resources at a time")
+
+    if permission_id is not None:
+        roles = await svc_get_roles_for_permission(db, permission_id)
+        return {
+            "permission_id": permission_id,
+            "roles": [{"role_id": r.role_id, "role_name": r.role_name} for r in roles],
+            "message": "Roles fetched successfully",
+        }
+
+    if role_id is not None:
+        permissions = await svc_get_permissions_by_role(db, role_id)
+        return [PermissionResponse.model_validate(p).model_copy(update={"message": "Fetched successfully"}) for p in permissions]
+
+    # resources is not None
+    permissions = await svc_get_permissions_by_resources(db, resources or [])
     return [PermissionResponse.model_validate(p).model_copy(update={"message": "Fetched successfully"}) for p in permissions]
-
-
-# ==============================================================
-# 5️⃣ GET ROLES ASSIGNED TO A PERMISSION
-# ==============================================================
-@permissions_router.get("/{permission_id}/roles")
-async def get_roles_for_permission(permission_id: int, db: AsyncSession = Depends(get_db)):
-    roles = await svc_get_roles_for_permission(db, permission_id)
-    return {
-        "permission_id": permission_id,
-        "roles": [{"role_id": r.role_id, "role_name": r.role_name} for r in roles],
-        "message": "Roles fetched successfully",
-    }

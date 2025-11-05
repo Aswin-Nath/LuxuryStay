@@ -2,9 +2,11 @@ from typing import List, Optional
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
+from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
 
 from app.models.sqlalchemy_schemas.images import Images
 from app.models.sqlalchemy_schemas.rooms import RoomTypes
+from app.models.sqlalchemy_schemas.reviews import Reviews
 
 
 async def create_image(
@@ -23,12 +25,18 @@ async def create_image(
     if entity_type == "room":
         effective_entity_type = "room_type"
 
-    # If the image is for a room_type, ensure room type exists
+    # Validate entity existence depending on entity_type
     if effective_entity_type == "room_type":
         res = await db.execute(select(RoomTypes).where(RoomTypes.room_type_id == entity_id))
         room_type = res.scalars().first()
         if not room_type:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room type not found")
+    elif effective_entity_type == "review":
+        # ensure review exists
+        res = await db.execute(select(Reviews).where(Reviews.review_id == entity_id))
+        review = res.scalars().first()
+        if not review:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review not found")
 
     # If this image is primary, unset other primary images for the same entity
     if is_primary:
@@ -72,6 +80,19 @@ async def get_images_for_room(db: AsyncSession, room_type_id: int) -> List[Image
     return items
 
 
+async def get_images_for_review(db: AsyncSession, review_id: int) -> List[Images]:
+    """Return images attached to a review."""
+    stmt = (
+        select(Images)
+        .where(Images.entity_type == "review")
+        .where(Images.entity_id == review_id)
+        .where(Images.is_deleted == False)
+    )
+    res = await db.execute(stmt)
+    items = res.scalars().all()
+    return items
+
+
 async def hard_delete_image(db: AsyncSession, image_id: int, requester_id: int | None = None, requester_permissions: dict | None = None) -> None:
     """Permanently delete an image row. Only the uploader or users with room_service.WRITE may delete.
 
@@ -89,9 +110,15 @@ async def hard_delete_image(db: AsyncSession, image_id: int, requester_id: int |
         allowed = True
     if requester_permissions:
         if (
-            "ROOM_MANAGEMENT" in requester_permissions
-            and "WRITE" in requester_permissions.get("ROOM_MANAGEMENT", set())
+            Resources.ROOM_MANAGEMENT.value in requester_permissions
+            and PermissionTypes.WRITE.value in requester_permissions.get(Resources.ROOM_MANAGEMENT.value, set())
         ):
+            allowed = True
+    # Allow review owner to delete images attached to their review
+    if not allowed and obj.entity_type == "review" and requester_id:
+        res = await db.execute(select(Reviews).where(Reviews.review_id == obj.entity_id))
+        review = res.scalars().first()
+        if review and review.user_id == requester_id:
             allowed = True
 
     if not allowed:
@@ -100,4 +127,43 @@ async def hard_delete_image(db: AsyncSession, image_id: int, requester_id: int |
     # Permanently delete the DB row
     await db.delete(obj)
     await db.commit()
+
+
+async def set_image_primary(db: AsyncSession, image_id: int, requester_id: int | None = None, requester_permissions: dict | None = None) -> None:
+    """Mark the given image as primary for its entity (unset others).
+
+    Only uploader or users with ROOM_MANAGEMENT.WRITE may perform this.
+    """
+    q = await db.execute(select(Images).where(Images.image_id == image_id))
+    obj = q.scalars().first()
+    if not obj:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+
+    # Permission check: uploader or ROOM_MANAGEMENT.WRITE
+    allowed = False
+    if requester_id and obj.uploaded_by and requester_id == obj.uploaded_by:
+        allowed = True
+    if requester_permissions:
+        if (
+            Resources.ROOM_MANAGEMENT.value in requester_permissions
+            and PermissionTypes.WRITE.value in requester_permissions.get(Resources.ROOM_MANAGEMENT.value, set())
+        ):
+            allowed = True
+
+    if not allowed:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to set primary image")
+
+    # Unset other primary images for same entity
+    await db.execute(
+        update(Images)
+        .where(Images.entity_type == obj.entity_type)
+        .where(Images.entity_id == obj.entity_id)
+        .values(is_primary=False)
+    )
+
+    # Set this image primary
+    obj.is_primary = True
+    db.add(obj)
+    await db.commit()
+    await db.refresh(obj)
     return None

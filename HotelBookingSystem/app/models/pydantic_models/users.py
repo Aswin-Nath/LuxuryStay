@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional
-from datetime import datetime
+from datetime import date
+from fastapi import Form
 
 
 class UserCreate(BaseModel):
@@ -24,6 +25,22 @@ class UserResponse(BaseModel):
     role_id: int
 
     model_config = {"from_attributes": True}
+
+
+class ProfileResponse(UserResponse):
+    dob: Optional[date] = None
+    gender: Optional[str] = None
+
+
+class ProfileUpdate(BaseModel):
+    full_name: Optional[str] = None
+    phone_number: Optional[str] = None
+    dob: Optional[date] = None
+    gender: Optional[str] = None
+
+class ChangePasswordPayload(BaseModel):
+    current_password: str
+    new_password: str
 
 
 class TokenResponse(BaseModel):

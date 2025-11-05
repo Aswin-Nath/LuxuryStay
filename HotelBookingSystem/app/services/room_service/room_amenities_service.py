@@ -41,6 +41,17 @@ async def get_amenities_for_room(db: AsyncSession, room_id: int) -> List[RoomAme
     return items
 
 
+async def get_rooms_for_amenity(db: AsyncSession, amenity_id: int) -> List[Rooms]:
+    """Return Rooms that are mapped to the given amenity_id."""
+    res = await db.execute(
+        select(Rooms)
+        .join(RoomAmenityMap, RoomAmenityMap.room_id == Rooms.room_id)
+        .where(RoomAmenityMap.amenity_id == amenity_id)
+    )
+    items = res.scalars().all()
+    return items
+
+
 async def unmap_amenity(db: AsyncSession, room_id: int, amenity_id: int) -> None:
     res = await db.execute(
         select(RoomAmenityMap).where(

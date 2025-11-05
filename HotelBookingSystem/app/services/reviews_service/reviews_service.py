@@ -9,7 +9,17 @@ from app.models.sqlalchemy_schemas.bookings import Bookings, BookingRoomMap
 
 
 async def create_review(db: AsyncSession, payload, current_user) -> Reviews:
-    data = payload.model_dump()
+    # Accept either a Pydantic model (with model_dump) or a plain dict
+    if hasattr(payload, "model_dump"):
+        data = payload.model_dump()
+    elif isinstance(payload, dict):
+        data = payload
+    else:
+        # try to coerce
+        try:
+            data = dict(payload)
+        except Exception:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payload")
     booking_id = data.get("booking_id")
     room_type_id = data.get("room_type_id")
     if room_type_id==0:
@@ -137,9 +147,8 @@ async def update_review_by_user(db: AsyncSession, review_id: int, payload, curre
     # Apply allowed updates
     if 'rating' in data and data['rating'] is not None:
         rev.rating = data['rating']
-    if 'comment' in data:
+    if 'comment' in data and data['comment'] is not None:
         rev.comment = data['comment']
-
     db.add(rev)
     await db.commit()
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, UploadFile, File, Form, HTTPException
 from typing import List, Optional, Union
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,28 +12,58 @@ from app.services.reviews_service.reviews_service import (
     admin_respond_review as svc_admin_respond,
     update_review_by_user as svc_update_review,
 )
-from app.dependencies.authentication import get_current_user, ensure_not_basic_user
+from app.dependencies.authentication import get_current_user, ensure_not_basic_user, get_user_permissions
 from app.models.sqlalchemy_schemas.users import Users
+from app.services.images_service.image_upload_service import save_uploaded_image
+from app.services.room_service.images_service import create_image, hard_delete_image, get_images_for_review
+from app.models.pydantic_models.images import ImageResponse
 
 
 router = APIRouter(prefix="/api/reviews", tags=["REVIEWS"])
 
 
 @router.post("/", response_model=ReviewResponse, status_code=status.HTTP_201_CREATED)
-async def create_review(payload: ReviewCreate, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)):
+async def create_review(
+    booking_id: int = Form(...),
+    room_type_id: Optional[int] = Form(None),
+    rating: int = Form(...),
+    comment: Optional[str] = Form(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+):
+    # Build payload dict and create review
+    payload = {
+        "booking_id": booking_id,
+        "room_type_id": room_type_id,
+        "rating": rating,
+        "comment": comment,
+    }
     obj = await svc_create_review(db, payload, current_user)
-    # return Pydantic response via orm_mode
+    # Images should be uploaded via the dedicated review images endpoints:
+    # POST /api/reviews/{review_id}/images  -> for uploading
+    # DELETE /api/reviews/{review_id}/images -> for removing images
     return ReviewResponse.model_validate(obj)
 
 
 @router.get("/", response_model=Union[ReviewResponse, List[ReviewResponse]])
 async def list_or_get_reviews(review_id: Optional[int] = None, booking_id: Optional[int] = None, room_id: Optional[int] = None, user_id: Optional[int] = None, db: AsyncSession = Depends(get_db)):
-    """If review_id is provided return that single review, otherwise return list (optionally filtered by booking_id)."""
+    """If review_id is provided return that single review (with images), otherwise return list (optionally filtered by booking_id).
+
+    Each returned review will include attached images in the `images` field.
+    """
     if review_id is not None:
         obj = await svc_get_review(db, review_id)
-        return ReviewResponse.model_validate(obj)
+        imgs = await get_images_for_review(db, review_id)
+        img_resps = [ImageResponse.model_validate(i) for i in imgs]
+        return ReviewResponse.model_validate(obj).model_copy(update={"images": img_resps})
+
     items = await svc_list_reviews(db, booking_id=booking_id, room_id=room_id, user_id=user_id)
-    return [ReviewResponse.model_validate(i) for i in items]
+    out = []
+    for i in items:
+        imgs = await get_images_for_review(db, i.review_id)
+        img_resps = [ImageResponse.model_validate(img) for img in imgs]
+        out.append(ReviewResponse.model_validate(i).model_copy(update={"images": img_resps}))
+    return out
 
 
 @router.put("/{review_id}/respond", response_model=ReviewResponse)
@@ -48,3 +78,50 @@ async def update_review(review_id: int, payload: ReviewUpdate, db: AsyncSession 
     """Allow the authenticated reviewer to update their review's rating/comment."""
     obj = await svc_update_review(db, review_id, payload, current_user)
     return ReviewResponse.model_validate(obj)
+
+
+@router.post("/{review_id}/images", response_model=List[ImageResponse], status_code=status.HTTP_201_CREATED)
+async def add_review_image(
+    review_id: int,
+    files: List[UploadFile] = File(...),
+    captions: Optional[List[str]] = Form(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+):
+    """Upload one or more images for a review.
+
+    captions may be provided as repeated form fields (`-F "captions=one" -F "captions=two"`) and
+    will be applied to files by index. If there are fewer captions than files, remaining captions are None.
+    """
+    images = []
+    for idx, file in enumerate(files):
+        # upload to external provider
+        url = await save_uploaded_image(file)
+        caption = None
+        if captions and idx < len(captions):
+            caption = captions[idx]
+        obj = await create_image(db, entity_type="review", entity_id=review_id, image_url=url, caption=caption, uploaded_by=current_user.user_id)
+        images.append(obj)
+
+    return [ImageResponse.model_validate(i) for i in images]
+
+
+@router.get("/{review_id}/images", response_model=List[ImageResponse])
+async def list_review_images(review_id: int, db: AsyncSession = Depends(get_db)):
+    items = await get_images_for_review(db, review_id)
+    return [ImageResponse.model_validate(i) for i in items]
+
+
+@router.delete("/{review_id}/images")
+async def delete_review_images(review_id: int, image_ids: List[int], db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user), user_permissions: dict = Depends(get_user_permissions)):
+    """Delete specified image ids attached to a review. Only the uploader/review-owner or ROOM_MANAGEMENT.WRITE may delete.
+
+    Caller must provide a list of image_ids (JSON body).
+    """
+    if not image_ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="image_ids is required")
+    deleted = []
+    for img_id in image_ids:
+        await hard_delete_image(db, img_id, requester_id=current_user.user_id, requester_permissions=user_permissions)
+        deleted.append(img_id)
+    return {"deleted": deleted, "message": "Images deleted"}

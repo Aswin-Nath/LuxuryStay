@@ -17,6 +17,7 @@ async def create_room(db: AsyncSession, payload) -> Rooms:
     if not room_type:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room type not found")
 
+    # For creation, use full payload (required fields must be present).
     data = payload.model_dump()
     # populate derived fields from room type
     data["price_per_night"] = room_type.price_per_night
@@ -66,16 +67,9 @@ async def update_room(db: AsyncSession, room_id: int, payload) -> Rooms:
     if not obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
 
-    data = payload.model_dump()
+    # Apply only fields explicitly provided by client to avoid overwriting existing values.
+    data = payload.model_dump(exclude_unset=True)
     # If room_type_id changed (or provided), fetch derived values and set them
-    if "room_type_id" in data and data["room_type_id"] is not None:
-        rt_res = await db.execute(select(RoomTypes).where(RoomTypes.room_type_id == data["room_type_id"]))
-        room_type = rt_res.scalars().first()
-        if not room_type:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room type not found")
-        data["price_per_night"] = room_type.price_per_night
-        data["max_adult_count"] = room_type.max_adult_count
-        data["max_child_count"] = room_type.max_child_count
 
     await db.execute(update(Rooms).where(Rooms.room_id == room_id).values(**data))
     await db.commit()
@@ -84,13 +78,7 @@ async def update_room(db: AsyncSession, room_id: int, payload) -> Rooms:
     return obj
 
 
-async def change_room_status(db: AsyncSession, room_id: int, status_value: str) -> None:
-    res = await db.execute(select(Rooms).where(Rooms.room_id == room_id))
-    obj = res.scalars().first()
-    if not obj:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
-    await db.execute(update(Rooms).where(Rooms.room_id == room_id).values(room_status=status_value))
-    await db.commit()
+
 
 
 async def delete_room(db: AsyncSession, room_id: int) -> None:

@@ -127,3 +127,39 @@ async def update_refund_transaction(db: AsyncSession, refund_id: int, payload, a
     stmt = select(Refunds).where(Refunds.refund_id == refund_id)
     res = await db.execute(stmt)
     return res.scalars().first()
+
+
+async def get_refund(db: AsyncSession, refund_id: int):
+    """Retrieve a single refund by id or raise 404 if not found."""
+    res = await db.execute(select(Refunds).where(Refunds.refund_id == refund_id))
+    rf = res.scalars().first()
+    if not rf:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Refund not found")
+    return rf
+
+
+async def list_refunds(db: AsyncSession, refund_id: int | None = None, booking_id: int | None = None, user_id: int | None = None, status: str | None = None, type: str | None = None, from_date: datetime | None = None, to_date: datetime | None = None):
+    """Return a list of refunds filtered by the provided optional criteria.
+
+    If refund_id is provided, this will return a list with that single refund (or empty if not found).
+    """
+    stmt = select(Refunds)
+    # Build filters
+    if refund_id is not None:
+        stmt = stmt.where(Refunds.refund_id == refund_id)
+    if booking_id is not None:
+        stmt = stmt.where(Refunds.booking_id == booking_id)
+    if user_id is not None:
+        stmt = stmt.where(Refunds.user_id == user_id)
+    if status is not None:
+        stmt = stmt.where(Refunds.status == status)
+    if type is not None:
+        stmt = stmt.where(Refunds.type == type)
+    if from_date is not None:
+        stmt = stmt.where(Refunds.initiated_at >= from_date)
+    if to_date is not None:
+        stmt = stmt.where(Refunds.initiated_at <= to_date)
+
+    res = await db.execute(stmt)
+    items = res.scalars().all()
+    return items

@@ -12,6 +12,7 @@ from app.routes.issue_management.issues import router as issue_router
 from app.routes.reviews_management.reviews import router as reviews_router
 from app.routes.refund_management.refund import router as refunds_router
 from app.routes.booking_management.edit_booking import router as booking_edits_router
+from app.routes.profile_management.profile import router as profile_router
 
 from app.middlewares.error_handler import ErrorHandlerMiddleware
 app = FastAPI()
@@ -41,3 +42,4 @@ app.include_router(issue_router)
 app.include_router(reviews_router)
 app.include_router(refunds_router)
 app.include_router(booking_edits_router)
+app.include_router(profile_router)

@@ -6,13 +6,14 @@ from fastapi import (
     HTTPException,
     Depends,
     status,
+    Query,
 )
 from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.images_service.image_upload_service import save_uploaded_image
 from app.services.room_service.images_service import create_image, get_images_for_room
-from app.services.room_service.images_service import hard_delete_image
+from app.services.room_service.images_service import hard_delete_image, set_image_primary
 from app.database.postgres_connection import get_db
 from app.models.pydantic_models.images import ImageResponse
 from app.dependencies.authentication import get_current_user, get_user_permissions
@@ -40,8 +41,8 @@ async def upload_image_for_room(
     # Permission check: require room_service.WRITE
     # ----------------------------------------------------------
     allowed = (
-        Resources.room_service.value in (user_permissions or {})
-        and PermissionTypes.WRITE.value in (user_permissions or {})[Resources.room_service.value]
+        Resources.ROOM_MANAGEMENT.value in (user_permissions or {})
+        and PermissionTypes.WRITE.value in (user_permissions or {})[Resources.ROOM_MANAGEMENT.value]
     )
     if not allowed:
         from app.core.exceptions import ForbiddenError
@@ -82,8 +83,27 @@ async def list_images_for_room(room_id: int, db: AsyncSession = Depends(get_db))
     return [ImageResponse.model_validate(i) for i in items]
 
 
-@router.delete("/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_image_for_room(room_id: int, image_id: int, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user), user_permissions: dict = Depends(get_user_permissions)):
-    """Hard-delete an image (remove DB row). The requester must be the uploader or have room_service.WRITE."""
-    await hard_delete_image(db, image_id, requester_id=current_user.user_id, requester_permissions=user_permissions)
-    return None
+@router.delete("/", status_code=status.HTTP_200_OK)
+async def delete_images_for_room(
+    image_ids: List[int] = Query(..., description="List of image IDs to delete"),
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    user_permissions: dict = Depends(get_user_permissions),
+):
+    """Hard-delete one or more images. The requester must be the uploader of each image or have room_service.WRITE."""
+    # Call hard_delete_image for each id to reuse permission checks per-image
+    for image_id in image_ids:
+        await hard_delete_image(db, image_id, requester_id=current_user.user_id, requester_permissions=user_permissions)
+    return {"message":"images deleted"}
+
+
+@router.put("/{image_id}/primary", status_code=status.HTTP_200_OK)
+async def mark_image_primary(
+    image_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    user_permissions: dict = Depends(get_user_permissions),
+):
+    """Mark a specific image as primary for the room's images. Only the uploader or users with ROOM_MANAGEMENT.WRITE may do this."""
+    await set_image_primary(db, image_id, requester_id=current_user.user_id, requester_permissions=user_permissions)
+    return {"message": "Image marked as primary"}

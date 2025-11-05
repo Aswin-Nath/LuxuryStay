@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
+from app.models.pydantic_models.images import ImageResponse
 
 
 class ReviewBase(BaseModel):
@@ -31,6 +32,7 @@ class ReviewResponse(ReviewBase):
     created_at: datetime
     updated_at: datetime
     is_deleted: bool = False
+    images: Optional[List[ImageResponse]] = []
     # Pydantic v2: allow constructing from ORM/SQLAlchemy objects
     model_config = {"from_attributes": True}
 

@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.postgres_connection import get_db
 from app.dependencies.authentication import get_current_user, get_user_permissions
+from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
 from app.models.pydantic_models.booking_edits import BookingEditCreate, BookingEditResponse,ReviewPayload,DecisionPayload
 from app.services.booking_service.booking_edit import (
     create_booking_edit_service,
@@ -66,8 +67,11 @@ async def review_booking_edit(
     """
     Admin suggests room changes and locks them for 30 minutes.
     """
-    # Check admin access
-    if not perms or ("ROOM_MANAGEMENT" not in perms or "WRITE" not in perms.get("ROOM_MANAGEMENT", set())):
+    # Check admin access against canonical permission enums
+    if not perms or (
+        Resources.ROOM_MANAGEMENT.value not in perms
+        or PermissionTypes.WRITE.value not in perms.get(Resources.ROOM_MANAGEMENT.value, set())
+    ):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin permission required")
 
     return await review_booking_edit_service(edit_id, payload, db, current_user)

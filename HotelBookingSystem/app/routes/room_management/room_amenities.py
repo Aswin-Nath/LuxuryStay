@@ -19,8 +19,8 @@ router = APIRouter(prefix="/api/room-amenities", tags=["ROOM_AMENITIES"])
 @router.post("/", response_model=RoomAmenityMapResponse, status_code=status.HTTP_201_CREATED)
 async def map_amenity(payload: RoomAmenityMapCreate, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
     if not (
-        Resources.room_service.value in user_permissions
-        and PermissionTypes.WRITE.value in user_permissions[Resources.room_service.value]
+        Resources.ROOM_MANAGEMENT.value in user_permissions
+        and PermissionTypes.WRITE.value in user_permissions[Resources.ROOM_MANAGEMENT.value]
     ):
         raise ForbiddenError("Insufficient permissions to map amenities")
     await svc_map_amenity(db, payload)
@@ -36,8 +36,8 @@ async def get_amenities_for_room(room_id: int, db: AsyncSession = Depends(get_db
 @router.delete("/")
 async def unmap_amenity(room_id: int, amenity_id: int, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
     if not (
-        Resources.room_service.value in user_permissions
-        and PermissionTypes.WRITE.value in user_permissions[Resources.room_service.value]
+        Resources.ROOM_MANAGEMENT.value in user_permissions
+        and PermissionTypes.WRITE.value in user_permissions[Resources.ROOM_MANAGEMENT.value]
     ):
         raise ForbiddenError("Insufficient permissions to unmap amenities")
     await svc_unmap_amenity(db, room_id, amenity_id)

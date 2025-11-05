@@ -76,3 +76,20 @@ async def list_user_notifications(
     res = await db.execute(stmt)
     items = res.scalars().all()
     return items
+
+
+async def mark_notification_as_read(db: AsyncSession, notification_id: int, user_id: int) -> None:
+    """Mark a notification as read. Only the recipient may mark their notification as read."""
+    stmt = select(Notifications).where(Notifications.notification_id == notification_id)
+    res = await db.execute(stmt)
+    obj = res.scalars().first()
+    if not obj:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+    if obj.recipient_user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot mark another user's notification as read")
+
+    obj.is_read = True
+    db.add(obj)
+    await db.commit()
+    await db.refresh(obj)
+    return None
