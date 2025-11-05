@@ -8,13 +8,21 @@ from app.models.sqlalchemy_schemas.users import Users
 from app.models.pydantic_models.users import ProfileResponse, ProfileUpdate, ChangePasswordPayload
 from app.services.images_service.image_upload_service import save_uploaded_image
 from app.services.authentication_service.authentication_usecases import change_password as svc_change_password
+from app.core.cache import invalidate_pattern, get_cached, set_cached
 
 router = APIRouter(prefix="/api/profile", tags=["PROFILE"])
 
 @router.get("/", response_model=ProfileResponse)
 async def get_my_profile(current_user: Users = Depends(get_current_user)) -> Any:
 	"""Return the authenticated user's profile."""
-	return ProfileResponse.model_validate(current_user)
+	cache_key = f"profile:user:{current_user.user_id}"
+	cached = await get_cached(cache_key)
+	if cached is not None:
+		return cached
+
+	result = ProfileResponse.model_validate(current_user)
+	await set_cached(cache_key, result, ttl=300)
+	return result
 
 @router.put("/", response_model=ProfileResponse)
 async def update_my_profile(
@@ -50,6 +58,8 @@ async def update_my_profile(
 	db.add(current_user)
 	await db.commit()
 	await db.refresh(current_user)
+	# invalidate profile cache for this user
+	await invalidate_pattern(f"profile:user:{current_user.user_id}")
 	return ProfileResponse.model_validate(current_user)
 
 
@@ -61,6 +71,8 @@ async def upload_profile_image(file: UploadFile = File(...), db: AsyncSession = 
 	db.add(current_user)
 	await db.commit()
 	await db.refresh(current_user)
+	# invalidate profile cache for this user
+	await invalidate_pattern(f"profile:user:{current_user.user_id}")
 	return ProfileResponse.model_validate(current_user)
 
 @router.put("/password")

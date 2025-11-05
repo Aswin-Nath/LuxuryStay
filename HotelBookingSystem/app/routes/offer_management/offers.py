@@ -10,6 +10,7 @@ from app.dependencies.authentication import get_user_permissions, get_current_us
 from app.models.sqlalchemy_schemas.users import Users
 from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
 from app.core.exceptions import ForbiddenError
+from app.core.cache import get_cached, set_cached, invalidate_pattern
 
 
 router = APIRouter(prefix="/api/offers", tags=["OFFERS"])
@@ -32,6 +33,8 @@ async def create_offer(payload: OfferCreate, db: AsyncSession = Depends(get_db),
 
     # Use current authenticated user as the creator — ignore any client-provided created_by value
     obj = await svc_create_offer(db, payload, created_by=current_user.user_id)
+    # invalidate offer list caches
+    await invalidate_pattern("offers:*")
     # Use pydantic model_validate (from_attributes=True) to convert SQLAlchemy object
     # Exclude created_at from any API responses (handled internally by backend)
     return OfferResponse.model_validate(obj).model_dump(exclude={"created_at"})
@@ -46,9 +49,15 @@ async def get_offer(offer_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.get("/", response_model=List[OfferResponse])
 async def list_offers(limit: int = Query(20, ge=1, le=200), offset: int = Query(0, ge=0), db: AsyncSession = Depends(get_db)):
+    cache_key = f"offers:limit:{limit}:offset:{offset}"
+    cached = await get_cached(cache_key)
+    if cached is not None:
+        return cached
+
     items = await svc_list_offers(db, limit=limit, offset=offset)
-    # Exclude created_at from list responses
-    return [OfferResponse.model_validate(i).model_dump(exclude={"created_at"}) for i in items]
+    result = [OfferResponse.model_validate(i).model_dump(exclude={"created_at"}) for i in items]
+    await set_cached(cache_key, result, ttl=120)
+    return result
 
 
 @router.put("/{offer_id}", response_model=OfferResponse)
@@ -61,6 +70,8 @@ async def edit_offer(offer_id: int, payload: OfferCreate, db: AsyncSession = Dep
         raise ForbiddenError("Insufficient permissions to edit offers")
 
     obj = await svc_update_offer(db, offer_id, payload, updated_by=current_user.user_id)
+    # invalidate offers cache on update
+    await invalidate_pattern("offers:*")
     return OfferResponse.model_validate(obj).model_dump(exclude={"created_at"})
 
 
@@ -74,4 +85,5 @@ async def delete_offer(offer_id: int, db: AsyncSession = Depends(get_db), user_p
         raise ForbiddenError("Insufficient permissions to delete offers")
 
     await svc_soft_delete_offer(db, offer_id)
+    await invalidate_pattern("offers:*")
     return None

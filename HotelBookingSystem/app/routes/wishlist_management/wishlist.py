@@ -7,6 +7,7 @@ from app.models.pydantic_models.wishlist import WishlistCreate, WishlistResponse
 from app.services.wishlist_service.wishlist_service import add_to_wishlist as svc_add, list_user_wishlist as svc_list, remove_wishlist as svc_remove, get_wishlist_item as svc_get_item
 from app.dependencies.authentication import get_current_user
 from app.models.sqlalchemy_schemas.users import Users
+from app.core.cache import get_cached, set_cached, invalidate_pattern
 
 
 router = APIRouter(prefix="/api/wishlist", tags=["WISHLIST"])
@@ -19,13 +20,22 @@ async def add_wishlist(payload: WishlistCreate, db: AsyncSession = Depends(get_d
         payload.user_id = current_user.user_id
 
     obj = await svc_add(db, payload)
+    # invalidate this user's wishlist cache
+    await invalidate_pattern(f"wishlist:user:{current_user.user_id}:*")
     return WishlistResponse.model_validate(obj).model_dump()
 
 
 @router.get("/", response_model=List[WishlistResponse])
 async def list_wishlist(db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)):
+    cache_key = f"wishlist:user:{current_user.user_id}"
+    cached = await get_cached(cache_key)
+    if cached is not None:
+        return cached
+
     items = await svc_list(db, current_user.user_id)
-    return [WishlistResponse.model_validate(i).model_dump() for i in items]
+    result = [WishlistResponse.model_validate(i).model_dump() for i in items]
+    await set_cached(cache_key, result, ttl=120)
+    return result
 
 
 
@@ -43,4 +53,6 @@ async def get_wishlist_item(room_type_id: int | None = None, offer_id: int | Non
 @router.delete("/{wishlist_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_wishlist(wishlist_id: int, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)):
     await svc_remove(db, wishlist_id, current_user.user_id)
+    # invalidate this user's wishlist cache
+    await invalidate_pattern(f"wishlist:user:{current_user.user_id}:*")
     return None

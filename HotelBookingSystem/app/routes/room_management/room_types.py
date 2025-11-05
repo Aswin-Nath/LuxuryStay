@@ -14,6 +14,7 @@ from app.services.room_service.room_types_service import (
     update_room_type as svc_update_room_type,
     soft_delete_room_type as svc_soft_delete_room_type,
 )
+from app.core.cache import get_cached, set_cached, invalidate_pattern
 
 router = APIRouter(prefix="/api/room-types", tags=["ROOM_TYPES"])
 
@@ -28,6 +29,8 @@ async def create_room_type(payload: RoomTypeCreate, db: AsyncSession = Depends(g
         raise ForbiddenError("Insufficient permissions to create room types")
 
     obj = await svc_create_room_type(db, payload)
+    # invalidate room-types cache
+    await invalidate_pattern("room_types:*")
     return RoomTypeResponse.model_validate(obj).model_copy(update={"message": "Room type created"})
 
 
@@ -49,8 +52,15 @@ async def get_room_types(
         obj = await svc_get_room_type(db, room_type_id)
         return RoomTypeResponse.model_validate(obj)
 
+    cache_key = f"room_types:include_deleted:{include_deleted}"
+    cached = await get_cached(cache_key)
+    if cached is not None:
+        return cached
+
     items = await svc_list_room_types(db, include_deleted=include_deleted)
-    return [RoomTypeResponse.model_validate(r).model_copy(update={"message": "Fetched successfully"}) for r in items]
+    result = [RoomTypeResponse.model_validate(r).model_copy(update={"message": "Fetched successfully"}) for r in items]
+    await set_cached(cache_key, result, ttl=300)
+    return result
 
 
 @router.put("/{room_type_id}", response_model=RoomTypeResponse)
@@ -62,6 +72,7 @@ async def update_room_type(room_type_id: int, payload: RoomTypeUpdate, db: Async
         raise ForbiddenError("Insufficient permissions to update room types")
 
     obj = await svc_update_room_type(db, room_type_id, payload)
+    await invalidate_pattern("room_types:*")
     return RoomTypeResponse.model_validate(obj).model_copy(update={"message": "Updated successfully"})
 
 
@@ -74,4 +85,5 @@ async def soft_delete_room_type(room_type_id: int, db: AsyncSession = Depends(ge
         raise ForbiddenError("Insufficient permissions to delete room types")
 
     await svc_soft_delete_room_type(db, room_type_id)
+    await invalidate_pattern("room_types:*")
     return {"message": "Room type soft-deleted"}

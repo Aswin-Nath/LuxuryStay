@@ -18,6 +18,10 @@ router = APIRouter(prefix="/api", tags=["REFUNDS"])
 async def complete_refund(refund_id: int, payload: RefundTransactionUpdate, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user), _ok: bool = Depends(ensure_not_basic_user)):
     # Admin-only endpoint to update refund transaction details and status (restricted fields only)
     obj = await svc_update_refund(db, refund_id, payload, current_user)
+    # invalidate refund caches
+    from app.core.cache import invalidate_pattern
+    await invalidate_pattern("refunds:*")
+    await invalidate_pattern(f"refund:{refund_id}")
     return RefundResponse.model_validate(obj)
 
 
@@ -66,4 +70,12 @@ async def query_refunds(
         user_id = current_user.user_id
 
     items = await svc_list_refunds(db, refund_id=refund_id, booking_id=booking_id, user_id=user_id, status=status, type=type, from_date=from_date, to_date=to_date)
-    return [RefundResponse.model_validate(i) for i in items]
+    # caching queries by parameters could be expensive; keep simple: cache common queries
+    from app.core.cache import get_cached, set_cached
+    cache_key = f"refunds:query:refund_id:{refund_id}:booking_id:{booking_id}:user_id:{user_id}:status:{status}:type:{type}:from:{from_date}:to:{to_date}"
+    cached = await get_cached(cache_key)
+    if cached is not None:
+        return cached
+    result = [RefundResponse.model_validate(i) for i in items]
+    await set_cached(cache_key, result, ttl=60)
+    return result

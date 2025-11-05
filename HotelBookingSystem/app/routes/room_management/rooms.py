@@ -14,6 +14,7 @@ from app.services.room_service.rooms_service import (
     update_room as svc_update_room,
     delete_room as svc_delete_room,
 )
+from app.core.cache import get_cached, set_cached, invalidate_pattern
 
 router = APIRouter(prefix="/api/rooms", tags=["ROOMS"])
 
@@ -44,6 +45,8 @@ async def create_room(payload: RoomCreate, db: AsyncSession = Depends(get_db), u
     # Require WRITE on both Booking and Room_Management
     _require_permissions(user_permissions, [Resources.BOOKING, Resources.ROOM_MANAGEMENT], PermissionTypes.WRITE, require_all=True)
     obj = await svc_create_room(db, payload)
+    # invalidate rooms cache
+    await invalidate_pattern("rooms:*")
     return RoomResponse.model_validate(obj).model_copy(update={"message": "Room created"})
 
 
@@ -71,8 +74,15 @@ async def get_rooms(
         obj = await svc_get_room(db, room_id)
         return RoomResponse.model_validate(obj)
 
+    cache_key = f"rooms:room_type:{room_type_id}:status:{status_filter}:is_freezed:{is_freezed}"
+    cached = await get_cached(cache_key)
+    if cached is not None:
+        return cached
+
     items = await svc_list_rooms(db, room_type_id=room_type_id, status_filter=status_filter, is_freezed=is_freezed)
-    return [Room.model_validate(r) for r in items]
+    result = [Room.model_validate(r) for r in items]
+    await set_cached(cache_key, result, ttl=120)
+    return result
 
 
 @router.put("/{room_id}", response_model=RoomResponse)
@@ -80,6 +90,8 @@ async def update_room(room_id: int, payload: RoomUpdate, db: AsyncSession = Depe
     # Require WRITE on both Booking and Room_Management
     _require_permissions(user_permissions, [Resources.BOOKING, Resources.ROOM_MANAGEMENT], PermissionTypes.WRITE, require_all=True)
     obj = await svc_update_room(db, room_id, payload)
+    # invalidate rooms cache after update
+    await invalidate_pattern("rooms:*")
     return RoomResponse.model_validate(obj).model_copy(update={"message": "Updated successfully"})
 
 
@@ -88,4 +100,6 @@ async def delete_room(room_id: int, db: AsyncSession = Depends(get_db), user_per
     # Require WRITE on both Booking and Room_Management
     _require_permissions(user_permissions, [Resources.BOOKING, Resources.ROOM_MANAGEMENT], PermissionTypes.WRITE, require_all=True)
     await svc_delete_room(db, room_id)
+    # invalidate rooms cache after delete
+    await invalidate_pattern("rooms:*")
     return {"message": "Room deleted"}

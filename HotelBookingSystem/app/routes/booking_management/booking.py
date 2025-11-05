@@ -11,6 +11,7 @@ from app.dependencies.authentication import get_current_user, get_user_permissio
 from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
 from app.core.exceptions import ForbiddenError
 from app.services.refunds_service.refunds_service import cancel_booking_and_create_refund as svc_cancel_booking
+from app.core.cache import get_cached, set_cached, invalidate_pattern
 
 
 router = APIRouter(prefix="/api/bookings", tags=["BOOKINGS"])
@@ -32,6 +33,8 @@ async def create_booking(payload: BookingCreate, db: AsyncSession = Depends(get_
 		payload.user_id = current_user.user_id
 
 	obj = await svc_create_booking(db, payload)
+	# invalidate bookings cache after new booking
+	await invalidate_pattern("bookings:*")
 	return BookingResponse.model_validate(obj).model_dump(exclude={"created_at"})
 
 @router.post("/{booking_id}/cancel", response_model=RefundResponse, status_code=status.HTTP_201_CREATED)
@@ -42,14 +45,28 @@ async def cancel_booking(booking_id: int, payload: RefundCreate, db: AsyncSessio
 
 @router.get("/", response_model=List[BookingResponse])
 async def list_all_bookings(limit: int = Query(20, ge=1, le=200), offset: int = Query(0, ge=0), db: AsyncSession = Depends(get_db)):
+	cache_key = f"bookings:limit:{limit}:offset:{offset}"
+	cached = await get_cached(cache_key)
+	if cached is not None:
+		return cached
+
 	items = await svc_list_bookings(db, limit=limit, offset=offset)
-	return [BookingResponse.model_validate(i).model_dump(exclude={"created_at"}) for i in items]
+	result = [BookingResponse.model_validate(i).model_dump(exclude={"created_at"}) for i in items]
+	await set_cached(cache_key, result, ttl=120)
+	return result
 
 
 @router.get("/query", response_model=List[BookingResponse])
 async def bookings_query(user_id: Optional[int] = None, status: Optional[str] = None, db: AsyncSession = Depends(get_db)):
+	cache_key = f"bookings:query:user:{user_id}:status:{status}"
+	cached = await get_cached(cache_key)
+	if cached is not None:
+		return cached
+
 	items = await svc_query_bookings(db, user_id=user_id, status=status)
-	return [BookingResponse.model_validate(i).model_dump(exclude={"created_at"}) for i in items]
+	result = [BookingResponse.model_validate(i).model_dump(exclude={"created_at"}) for i in items]
+	await set_cached(cache_key, result, ttl=60)
+	return result
 
 
 @router.get("/{booking_id}", response_model=BookingResponse)

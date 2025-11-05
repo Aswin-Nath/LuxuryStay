@@ -12,6 +12,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import smtplib
 from email.message import EmailMessage
 import os
+from dotenv import load_dotenv
+import logging
+import traceback
+
+# Ensure .env is loaded when this module is imported so SMTP and other envs are available
+load_dotenv()
+_logger = logging.getLogger(__name__)
 
 # Load JWT configs from .env
 SECRET_KEY = os.getenv("SECRET_KEY", "supersecretkey")
@@ -207,16 +214,25 @@ def _send_email(to_email: str, subject: str, body: str) -> bool:
     """Send a simple plain-text email using SMTP env configuration.
 
     Returns True on success, False if SMTP isn't configured or send failed.
+    This function is defensive and logs detailed errors to help debugging.
     """
     SMTP_HOST = os.getenv("SMTP_HOST")
-    SMTP_PORT = int(os.getenv("SMTP_PORT", "0")) if os.getenv("SMTP_PORT") else None
+    SMTP_PORT_RAW = os.getenv("SMTP_PORT")
     SMTP_USER = os.getenv("SMTP_USER")
     SMTP_PASS = os.getenv("SMTP_PASS")
-    SMTP_FROM = os.getenv("SMTP_FROM", "noreply@example.com")
+    SMTP_FROM = os.getenv("SMTP_FROM")
+    SMTP_USE_SSL = os.getenv("SMTP_USE_SSL", "false").lower() in ("1", "true", "yes")
 
-    if not SMTP_HOST or not SMTP_PORT:
-        # Not configured — caller should handle OTP display/logging in dev
-        print(f"SMTP not configured, email to {to_email}: subject={subject} body={body}")
+    # parse port safely
+    smtp_port = None
+    try:
+        if SMTP_PORT_RAW:
+            smtp_port = int(SMTP_PORT_RAW)
+    except Exception:
+        _logger.warning("Invalid SMTP_PORT value: %s", SMTP_PORT_RAW)
+
+    if not SMTP_HOST or not smtp_port:
+        _logger.warning("SMTP not configured (HOST=%s, PORT=%s). Email to %s will not be sent.", SMTP_HOST, SMTP_PORT_RAW, to_email)
         return False
 
     msg = EmailMessage()
@@ -224,16 +240,31 @@ def _send_email(to_email: str, subject: str, body: str) -> bool:
     msg["From"] = SMTP_FROM
     msg["To"] = to_email
     msg.set_content(body)
-
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
-            s.starttls()
-            if SMTP_USER and SMTP_PASS:
-                s.login(SMTP_USER, SMTP_PASS)
-            s.send_message(msg)
+        if SMTP_USE_SSL or smtp_port == 465:
+            # implicit SSL
+            with smtplib.SMTP_SSL(SMTP_HOST, smtp_port, timeout=15) as s:
+                if SMTP_USER and SMTP_PASS:
+                    s.login(SMTP_USER, SMTP_PASS)
+                s.send_message(msg)
+        else:
+            with smtplib.SMTP(SMTP_HOST, smtp_port, timeout=15) as s:
+                s.ehlo()
+                s.starttls()
+                s.ehlo()
+                if SMTP_USER and SMTP_PASS:
+                    s.login(SMTP_USER, SMTP_PASS)
+                s.send_message(msg)
+
+        _logger.info("Email sent to %s (subject=%s)", to_email, subject)
         return True
+    except smtplib.SMTPAuthenticationError as e:
+        _logger.error("SMTP authentication failed for user %s: %s", SMTP_USER, e)
+        _logger.debug(traceback.format_exc())
+        return False
     except Exception as e:
-        print("Failed to send email:", e)
+        _logger.error("Failed to send email to %s: %s", to_email, e)
+        _logger.debug(traceback.format_exc())
         return False
 
 

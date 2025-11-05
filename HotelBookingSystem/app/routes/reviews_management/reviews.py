@@ -17,6 +17,7 @@ from app.models.sqlalchemy_schemas.users import Users
 from app.services.images_service.image_upload_service import save_uploaded_image
 from app.services.room_service.images_service import create_image, hard_delete_image, get_images_for_review
 from app.models.pydantic_models.images import ImageResponse
+from app.core.cache import get_cached, set_cached, invalidate_pattern
 
 
 router = APIRouter(prefix="/api/reviews", tags=["REVIEWS"])
@@ -39,6 +40,8 @@ async def create_review(
         "comment": comment,
     }
     obj = await svc_create_review(db, payload, current_user)
+    # invalidate reviews caches
+    await invalidate_pattern("reviews:*")
     # Images should be uploaded via the dedicated review images endpoints:
     # POST /api/reviews/{review_id}/images  -> for uploading
     # DELETE /api/reviews/{review_id}/images -> for removing images
@@ -57,12 +60,18 @@ async def list_or_get_reviews(review_id: Optional[int] = None, booking_id: Optio
         img_resps = [ImageResponse.model_validate(i) for i in imgs]
         return ReviewResponse.model_validate(obj).model_copy(update={"images": img_resps})
 
+    cache_key = f"reviews:booking:{booking_id}:room:{room_id}:user:{user_id}"
+    cached = await get_cached(cache_key)
+    if cached is not None:
+        return cached
+
     items = await svc_list_reviews(db, booking_id=booking_id, room_id=room_id, user_id=user_id)
     out = []
     for i in items:
         imgs = await get_images_for_review(db, i.review_id)
         img_resps = [ImageResponse.model_validate(img) for img in imgs]
         out.append(ReviewResponse.model_validate(i).model_copy(update={"images": img_resps}))
+    await set_cached(cache_key, out, ttl=120)
     return out
 
 
@@ -70,6 +79,7 @@ async def list_or_get_reviews(review_id: Optional[int] = None, booking_id: Optio
 async def respond_review(review_id: int, payload: AdminResponseCreate, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user), _ok: bool = Depends(ensure_not_basic_user)):
     # payload validated by Pydantic: {"admin_response": "..."}
     obj = await svc_admin_respond(db, review_id, current_user, payload.admin_response)
+    await invalidate_pattern("reviews:*")
     return ReviewResponse.model_validate(obj)
 
 
@@ -77,6 +87,7 @@ async def respond_review(review_id: int, payload: AdminResponseCreate, db: Async
 async def update_review(review_id: int, payload: ReviewUpdate, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)):
     """Allow the authenticated reviewer to update their review's rating/comment."""
     obj = await svc_update_review(db, review_id, payload, current_user)
+    await invalidate_pattern("reviews:*")
     return ReviewResponse.model_validate(obj)
 
 
@@ -103,6 +114,8 @@ async def add_review_image(
         obj = await create_image(db, entity_type="review", entity_id=review_id, image_url=url, caption=caption, uploaded_by=current_user.user_id)
         images.append(obj)
 
+    # invalidate caches for this review
+    await invalidate_pattern(f"reviews:*{review_id}*")
     return [ImageResponse.model_validate(i) for i in images]
 
 
@@ -124,4 +137,6 @@ async def delete_review_images(review_id: int, image_ids: List[int], db: AsyncSe
     for img_id in image_ids:
         await hard_delete_image(db, img_id, requester_id=current_user.user_id, requester_permissions=user_permissions)
         deleted.append(img_id)
+    # invalidate caches for this review
+    await invalidate_pattern(f"reviews:*{review_id}*")
     return {"deleted": deleted, "message": "Images deleted"}
