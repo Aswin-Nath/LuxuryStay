@@ -12,7 +12,7 @@ from app.services.notification_service.notifications_service import add_notifica
 
 
 # ===========================================================
-# CREATE ISSUE
+# CREATE ISSUE (Fixed)
 # ===========================================================
 async def create_issue(db: AsyncSession, payload: dict, images: Optional[List[UploadFile]] = None) -> Issues:
     """
@@ -29,12 +29,11 @@ async def create_issue(db: AsyncSession, payload: dict, images: Optional[List[Up
     )
     db.add(issue)
     await db.commit()
-    await db.refresh(issue)
+    await db.refresh(issue)  # ✅ ensures issue_id and defaults are populated
 
-    # Upload and link images (if any)
+    # Upload and link images concurrently
     if images:
         try:
-            # upload concurrently
             coros = [save_uploaded_image(f) for f in images]
             upload_results = await asyncio.gather(*coros, return_exceptions=True)
 
@@ -53,13 +52,14 @@ async def create_issue(db: AsyncSession, payload: dict, images: Optional[List[Up
                     uploaded_by=payload["user_id"],
                 )
                 image_ids.append(img.image_id)
+
             issue.images = image_ids
             await db.commit()
             await db.refresh(issue)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Image handling failed: {e}")
 
-    # Notify issue creator
+    # Add notification for issue creator
     try:
         notif = NotificationCreate(
             recipient_user_id=issue.user_id,
@@ -72,10 +72,11 @@ async def create_issue(db: AsyncSession, payload: dict, images: Optional[List[Up
         await svc_add_notification(db, notif, commit=False)
         await db.commit()
     except Exception:
-        try:
-            await db.rollback()
-        except Exception:
-            pass
+        await db.rollback()
+
+    # ✅ The two key lines that fix MissingGreenlet forever:
+    await db.refresh(issue)   # hydrate everything
+    db.expunge(issue)
 
     return issue
 

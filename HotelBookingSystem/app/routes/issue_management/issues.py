@@ -23,7 +23,6 @@ from app.services.issue_service.issues_service import (
 )
 from app.schemas.pydantic_models.issues import IssueResponse
 from app.core.exceptions import ForbiddenError
-from app.core.cache import get_cached, set_cached, invalidate_pattern
 from app.utils.audit_helper import log_audit
 
 
@@ -55,6 +54,7 @@ async def create_issue(
     current_user: Users = Depends(get_current_user),
 ):
     urls: List[str] = []
+    user_id=current_user.user_id
     if images:
         coros = [save_uploaded_image(f) for f in images]
         results = await asyncio.gather(*coros, return_exceptions=True)
@@ -66,24 +66,22 @@ async def create_issue(
     payload = {
         "booking_id": booking_id,
         "room_id": room_id,
-        "user_id": current_user.user_id,
+        "user_id": user_id,
         "title": title,
         "description": description,
         "images": urls,
     }
 
     obj = await svc_create_issue(db, payload)
-    # invalidate issue lists for this user and admin lists
-    await invalidate_pattern(f"issues:user:{current_user.user_id}:*")
-    await invalidate_pattern("issues:admin:*")
+
     # audit issue create
     try:
-        new_val = IssueResponse.model_validate(obj).model_dump()
+        new_val = IssueResponse.model_validate(obj,from_attributes=True).model_dump()
         entity_id = f"issue:{getattr(obj, 'issue_id', None)}"
         await log_audit(entity="issue", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
     except Exception:
         pass
-    return IssueResponse.model_validate(obj).model_dump()
+    return IssueResponse.model_validate(obj,from_attributes=True).model_dump()
 
 
 @router.get("/", response_model=List[IssueResponse])
@@ -94,12 +92,8 @@ async def list_my_issues(
     current_user: Users = Depends(get_current_user),
 ):
     items = await svc_list_issues(db, user_id=current_user.user_id, limit=limit, offset=offset)
-    cache_key = f"issues:user:{current_user.user_id}:limit:{limit}:offset:{offset}"
-    cached = await get_cached(cache_key)
-    if cached is not None:
-        return cached
+
     result = [IssueResponse.model_validate(i).model_dump() for i in items]
-    await set_cached(cache_key, result, ttl=60)
     return result
 
 
@@ -147,9 +141,6 @@ async def update_my_issue(
         payload["images"] = urls
 
     updated = await svc_update_issue(db, issue_id, payload)
-    # invalidate caches related to this issue
-    await invalidate_pattern(f"issues:user:*{issue_id}*")
-    await invalidate_pattern("issues:admin:*")
     # audit issue update
     try:
         new_val = IssueResponse.model_validate(updated).model_dump()
@@ -171,8 +162,7 @@ async def post_chat(
     if obj.user_id != current_user.user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to post chat to this issue")
     chat = await svc_add_chat(db, issue_id, current_user.user_id, message)
-    # invalidate chats cache for this issue
-    await invalidate_pattern(f"issue_chats:{issue_id}:*")
+
     # audit chat message create
     try:
         entity_id = f"issue:{issue_id}:chat:{getattr(chat, 'chat_id', None)}"
@@ -198,10 +188,6 @@ async def list_chats(
     if obj.user_id != current_user.user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to view chats for this issue")
     items = await svc_list_chats(db, issue_id)
-    cache_key = f"issue_chats:{issue_id}"
-    cached = await get_cached(cache_key)
-    if cached is not None:
-        return cached
 
     result = [
         {
@@ -213,7 +199,6 @@ async def list_chats(
         }
         for i in items
     ]
-    await set_cached(cache_key, result, ttl=60)
     return result
 
 
@@ -229,13 +214,8 @@ async def admin_list_issues(
 ):
     _require_issue_write(user_permissions)
     items = await svc_list_issues(db, limit=limit, offset=offset)
-    cache_key = f"issues:admin:limit:{limit}:offset:{offset}"
-    cached = await get_cached(cache_key)
-    if cached is not None:
-        return cached
 
     result = [IssueResponse.model_validate(i).model_dump() for i in items]
-    await set_cached(cache_key, result, ttl=60)
     return result
 
 
@@ -266,9 +246,6 @@ async def admin_update_issue(
             payload["resolved_by"] = current_user.user_id
 
     updated = await svc_update_issue(db, issue_id, payload)
-    # invalidate admin and user issue caches
-    await invalidate_pattern("issues:admin:*")
-    await invalidate_pattern(f"issues:user:*{issue_id}*")
     # audit admin issue update
     try:
         new_val = IssueResponse.model_validate(updated).model_dump()
@@ -289,7 +266,6 @@ async def admin_post_chat(
 ):
     _require_issue_write(user_permissions)
     chat = await svc_add_chat(db, issue_id, current_user.user_id, message)
-    await invalidate_pattern(f"issue_chats:{issue_id}:*")
     # audit admin chat
     try:
         entity_id = f"issue:{issue_id}:chat:{getattr(chat, 'chat_id', None)}"
