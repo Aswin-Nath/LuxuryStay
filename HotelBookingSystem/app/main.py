@@ -17,6 +17,8 @@ from app.routes.reviews_management.reviews import router as reviews_router
 from app.routes.refund_management.refund import router as refunds_router
 from app.routes.booking_management.edit_booking import router as booking_edits_router
 from app.routes.profile_management.profile import router as profile_router
+from app.routes.logs_management.audit_logs import router as audit_logs_router
+from app.routes.logs_management.booking_logs import router as booking_logs_router
 from app.routes.backup_and_restore_management.backups import router as backups_router
 
 
@@ -48,4 +50,8 @@ app.include_router(refunds_router)
 app.include_router(booking_edits_router)
 app.include_router(profile_router)
 app.include_router(backups_router)
+app.include_router(audit_logs_router)
+app.include_router(booking_logs_router)
+from app.routes.backup_and_restore_management.restores import router as restores_router
+app.include_router(restores_router)
 

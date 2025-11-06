@@ -11,6 +11,7 @@ from app.models.sqlalchemy_schemas.permissions import Permissions,PermissionRole
 from app.core.security import oauth2_scheme
 from app.models.sqlalchemy_schemas.authentication import BlacklistedTokens
 from app.services.authentication_service.authentication_core import _hash_token
+from app.models.sqlalchemy_schemas.roles import Roles
 
 load_dotenv()
 
@@ -136,4 +137,20 @@ async def ensure_not_basic_user(current_user: Users = Depends(get_current_user))
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient privileges: action not available for basic users",
         )
+    return True
+
+
+async def ensure_admin(current_user: Users = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Dependency that permits only users whose role name is 'ADMIN'.
+
+    This queries the `roles_utility` table to verify the human-readable role name.
+    """
+    role_id = getattr(current_user, "role_id", None)
+    if not role_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient privileges")
+
+    result = await db.execute(select(Roles).where(Roles.role_id == role_id))
+    role = result.scalars().first()
+    if not role or not getattr(role, "role_name", "").upper() == "ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required")
     return True

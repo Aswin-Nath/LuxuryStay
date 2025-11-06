@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional
 from pymongo import ASCENDING, DESCENDING
-from dateutil import parser
+from datetime import datetime
+
 from app.database.mongo_connnection import get_database
 from app.schemas.pydantic_models.backup_data_collections import BackupDataCollection
 
@@ -9,7 +10,11 @@ async def create_backup(doc: BackupDataCollection) -> Dict[str, Any]:
 	"""Insert a backup_data_collections document and return the inserted document (with _id)."""
 	db = get_database()
 	collection = db.backup_data_collections
-	payload = doc.model_dump(by_alias=True, exclude_none=True)
+	# Use dict for broad pydantic compatibility
+	try:
+		payload = doc.dict(by_alias=True, exclude_none=True)
+	except Exception:
+		payload = doc.model_dump(by_alias=True, exclude_none=True)
 	result = await collection.insert_one(payload)
 	inserted = await collection.find_one({"_id": result.inserted_id})
 	return inserted
@@ -42,12 +47,15 @@ async def list_backups(
 		filt["databaseType"] = databaseType
 	if start_ts or end_ts:
 		ts_filter: Dict[str, Any] = {}
-
-		if start_ts:
-			ts_filter["$gte"] = parser.isoparse(start_ts)
-		if end_ts:
-			ts_filter["$lte"] = parser.isoparse(end_ts)
-		filt["timestamp"] = ts_filter
+		try:
+			if start_ts:
+				ts_filter["$gte"] = datetime.fromisoformat(start_ts)
+			if end_ts:
+				ts_filter["$lte"] = datetime.fromisoformat(end_ts)
+		except Exception:
+			ts_filter = {}
+		if ts_filter:
+			filt["timestamp"] = ts_filter
 
 	cursor = collection.find(filt).sort("timestamp", DESCENDING).skip(int(skip)).limit(int(limit))
 	results = []
