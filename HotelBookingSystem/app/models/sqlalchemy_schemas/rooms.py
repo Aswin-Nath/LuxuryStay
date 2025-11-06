@@ -42,13 +42,13 @@ class RoomTypes(Base):
     __tablename__ = "room_types"
 
     room_type_id = Column(Integer, primary_key=True, autoincrement=True)
-    type_name = Column(String(50), nullable=False, unique=True)
+    type_name = Column(String(50), nullable=False, unique=True, index=True)
     max_adult_count = Column(SmallInteger, nullable=False)
     max_child_count = Column(SmallInteger, nullable=False, default=0)
-    price_per_night = Column(Numeric(12, 2), nullable=False)
+    price_per_night = Column(Numeric(12, 2), nullable=False, index=True)
     description = Column(Text, nullable=True)
     square_ft = Column(Integer, nullable=False)
-    is_deleted = Column(Boolean, nullable=False, default=False)
+    is_deleted = Column(Boolean, nullable=False, default=False, index=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
     
@@ -63,8 +63,8 @@ class Rooms(Base):
 
     room_id = Column(Integer, primary_key=True, autoincrement=True)
     room_no = Column(String(20), nullable=False, unique=True)
-    room_type_id = Column(Integer, ForeignKey("room_types.room_type_id", ondelete="RESTRICT"), nullable=False)
-    room_status = Column(PgEnum(RoomStatus, name="room_status_enum"), nullable=False, default=RoomStatus.AVAILABLE)
+    room_type_id = Column(Integer, ForeignKey("room_types.room_type_id", ondelete="RESTRICT"), index=True, nullable=False)
+    room_status = Column(PgEnum(RoomStatus, name="room_status_enum"), nullable=False, default=RoomStatus.AVAILABLE, index=True)
     freeze_reason = Column(PgEnum(FreezeReason, name="freeze_reason_enum"), nullable=True)
     price_per_night = Column(Numeric(12, 2), nullable=False)
     max_adult_count = Column(SmallInteger, nullable=False)
@@ -83,7 +83,7 @@ class RoomAmenities(Base):
     __tablename__ = "room_amenities"
 
     amenity_id = Column(Integer, primary_key=True, autoincrement=True)
-    amenity_name = Column(String(100), nullable=False, unique=True)
+    amenity_name = Column(String(100), nullable=False, unique=True, index=True)
 
     # Relationships
     rooms = relationship("RoomAmenityMap", back_populates="amenity", cascade="all, delete-orphan")
@@ -94,8 +94,8 @@ class RoomAmenities(Base):
 class RoomAmenityMap(Base):
     __tablename__ = "room_amenity_map"
 
-    room_id = Column(Integer, ForeignKey("rooms.room_id", ondelete="CASCADE"), primary_key=True)
-    amenity_id = Column(Integer, ForeignKey("room_amenities.amenity_id", ondelete="CASCADE"), primary_key=True)
+    room_id = Column(Integer, ForeignKey("rooms.room_id", ondelete="CASCADE"), primary_key=True, index=True)
+    amenity_id = Column(Integer, ForeignKey("room_amenities.amenity_id", ondelete="CASCADE"), primary_key=True, index=True)
 
     # Relationships
     room = relationship("Rooms", back_populates="amenities")

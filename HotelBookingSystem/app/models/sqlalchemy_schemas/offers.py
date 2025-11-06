@@ -18,20 +18,20 @@ class Offer(Base):
     __tablename__ = "offers"
 
     offer_id = Column(Integer, primary_key=True, autoincrement=True)
-    offer_name = Column(String(100), unique=True, nullable=False)
+    offer_name = Column(String(100), unique=True, index=True, nullable=False)
     description = Column(Text, nullable=True)
     offer_price = Column(Numeric(10, 2), nullable=False, default=0)  # ✅ MUST EXIST
     offer_items = Column(JSON, nullable=True)  # Array of perks/features
     discount_percent = Column(Numeric(5, 2), CheckConstraint("discount_percent >= 0"), nullable=False)
-    start_date = Column(Date, nullable=False)
-    expiry_date = Column(Date, nullable=False)
-    created_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"))
-    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
-    is_deleted = Column(Boolean, default=False)
+    start_date = Column(Date, nullable=False, index=True)
+    expiry_date = Column(Date, nullable=False, index=True)
+    created_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"), index=True)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), index=True)
+    is_deleted = Column(Boolean, default=False, index=True)
 
     # Newly added columns
     offer_url = Column(String(255), nullable=True)
-    visibility_status = Column(String(50), server_default="AVAILABLE", nullable=False)
+    visibility_status = Column(String(50), server_default="AVAILABLE", nullable=False, index=True)
 
 
     # Relationships

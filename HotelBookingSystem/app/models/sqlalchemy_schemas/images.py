@@ -6,12 +6,12 @@ class Images(Base):
 	__tablename__ = "images"
 
 	image_id = Column(Integer, primary_key=True, autoincrement=True)
-	entity_type = Column(String(50), nullable=False)
-	entity_id = Column(Integer, nullable=False)
+	entity_type = Column(String(50), nullable=False, index=True)
+	entity_id = Column(Integer, nullable=False, index=True)
 	image_url = Column(Text, nullable=False)
 	caption = Column(String(255), nullable=True)
-	is_primary = Column(Boolean, server_default="false")
-	uploaded_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
+	is_primary = Column(Boolean, server_default="false", index=True)
+	uploaded_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"), index=True, nullable=True)
 	created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
-	is_deleted = Column(Boolean, server_default="false")
+	is_deleted = Column(Boolean, server_default="false", index=True)
 

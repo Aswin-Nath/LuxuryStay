@@ -46,14 +46,15 @@ class Notifications(Base):
 	recipient_user_id = Column(
 		Integer,
 		ForeignKey("users.user_id", ondelete="CASCADE"),
+		index=True,
 		nullable=False,
 	)
 	notification_type = Column(notification_type_enum, server_default="OTHER", nullable=False)
 	entity_type = Column(entity_type_enum, nullable=True)
-	entity_id = Column(Integer, nullable=True)
+	entity_id = Column(Integer, nullable=True, index=True)
 	title = Column(Text, nullable=False)
 	message = Column(Text, nullable=False)
-	is_read = Column(Boolean, server_default="false", nullable=False)
-	created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+	is_read = Column(Boolean, server_default="false", nullable=False, index=True)
+	created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), index=True)
 	read_at = Column(TIMESTAMP(timezone=True), nullable=True)
-	is_deleted = Column(Boolean, server_default="false", nullable=False)
+	is_deleted = Column(Boolean, server_default="false", nullable=False, index=True)

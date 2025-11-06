@@ -16,16 +16,16 @@ class Refunds(Base):
     __tablename__ = "refunds"
 
     refund_id = Column(Integer, primary_key=True, autoincrement=True)
-    booking_id = Column(Integer, ForeignKey("bookings.booking_id", ondelete="RESTRICT"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="RESTRICT"), nullable=False)
+    booking_id = Column(Integer, ForeignKey("bookings.booking_id", ondelete="RESTRICT"), index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="RESTRICT"), index=True, nullable=False)
     type = Column(String(50), nullable=False)
-    status = Column(String(50), server_default="INITIATED")
+    status = Column(String(50), server_default="INITIATED", index=True)
     refund_amount = Column(Numeric(12, 2), nullable=False)
-    initiated_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    initiated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), index=True)
     processed_at = Column(TIMESTAMP(timezone=True), nullable=True)
     completed_at = Column(TIMESTAMP(timezone=True), nullable=True)
     remarks = Column(Text, nullable=True)
-    is_deleted = Column(Boolean, server_default="false")
+    is_deleted = Column(Boolean, server_default="false", index=True)
     # transaction details are nullable because the refund transfer may be processed later
     transaction_method_id = Column(Integer, ForeignKey("payment_method_utility.method_id", ondelete="RESTRICT"), nullable=True)
     transaction_number = Column(String(100), nullable=True)
@@ -35,7 +35,7 @@ class Refunds(Base):
 class RefundRoomMap(Base):
     __tablename__ = "refund_room_map"
 
-    refund_id = Column(Integer, ForeignKey("refunds.refund_id", ondelete="CASCADE"), primary_key=True)
-    booking_id = Column(Integer, ForeignKey("bookings.booking_id"), primary_key=True)
-    room_id = Column(Integer, ForeignKey("rooms.room_id"), primary_key=True)
+    refund_id = Column(Integer, ForeignKey("refunds.refund_id", ondelete="CASCADE"), primary_key=True, index=True)
+    booking_id = Column(Integer, ForeignKey("bookings.booking_id"), primary_key=True, index=True)
+    room_id = Column(Integer, ForeignKey("rooms.room_id"), primary_key=True, index=True)
     refund_amount = Column(Numeric(12, 2), nullable=False)

@@ -51,8 +51,8 @@ class Permissions(Base):
     __tablename__ = "permissions"
 
     permission_id = Column(Integer, primary_key=True, autoincrement=True)
-    resource = Column(Enum(Resources, name="resources", native_enum=False), unique=True, nullable=False)
-    permission_type = Column(Enum(PermissionTypes, name="permission_types", native_enum=False), nullable=False)
+    resource = Column(Enum(Resources, name="resources", native_enum=False), unique=True, index=True, nullable=False)
+    permission_type = Column(Enum(PermissionTypes, name="permission_types", native_enum=False), index=True, nullable=False)
     __table_args__ = (UniqueConstraint('resource', 'permission_type', name='unique_resource_permission'),)
 
     roles = relationship("PermissionRoleMap", back_populates="permission")
@@ -60,8 +60,8 @@ class Permissions(Base):
 class PermissionRoleMap(Base):
     __tablename__ = "permission_role_map"
 
-    role_id = Column(Integer, ForeignKey("roles_utility.role_id"), primary_key=True)
-    permission_id = Column(Integer, ForeignKey("permissions.permission_id"), primary_key=True)
+    role_id = Column(Integer, ForeignKey("roles_utility.role_id"), primary_key=True, index=True)
+    permission_id = Column(Integer, ForeignKey("permissions.permission_id"), primary_key=True, index=True)
 
     # Relationships
     role = relationship("Roles", back_populates="permissions")
