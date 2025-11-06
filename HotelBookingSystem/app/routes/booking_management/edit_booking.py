@@ -13,7 +13,7 @@ from app.services.booking_service.booking_edit import (
     decision_on_booking_edit_service
 )
 
-router = APIRouter(prefix="/booking-edits", tags=["booking-edits"])
+router = APIRouter(prefix="/booking-edits", tags=["BOOKING-EDITS"])
 
 
 # ✅ 1️⃣ Create Booking Edit
