@@ -24,6 +24,7 @@ from app.services.issue_service.issues_service import (
 from app.schemas.pydantic_models.issues import IssueResponse
 from app.core.exceptions import ForbiddenError
 from app.core.cache import get_cached, set_cached, invalidate_pattern
+from app.utils.audit_helper import log_audit
 
 
 router = APIRouter(prefix="/api/issues", tags=["ISSUES"])
@@ -75,6 +76,13 @@ async def create_issue(
     # invalidate issue lists for this user and admin lists
     await invalidate_pattern(f"issues:user:{current_user.user_id}:*")
     await invalidate_pattern("issues:admin:*")
+    # audit issue create
+    try:
+        new_val = IssueResponse.model_validate(obj).model_dump()
+        entity_id = f"issue:{getattr(obj, 'issue_id', None)}"
+        await log_audit(entity="issue", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
+    except Exception:
+        pass
     return IssueResponse.model_validate(obj).model_dump()
 
 
@@ -142,6 +150,13 @@ async def update_my_issue(
     # invalidate caches related to this issue
     await invalidate_pattern(f"issues:user:*{issue_id}*")
     await invalidate_pattern("issues:admin:*")
+    # audit issue update
+    try:
+        new_val = IssueResponse.model_validate(updated).model_dump()
+        entity_id = f"issue:{getattr(updated, 'issue_id', None)}"
+        await log_audit(entity="issue", entity_id=entity_id, action="UPDATE", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
+    except Exception:
+        pass
     return IssueResponse.model_validate(updated).model_dump()
 
 
@@ -158,6 +173,12 @@ async def post_chat(
     chat = await svc_add_chat(db, issue_id, current_user.user_id, message)
     # invalidate chats cache for this issue
     await invalidate_pattern(f"issue_chats:{issue_id}:*")
+    # audit chat message create
+    try:
+        entity_id = f"issue:{issue_id}:chat:{getattr(chat, 'chat_id', None)}"
+        await log_audit(entity="issue_chat", entity_id=entity_id, action="INSERT", new_value={"message": chat.message}, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
+    except Exception:
+        pass
     return {
         "chat_id": chat.chat_id,
         "issue_id": chat.issue_id,
@@ -248,6 +269,13 @@ async def admin_update_issue(
     # invalidate admin and user issue caches
     await invalidate_pattern("issues:admin:*")
     await invalidate_pattern(f"issues:user:*{issue_id}*")
+    # audit admin issue update
+    try:
+        new_val = IssueResponse.model_validate(updated).model_dump()
+        entity_id = f"issue:{getattr(updated, 'issue_id', None)}"
+        await log_audit(entity="issue", entity_id=entity_id, action="UPDATE", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
+    except Exception:
+        pass
     return IssueResponse.model_validate(updated).model_dump()
 
 
@@ -262,6 +290,12 @@ async def admin_post_chat(
     _require_issue_write(user_permissions)
     chat = await svc_add_chat(db, issue_id, current_user.user_id, message)
     await invalidate_pattern(f"issue_chats:{issue_id}:*")
+    # audit admin chat
+    try:
+        entity_id = f"issue:{issue_id}:chat:{getattr(chat, 'chat_id', None)}"
+        await log_audit(entity="issue_chat", entity_id=entity_id, action="INSERT", new_value={"message": chat.message}, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
+    except Exception:
+        pass
     return {
         "chat_id": chat.chat_id,
         "issue_id": chat.issue_id,

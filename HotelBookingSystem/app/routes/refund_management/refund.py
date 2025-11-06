@@ -7,6 +7,7 @@ from app.services.refunds_service.refunds_service import update_refund_transacti
 from datetime import datetime
 from app.dependencies.authentication import get_current_user, ensure_not_basic_user
 from app.models.sqlalchemy_schemas.users import Users
+from app.utils.audit_helper import log_audit
 
 
 router = APIRouter(prefix="/api", tags=["REFUNDS"])
@@ -21,6 +22,13 @@ async def complete_refund(refund_id: int, payload: RefundTransactionUpdate, db: 
     from app.core.cache import invalidate_pattern
     await invalidate_pattern("refunds:*")
     await invalidate_pattern(f"refund:{refund_id}")
+    # audit refund transaction update
+    try:
+        new_val = RefundResponse.model_validate(obj).model_dump()
+        entity_id = f"refund:{refund_id}"
+        await log_audit(entity="refund", entity_id=entity_id, action="UPDATE", new_value=new_val, changed_by_user_id=getattr(current_user, 'user_id', None), user_id=getattr(current_user, 'user_id', None))
+    except Exception:
+        pass
     return RefundResponse.model_validate(obj)
 
 

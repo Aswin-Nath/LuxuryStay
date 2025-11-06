@@ -8,6 +8,7 @@ from app.services.wishlist_service.wishlist_service import add_to_wishlist as sv
 from app.dependencies.authentication import get_current_user
 from app.models.sqlalchemy_schemas.users import Users
 from app.core.cache import get_cached, set_cached, invalidate_pattern
+from app.utils.audit_helper import log_audit
 
 
 router = APIRouter(prefix="/api/wishlist", tags=["WISHLIST"])
@@ -20,6 +21,13 @@ async def add_wishlist(payload: WishlistCreate, db: AsyncSession = Depends(get_d
         payload.user_id = current_user.user_id
 
     obj = await svc_add(db, payload)
+    # audit wishlist create
+    try:
+        new_val = WishlistResponse.model_validate(obj).model_dump()
+        entity_id = f"wishlist:{getattr(obj, 'wishlist_id', None)}"
+        await log_audit(entity="wishlist", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
+    except Exception:
+        pass
     # invalidate this user's wishlist cache
     await invalidate_pattern(f"wishlist:user:{current_user.user_id}:*")
     return WishlistResponse.model_validate(obj).model_dump()

@@ -4,6 +4,7 @@ from typing import List, Optional
 from app.services.backup_restore_service.restore_service import create_restore, list_restores
 from app.schemas.pydantic_models.restored_data_collections import RestoredDataCollection
 from app.dependencies.authentication import ensure_not_basic_user
+from app.utils.audit_helper import log_audit
 
 router = APIRouter(prefix="/restores", tags=["restore"])
 
@@ -13,6 +14,12 @@ async def post_restore(payload: RestoredDataCollection, _ok: bool = Depends(ensu
     created = await create_restore(payload)
     if not created:
         raise HTTPException(status_code=500, detail="Failed to create restore record")
+    # audit restore create
+    try:
+        entity_id = f"restore:{created.get('id') or created.get('_id') or ''}"
+        await log_audit(entity="restore", entity_id=entity_id, action="INSERT", new_value=created)
+    except Exception:
+        pass
     return created
 
 

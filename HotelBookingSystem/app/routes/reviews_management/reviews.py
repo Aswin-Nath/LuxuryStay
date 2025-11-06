@@ -18,6 +18,7 @@ from app.services.images_service.image_upload_service import save_uploaded_image
 from app.services.room_service.images_service import create_image, hard_delete_image, get_images_for_review
 from app.schemas.pydantic_models.images import ImageResponse
 from app.core.cache import get_cached, set_cached, invalidate_pattern
+from app.utils.audit_helper import log_audit
 
 
 router = APIRouter(prefix="/api/reviews", tags=["REVIEWS"])
@@ -42,6 +43,13 @@ async def create_review(
     obj = await svc_create_review(db, payload, current_user)
     # invalidate reviews caches
     await invalidate_pattern("reviews:*")
+    # audit review create
+    try:
+        new_val = ReviewResponse.model_validate(obj).model_dump()
+        entity_id = f"review:{getattr(obj, 'review_id', None)}"
+        await log_audit(entity="review", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
+    except Exception:
+        pass
     # Images should be uploaded via the dedicated review images endpoints:
     # POST /api/reviews/{review_id}/images  -> for uploading
     # DELETE /api/reviews/{review_id}/images -> for removing images
@@ -80,6 +88,13 @@ async def respond_review(review_id: int, payload: AdminResponseCreate, db: Async
     # payload validated by Pydantic: {"admin_response": "..."}
     obj = await svc_admin_respond(db, review_id, current_user, payload.admin_response)
     await invalidate_pattern("reviews:*")
+    # audit admin response
+    try:
+        new_val = ReviewResponse.model_validate(obj).model_dump()
+        entity_id = f"review:{getattr(obj, 'review_id', None)}"
+        await log_audit(entity="review", entity_id=entity_id, action="UPDATE", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
+    except Exception:
+        pass
     return ReviewResponse.model_validate(obj)
 
 
@@ -88,6 +103,13 @@ async def update_review(review_id: int, payload: ReviewUpdate, db: AsyncSession 
     """Allow the authenticated reviewer to update their review's rating/comment."""
     obj = await svc_update_review(db, review_id, payload, current_user)
     await invalidate_pattern("reviews:*")
+    # audit user update
+    try:
+        new_val = ReviewResponse.model_validate(obj).model_dump()
+        entity_id = f"review:{getattr(obj, 'review_id', None)}"
+        await log_audit(entity="review", entity_id=entity_id, action="UPDATE", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
+    except Exception:
+        pass
     return ReviewResponse.model_validate(obj)
 
 
@@ -113,6 +135,13 @@ async def add_review_image(
             caption = captions[idx]
         obj = await create_image(db, entity_type="review", entity_id=review_id, image_url=url, caption=caption, uploaded_by=current_user.user_id)
         images.append(obj)
+        # audit each image created
+        try:
+            new_val = ImageResponse.model_validate(obj).model_dump()
+            entity_id = f"review:{review_id}:image:{getattr(obj, 'image_id', None)}"
+            await log_audit(entity="review_image", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
+        except Exception:
+            pass
 
     # invalidate caches for this review
     await invalidate_pattern(f"reviews:*{review_id}*")

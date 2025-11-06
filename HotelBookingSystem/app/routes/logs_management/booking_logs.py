@@ -1,20 +1,12 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 
-from app.services.logger_service.logs_service import create_booking_log, list_booking_logs
+from app.services.logger_service.logs_service import list_booking_logs
 from app.schemas.pydantic_models.booking_logs import BookingLogModel
 
 router = APIRouter(prefix="/booking_logs", tags=["logs"])
 
-
-@router.post("/", response_model=dict)
-async def post_booking_log(payload: BookingLogModel):
-    created = await create_booking_log(payload)
-    if not created:
-        raise HTTPException(status_code=500, detail="Failed to create booking log")
-    return created
-
-
+# POST for creating booking logs is handled by middleware (app/middlewares/logs_middleware.py)
 @router.get("/", response_model=List[dict])
 async def get_booking_logs(
     booking_id: Optional[int] = Query(None),

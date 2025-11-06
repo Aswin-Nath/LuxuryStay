@@ -19,6 +19,7 @@ from app.schemas.pydantic_models.images import ImageResponse
 from app.dependencies.authentication import get_current_user, get_user_permissions
 from app.models.sqlalchemy_schemas.users import Users
 from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
+from app.utils.audit_helper import log_audit
 
 
 router = APIRouter(prefix="/api/rooms/{room_id}/images", tags=["ROOM_IMAGES"])
@@ -64,6 +65,13 @@ async def upload_image_for_room(
             is_primary=is_primary,
             uploaded_by=current_user.user_id,
         )
+        # audit image create
+        try:
+            new_val = ImageResponse.model_validate(obj).model_dump()
+            entity_id = f"room:{room_id}:image:{getattr(obj, 'image_id', None)}"
+            await log_audit(entity="room_image", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
+        except Exception:
+            pass
         return ImageResponse.model_validate(obj)
     except HTTPException:
         raise

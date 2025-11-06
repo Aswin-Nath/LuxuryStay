@@ -4,6 +4,7 @@ from typing import List, Optional
 from app.services.backup_restore_service.backup_service import create_backup, list_backups
 from app.schemas.pydantic_models.backup_data_collections import BackupDataCollection
 from app.dependencies.authentication import ensure_not_basic_user
+from app.utils.audit_helper import log_audit
 
 router = APIRouter(prefix="/backups", tags=["backup"])
 
@@ -14,6 +15,12 @@ async def post_backup(payload: BackupDataCollection, _ok: bool = Depends(ensure_
     created = await create_backup(payload)
     if not created:
         raise HTTPException(status_code=500, detail="Failed to create backup record")
+    # audit backup create
+    try:
+        entity_id = f"backup:{created.get('id') or created.get('_id') or ''}"
+        await log_audit(entity="backup", entity_id=entity_id, action="INSERT", new_value=created)
+    except Exception:
+        pass
     return created
 
 

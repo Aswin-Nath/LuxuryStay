@@ -12,6 +12,7 @@ from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
 from app.core.exceptions import ForbiddenError
 from app.services.refunds_service.refunds_service import cancel_booking_and_create_refund as svc_cancel_booking
 from app.core.cache import get_cached, set_cached, invalidate_pattern
+from app.utils.audit_helper import log_audit
 
 
 router = APIRouter(prefix="/api/bookings", tags=["BOOKINGS"])
@@ -33,14 +34,31 @@ async def create_booking(payload: BookingCreate, db: AsyncSession = Depends(get_
 		payload.user_id = current_user.user_id
 
 	obj = await svc_create_booking(db, payload)
+	# create audit log for booking creation
+	try:
+		new_val = BookingResponse.model_validate(obj).model_dump(exclude={"created_at"})
+		entity_id = f"booking:{getattr(obj, 'booking_id', None)}"
+		changed_by = getattr(locals().get('current_user'), 'user_id', None) or getattr(payload, 'user_id', None)
+		await log_audit(entity="booking", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=changed_by, user_id=changed_by)
+	except Exception:
+		# auditing must not break main flow; swallow errors
+		pass
 	# invalidate bookings cache after new booking
 	await invalidate_pattern("bookings:*")
 	return BookingResponse.model_validate(obj).model_dump(exclude={"created_at"})
 
 @router.post("/{booking_id}/cancel", response_model=RefundResponse, status_code=status.HTTP_201_CREATED)
 async def cancel_booking(booking_id: int, payload: RefundCreate, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)):
-    obj = await svc_cancel_booking(db, booking_id, payload, current_user)
-    return RefundResponse.model_validate(obj)
+	obj = await svc_cancel_booking(db, booking_id, payload, current_user)
+	# audit booking cancellation (status change)
+	try:
+		new_val = RefundResponse.model_validate(obj).model_dump()
+		entity_id = f"booking:{booking_id}"
+		changed_by = getattr(locals().get('current_user'), 'user_id', None)
+		await log_audit(entity="booking", entity_id=entity_id, action="UPDATE", new_value=new_val, changed_by_user_id=changed_by, user_id=changed_by)
+	except Exception:
+		pass
+	return RefundResponse.model_validate(obj)
 
 
 @router.get("/", response_model=List[BookingResponse])

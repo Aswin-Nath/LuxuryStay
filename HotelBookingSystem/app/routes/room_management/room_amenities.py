@@ -12,6 +12,7 @@ from app.services.room_service.room_amenities_service import (
     get_amenities_for_room as svc_get_amenities_for_room,
     unmap_amenity as svc_unmap_amenity,
 )
+from app.utils.audit_helper import log_audit
 
 router = APIRouter(prefix="/api/room-amenities", tags=["ROOM_AMENITIES"])
 
@@ -24,6 +25,13 @@ async def map_amenity(payload: RoomAmenityMapCreate, db: AsyncSession = Depends(
     ):
         raise ForbiddenError("Insufficient permissions to map amenities")
     await svc_map_amenity(db, payload)
+    # audit mapping
+    try:
+        new_val = RoomAmenityMapResponse.model_validate(payload).model_dump()
+        entity_id = f"room:{getattr(payload, 'room_id', None)}:amenity:{getattr(payload, 'amenity_id', None)}"
+        await log_audit(entity="room_amenity", entity_id=entity_id, action="INSERT", new_value=new_val)
+    except Exception:
+        pass
     return RoomAmenityMapResponse.model_validate(payload).model_copy(update={"message": "Mapped successfully"})
 
 

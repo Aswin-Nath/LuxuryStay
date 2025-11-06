@@ -6,6 +6,7 @@ from typing import List
 from app.services.roles_and_permissions_service.roles_service import create_role as svc_create_role, list_roles as svc_list_roles
 from app.dependencies.authentication import get_user_permissions, ensure_not_basic_user
 from app.core.cache import get_cached, set_cached, invalidate_pattern
+from app.utils.audit_helper import log_audit
 
 roles_router = APIRouter(prefix="/roles", tags=["ROLES"])
 
@@ -21,6 +22,13 @@ async def create_new_role(payload: RoleCreate, db: AsyncSession = Depends(get_db
     # Invalidate roles cache after creation
     await invalidate_pattern("roles:*")
     schema_data = RoleResponse.model_validate(role_obj)
+    # audit role creation
+    try:
+        new_val = schema_data.model_dump()
+        entity_id = f"role:{getattr(role_obj, 'role_id', None)}"
+        await log_audit(entity="role", entity_id=entity_id, action="INSERT", new_value=new_val)
+    except Exception:
+        pass
     return schema_data.model_copy(update={"message": "Role created successfully"})
 
 

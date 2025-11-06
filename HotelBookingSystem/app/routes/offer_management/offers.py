@@ -11,6 +11,7 @@ from app.models.sqlalchemy_schemas.users import Users
 from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
 from app.core.exceptions import ForbiddenError
 from app.core.cache import get_cached, set_cached, invalidate_pattern
+from app.utils.audit_helper import log_audit
 
 
 router = APIRouter(prefix="/api/offers", tags=["OFFERS"])
@@ -35,6 +36,13 @@ async def create_offer(payload: OfferCreate, db: AsyncSession = Depends(get_db),
     obj = await svc_create_offer(db, payload, created_by=current_user.user_id)
     # invalidate offer list caches
     await invalidate_pattern("offers:*")
+    # audit offer create
+    try:
+        new_val = OfferResponse.model_validate(obj).model_dump(exclude={"created_at"})
+        entity_id = f"offer:{getattr(obj, 'offer_id', None)}"
+        await log_audit(entity="offer", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
+    except Exception:
+        pass
     # Use pydantic model_validate (from_attributes=True) to convert SQLAlchemy object
     # Exclude created_at from any API responses (handled internally by backend)
     return OfferResponse.model_validate(obj).model_dump(exclude={"created_at"})
@@ -72,6 +80,13 @@ async def edit_offer(offer_id: int, payload: OfferCreate, db: AsyncSession = Dep
     obj = await svc_update_offer(db, offer_id, payload, updated_by=current_user.user_id)
     # invalidate offers cache on update
     await invalidate_pattern("offers:*")
+    # audit offer update
+    try:
+        new_val = OfferResponse.model_validate(obj).model_dump(exclude={"created_at"})
+        entity_id = f"offer:{getattr(obj, 'offer_id', None)}"
+        await log_audit(entity="offer", entity_id=entity_id, action="UPDATE", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
+    except Exception:
+        pass
     return OfferResponse.model_validate(obj).model_dump(exclude={"created_at"})
 
 

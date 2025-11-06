@@ -9,6 +9,7 @@ from app.schemas.pydantic_models.users import ProfileResponse, ProfileUpdate, Ch
 from app.services.images_service.image_upload_service import save_uploaded_image
 from app.services.authentication_service.authentication_usecases import change_password as svc_change_password
 from app.core.cache import invalidate_pattern, get_cached, set_cached
+from app.utils.audit_helper import log_audit
 
 router = APIRouter(prefix="/api/profile", tags=["PROFILE"])
 
@@ -60,6 +61,13 @@ async def update_my_profile(
 	await db.refresh(current_user)
 	# invalidate profile cache for this user
 	await invalidate_pattern(f"profile:user:{current_user.user_id}")
+	# audit profile update
+	try:
+		new_val = ProfileResponse.model_validate(current_user).model_dump()
+		entity_id = f"user:{getattr(current_user, 'user_id', None)}"
+		await log_audit(entity="user", entity_id=entity_id, action="UPDATE", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
+	except Exception:
+		pass
 	return ProfileResponse.model_validate(current_user)
 
 
@@ -73,10 +81,23 @@ async def upload_profile_image(file: UploadFile = File(...), db: AsyncSession = 
 	await db.refresh(current_user)
 	# invalidate profile cache for this user
 	await invalidate_pattern(f"profile:user:{current_user.user_id}")
+	# audit profile image upload
+	try:
+		new_val = ProfileResponse.model_validate(current_user).model_dump()
+		entity_id = f"user:{getattr(current_user, 'user_id', None)}"
+		await log_audit(entity="user", entity_id=entity_id, action="UPDATE", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
+	except Exception:
+		pass
 	return ProfileResponse.model_validate(current_user)
 
 @router.put("/password")
 async def change_my_password(payload: ChangePasswordPayload, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)):
 	"""Change current user's password by verifying current password."""
 	await svc_change_password(db, current_user, payload.current_password, payload.new_password)
+	# audit password change (do not store password values)
+	try:
+		entity_id = f"user:{getattr(current_user, 'user_id', None)}"
+		await log_audit(entity="user", entity_id=entity_id, action="UPDATE", new_value={"password_changed": True}, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
+	except Exception:
+		pass
 	return {"message": "Password changed successfully"}

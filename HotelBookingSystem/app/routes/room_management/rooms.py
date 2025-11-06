@@ -15,6 +15,7 @@ from app.services.room_service.rooms_service import (
     delete_room as svc_delete_room,
 )
 from app.core.cache import get_cached, set_cached, invalidate_pattern
+from app.utils.audit_helper import log_audit
 
 router = APIRouter(prefix="/api/rooms", tags=["ROOMS"])
 
@@ -45,6 +46,14 @@ async def create_room(payload: RoomCreate, db: AsyncSession = Depends(get_db), u
     # Require WRITE on both Booking and Room_Management
     _require_permissions(user_permissions, [Resources.BOOKING, Resources.ROOM_MANAGEMENT], PermissionTypes.WRITE, require_all=True)
     obj = await svc_create_room(db, payload)
+    # create audit log for room creation
+    try:
+        new_val = RoomResponse.model_validate(obj).model_dump()
+        entity_id = f"room:{getattr(obj, 'room_id', None)}"
+        changed_by = getattr(locals().get('current_user'), 'user_id', None) or getattr(payload, 'user_id', None)
+        await log_audit(entity="room", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=changed_by, user_id=changed_by)
+    except Exception:
+        pass
     # invalidate rooms cache
     await invalidate_pattern("rooms:*")
     return RoomResponse.model_validate(obj).model_copy(update={"message": "Room created"})
@@ -90,6 +99,14 @@ async def update_room(room_id: int, payload: RoomUpdate, db: AsyncSession = Depe
     # Require WRITE on both Booking and Room_Management
     _require_permissions(user_permissions, [Resources.BOOKING, Resources.ROOM_MANAGEMENT], PermissionTypes.WRITE, require_all=True)
     obj = await svc_update_room(db, room_id, payload)
+    # audit update
+    try:
+        new_val = RoomResponse.model_validate(obj).model_dump()
+        entity_id = f"room:{getattr(obj, 'room_id', None)}"
+        changed_by = getattr(locals().get('current_user'), 'user_id', None)
+        await log_audit(entity="room", entity_id=entity_id, action="UPDATE", new_value=new_val, changed_by_user_id=changed_by, user_id=changed_by)
+    except Exception:
+        pass
     # invalidate rooms cache after update
     await invalidate_pattern("rooms:*")
     return RoomResponse.model_validate(obj).model_copy(update={"message": "Updated successfully"})

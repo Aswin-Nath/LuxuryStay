@@ -14,6 +14,7 @@ from app.services.room_service.amenities_service import (
     delete_amenity as svc_delete_amenity,
 )
 from app.services.room_service.room_amenities_service import get_rooms_for_amenity as svc_get_rooms_for_amenity
+from app.utils.audit_helper import log_audit
 
 router = APIRouter(prefix="/api/amenities", tags=["AMENITIES"])
 
@@ -27,6 +28,13 @@ async def create_amenity(payload: AmenityCreate, db: AsyncSession = Depends(get_
     ):
         raise ForbiddenError("Insufficient permissions to create amenities")
     obj = await svc_create_amenity(db, payload)
+    # audit amenity create
+    try:
+        new_val = AmenityResponse.model_validate(obj).model_dump()
+        entity_id = f"amenity:{getattr(obj, 'amenity_id', None)}"
+        await log_audit(entity="amenity", entity_id=entity_id, action="INSERT", new_value=new_val)
+    except Exception:
+        pass
     return AmenityResponse.model_validate(obj).model_copy(update={"message": "Amenity created"})
 
 

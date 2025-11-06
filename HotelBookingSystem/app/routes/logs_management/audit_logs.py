@@ -1,20 +1,11 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 
-from app.services.audit_service.audit_service import create_audit, list_audits
+from app.services.audit_service.audit_service import list_audits
 from app.schemas.pydantic_models.audit_log import AuditLogModel
 
 router = APIRouter(prefix="/audit", tags=["audit"])
-
-
-@router.post("/", response_model=dict)
-async def post_audit(payload: AuditLogModel):
-    created = await create_audit(payload)
-    if not created:
-        raise HTTPException(status_code=500, detail="Failed to create audit record")
-    return created
-
-
+# POST for creating audit logs is handled by middleware (app/middlewares/logs_middleware.py)
 @router.get("/", response_model=List[dict])
 async def get_audits(
     entity: Optional[str] = Query(None),
