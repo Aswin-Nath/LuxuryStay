@@ -81,8 +81,8 @@ async def change_password(db: AsyncSession, current_user: Users, current_passwor
     return {"message": "Password changed successfully"}
 
 
-async def login_flow(db: AsyncSession, username: str, password: str, device_info: Optional[str] = None, client_host: Optional[str] = None) -> TokenResponse:
-    user = await authentication_core.authenticate_user(db, email=username, password=password)
+async def login_flow(db: AsyncSession, email: str, password: str, device_info: Optional[str] = None, client_host: Optional[str] = None) -> TokenResponse:
+    user = await authentication_core.authenticate_user(db, email=email, password=password)
     if not user:
         raise UnauthorizedError("Invalid credentials")
 
@@ -103,9 +103,9 @@ async def login_flow(db: AsyncSession, username: str, password: str, device_info
     )
 
 
-async def refresh_tokens(db: AsyncSession, refresh_token: str) -> TokenResponse:
+async def refresh_tokens(db: AsyncSession, access_token: str) -> TokenResponse:
     try:
-        session = await authentication_core.refresh_access_token(db, refresh_token)
+        session = await authentication_core.refresh_access_token(db, access_token)
     except Exception as e:
         raise UnauthorizedError(str(e))
 

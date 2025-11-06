@@ -132,6 +132,7 @@ class RoomAmenityMapCreate(BaseModel):
 
 
 class RoomAmenityMapResponse(RoomAmenityMapCreate):
+    message:str="mapping created successfully"
     model_config = {"from_attributes": True}
 
 

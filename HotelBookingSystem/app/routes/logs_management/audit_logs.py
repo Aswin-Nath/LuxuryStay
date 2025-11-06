@@ -17,6 +17,7 @@ async def get_audits(
     limit: int = Query(50, ge=1, le=1000),
     skip: int = Query(0, ge=0),
 ):
+    print("Entity__")
     results = await list_audits(
         entity=entity,
         entity_id=entity_id,

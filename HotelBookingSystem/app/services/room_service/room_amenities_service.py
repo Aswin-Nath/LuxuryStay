@@ -28,8 +28,7 @@ async def map_amenity(db: AsyncSession, payload) -> None:
     obj = RoomAmenityMap(**payload.model_dump())
     db.add(obj)
     await db.commit()
-    return
-
+    return obj
 
 async def get_amenities_for_room(db: AsyncSession, room_id: int) -> List[RoomAmenities]:
     res = await db.execute(

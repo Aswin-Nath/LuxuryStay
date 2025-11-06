@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
 from datetime import datetime
-
+from bson import ObjectId
 from app.database.mongo_connnection import get_database
 from app.schemas.pydantic_models.audit_log import AuditLogModel
 
@@ -57,6 +57,8 @@ async def list_audits(
 	cursor = collection.find(filt).sort("created_at", -1).skip(int(skip)).limit(int(limit))
 	results = []
 	async for doc in cursor:
+		if "_id" in doc and isinstance(doc["_id"], ObjectId):
+			doc["_id"] = str(doc["_id"])
 		results.append(doc)
 	return results
 

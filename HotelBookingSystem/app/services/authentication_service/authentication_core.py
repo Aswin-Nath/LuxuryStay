@@ -337,58 +337,69 @@ async def revoke_session(db: AsyncSession, *, session: Sessions, reason: str | N
     return session
 
 
-async def refresh_access_token(db: AsyncSession, refresh_token_value: str):
-    """Rotate tokens given a valid refresh token.
+from jose import jwt, JWTError
+from sqlalchemy import select
+from datetime import datetime, timedelta
+import uuid
 
-    - Validates refresh token signature/scope
-    - Finds session by refresh_token
-    - Ensures session is active and refresh not expired
-    - Blacklists old refresh token and generates new access + refresh tokens
-    - Updates session with new tokens and expiries
-    Returns updated session
+# assume these exist
+# SECRET_KEY, ALGORITHM
+# create_access_token(), create_refresh_token()
+# Sessions model (access_token, access_token_expires_at, refresh_token, refresh_token_expires_at, is_active, revoked_at, last_active)
+
+async def refresh_access_token(db: AsyncSession, access_token_value: str):
     """
-    from jose import JWTError
-    from sqlalchemy import select
+    Overwrite-style token rotation:
+    - Validate refresh token
+    - Verify session + expiry
+    - Overwrite existing access token (invalidate previous)
+    - Return updated session
+    """
 
-    # decode & validate
+    # Step 1: Decode refresh token and extract user
     try:
-        payload = jwt.decode(refresh_token_value, SECRET_KEY, algorithms=[ALGORITHM])
-        # ensure scope
-        if payload.get("scope") != "refresh_token":
-            raise JWTError("Invalid token scope")
+        payload = jwt.decode(access_token_value, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = int(payload.get("sub"))
-    except JWTError as e:
-        raise e
+    except JWTError:
+        raise Exception("Invalid access_token")
 
-    # find session by refresh_token
-    result = await db.execute(select(Sessions).where(Sessions.refresh_token == refresh_token_value))
+    # Step 2: Find session linked to this refresh token
+    result = await db.execute(
+        select(Sessions).where(Sessions.access_token == access_token_value)
+    )
     session = result.scalars().first()
-    if not session:
-        # session must exist for the given refresh token
-        raise Exception("Session not found for refresh token")
+    if not session or not session.is_active:
+        raise Exception("Invalid or inactive session")
 
-    # Strict checks: session must be active and not revoked
-    if not session.is_active or session.revoked_at is not None:
-        raise Exception("Session is revoked or inactive")
-
-    # Ensure refresh token on session matches provided token (defense-in-depth)
-    if session.refresh_token != refresh_token_value:
-        raise Exception("Refresh token mismatch")
-
-    # Check stored refresh expiry
+    # Step 3: Check refresh token expiry
     if session.refresh_token_expires_at and datetime.utcnow() > session.refresh_token_expires_at:
-        # mark session revoked for hygiene
-        await revoke_session(db, session=session, reason="refresh_expired")
+        session.is_active = False
+        session.revoked_at = datetime.utcnow()
+        db.add(session)
+        await db.commit()
         raise Exception("Refresh token expired")
 
-    # Passed checks — issue a NEW access token only (no refresh rotation)
-    new_access, new_access_exp = create_access_token({"sub": str(session.user_id)}, jti=str(session.jti))
+    # Step 4: Rotate (overwrite) the access token
+    new_access_token, new_access_exp = create_access_token(
+        {"sub": str(user_id), "scope": "access_token"},
+        jti=str(uuid.uuid4())
+    )
 
-    # update session with new access token and last active timestamp
-    session.access_token = new_access
+    # Optional: also rotate the refresh token to improve security
+    # (Uncomment if you want refresh tokens to change each time)
+    # new_refresh_token, new_refresh_exp = create_refresh_token(
+    #     {"sub": str(user_id), "scope": "refresh_token"},
+    #     jti=str(uuid.uuid4())
+    # )
+    # session.refresh_token = new_refresh_token
+    # session.refresh_token_expires_at = new_refresh_exp
+
+    # Step 5: Update session record (overwrite = old token invalidated)
+    session.access_token = new_access_token
     session.access_token_expires_at = new_access_exp
     session.last_active = datetime.utcnow()
     db.add(session)
     await db.commit()
     await db.refresh(session)
+
     return session

@@ -7,7 +7,10 @@ from app.models.sqlalchemy_schemas.rooms import Rooms, RoomTypes
 
 
 async def create_room(db: AsyncSession, payload) -> Rooms:
-    q = await db.execute(select(Rooms).where(Rooms.room_no == payload.room_no))
+    # Consider only non-deleted rooms when checking uniqueness of room number.
+    q = await db.execute(
+        select(Rooms).where(Rooms.room_no == payload.room_no, Rooms.is_deleted.is_(False))
+    )
     if q.scalars().first():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Room number already exists")
 
@@ -62,6 +65,9 @@ async def get_room(db: AsyncSession, room_id: int) -> Rooms:
 
 
 async def update_room(db: AsyncSession, room_id: int, payload) -> Rooms:
+    q = await db.execute(select(Rooms).where(Rooms.room_no == payload.room_no))
+    if q.scalars().first():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Room number already exists")
     res = await db.execute(select(Rooms).where(Rooms.room_id == room_id))
     obj = res.scalars().first()
     if not obj:
@@ -86,5 +92,6 @@ async def delete_room(db: AsyncSession, room_id: int) -> None:
     obj = res.scalars().first()
     if not obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
-    await db.delete(obj)
+    # Soft delete: mark the row as deleted instead of removing it.
+    await db.execute(update(Rooms).where(Rooms.room_id == room_id).values(is_deleted=True))
     await db.commit()

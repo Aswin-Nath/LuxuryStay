@@ -40,7 +40,7 @@ class ChangePasswordRequest(BaseModel):
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str
+    access_token: str
 
 
 @auth_router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -90,7 +90,7 @@ async def login(
 @auth_router.post("/refresh", response_model=TokenResponse)
 async def refresh_tokens(payload: RefreshRequest, db: AsyncSession = Depends(get_db)):
     """Refresh (rotate) access and refresh tokens using a valid refresh token."""
-    return await svc_refresh_tokens(db, payload.refresh_token)
+    return await svc_refresh_tokens(db, payload.access_token)
 
 
 

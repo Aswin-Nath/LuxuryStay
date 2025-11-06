@@ -71,7 +71,7 @@ class Rooms(Base):
     max_child_count = Column(SmallInteger, nullable=False, default=0)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
-
+    is_deleted = Column(Boolean, nullable=False, default=False, index=True)
     # Relationships
     room_type = relationship("RoomTypes", back_populates="rooms")
     amenities = relationship("RoomAmenityMap", back_populates="room", cascade="all, delete-orphan")

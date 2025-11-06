@@ -28,6 +28,7 @@ class UserResponse(BaseModel):
 
 
 class ProfileResponse(UserResponse):
+    profile_image_url:Optional[str]=None
     dob: Optional[date] = None
     gender: Optional[str] = None
 

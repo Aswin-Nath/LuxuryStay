@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
+from pydantic import BaseModel,model_validator
+from typing import Optional, List,Any
 from datetime import datetime
 
 
@@ -16,8 +16,13 @@ class RefundCreate(BaseModel):
 	remarks: Optional[str] = None
 	transaction_method_id: Optional[int] = None
 	transaction_number: Optional[str] = None
-
-
+	@model_validator(mode="before")
+	def normalize_zero_to_none(cls, values):
+		if not isinstance(values, dict):
+			return values
+		if values.get("transaction_method_id") == 0:
+			values["transaction_method_id"] = None
+		return values
 class RefundResponse(BaseModel):
 	refund_id: int
 	booking_id: int

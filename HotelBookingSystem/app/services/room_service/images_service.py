@@ -22,8 +22,6 @@ async def create_image(
     # We maintain images at the room-type level (centralized). Accept either
     # entity_type == "room_type" or legacy "room" and treat both as room-type images.
     effective_entity_type = entity_type
-    if entity_type == "room":
-        effective_entity_type = "room_type"
 
     # Validate entity existence depending on entity_type
     if effective_entity_type == "room_type":

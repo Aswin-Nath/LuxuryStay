@@ -12,19 +12,6 @@ from app.utils.audit_helper import log_audit
 router = APIRouter(prefix="/api/notifications", tags=["NOTIFICATIONS"])
 
 
-@router.post("/", response_model=NotificationResponse, status_code=status.HTTP_201_CREATED)
-async def create_notification(payload: NotificationCreate, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)):
-    # Allow creation by any authenticated service user. Ownership is by recipient_user_id in payload.
-    obj = await svc_add(db, payload)
-    # audit notification create
-    try:
-        new_val = NotificationResponse.model_validate(obj).model_dump()
-        entity_id = f"notification:{getattr(obj, 'notification_id', None)}"
-        await log_audit(entity="notification", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
-    except Exception:
-        pass
-    return NotificationResponse.model_validate(obj).model_dump()
-
 
 @router.get("/", response_model=List[NotificationResponse])
 async def list_notifications(

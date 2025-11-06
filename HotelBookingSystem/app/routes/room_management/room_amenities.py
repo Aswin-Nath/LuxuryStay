@@ -18,21 +18,27 @@ router = APIRouter(prefix="/api/room-amenities", tags=["ROOM_AMENITIES"])
 
 
 @router.post("/", response_model=RoomAmenityMapResponse, status_code=status.HTTP_201_CREATED)
-async def map_amenity(payload: RoomAmenityMapCreate, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
+async def map_amenity(
+    payload: RoomAmenityMapCreate,
+    db: AsyncSession = Depends(get_db),
+    user_permissions: dict = Depends(get_user_permissions),
+):
     if not (
         Resources.ROOM_MANAGEMENT.value in user_permissions
         and PermissionTypes.WRITE.value in user_permissions[Resources.ROOM_MANAGEMENT.value]
     ):
         raise ForbiddenError("Insufficient permissions to map amenities")
-    await svc_map_amenity(db, payload)
+
+    obj = await svc_map_amenity(db, payload)
+
     # audit mapping
     try:
-        new_val = RoomAmenityMapResponse.model_validate(payload).model_dump()
-        entity_id = f"room:{getattr(payload, 'room_id', None)}:amenity:{getattr(payload, 'amenity_id', None)}"
-        await log_audit(entity="room_amenity", entity_id=entity_id, action="INSERT", new_value=new_val)
+        entity_id = f"room:{obj.room_id}:amenity:{obj.amenity_id}"
+        await log_audit(entity="room_amenity", entity_id=entity_id, action="INSERT", new_value=obj.__dict__)
     except Exception:
         pass
-    return RoomAmenityMapResponse.model_validate(payload).model_copy(update={"message": "Mapped successfully"})
+
+    return RoomAmenityMapResponse.model_validate(obj).model_copy(update={"message": "Mapped successfully"})
 
 
 @router.get("/room/{room_id}")
