@@ -1,10 +1,20 @@
 from typing import List, Optional, Dict, Any
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# CRUD imports
+from app.crud.report_management.reports import (
+    fetch_customer_booking_summary,
+    fetch_customer_payment_summary,
+    fetch_customer_refund_summary,
+    fetch_admin_booking_performance,
+    fetch_admin_revenue_summary,
+    fetch_admin_refund_summary,
+    fetch_admin_payment_summary,
+    fetch_admin_review_summary,
+)
 
 # ==========================================================
-# 🔹 CUSTOMER REPORTS
+# 🔹 CUSTOMER REPORT SERVICES
 # ==========================================================
 
 async def get_customer_booking_summary(
@@ -15,30 +25,15 @@ async def get_customer_booking_summary(
     entity_id: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """
-    Fetch bookings for the authenticated customer from view vw_customer_booking_summary.
-
-    If entity_id is provided, return the single matching booking_id for that user.
+    Service: Fetch bookings for a customer via vw_customer_booking_summary.
     """
-    if entity_id is not None:
-        sql = text("""
-            SELECT *
-            FROM vw_customer_booking_summary
-            WHERE booking_id = :entity_id AND user_id = :user_id
-            LIMIT 1
-        """)
-        params = {"entity_id": entity_id, "user_id": user_id}
-    else:
-        sql = text("""
-            SELECT *
-            FROM vw_customer_booking_summary
-            WHERE user_id = :user_id
-            ORDER BY created_at DESC
-            LIMIT :limit OFFSET :offset
-        """)
-        params = {"user_id": user_id, "limit": limit, "offset": offset}
-
-    result = await db.execute(sql, params)
-    return [dict(row) for row in result.mappings().all()]
+    return await fetch_customer_booking_summary(
+        db=db,
+        user_id=user_id,
+        limit=limit,
+        offset=offset,
+        entity_id=entity_id,
+    )
 
 
 async def get_customer_payment_summary(
@@ -49,30 +44,15 @@ async def get_customer_payment_summary(
     entity_id: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """
-    Fetch payments for the authenticated customer from view vw_customer_payment_summary.
-
-    If entity_id is provided, treat it as payment_id and return that single row for the user.
+    Service: Fetch payments for a customer via vw_customer_payment_summary.
     """
-    if entity_id is not None:
-        sql = text("""
-            SELECT *
-            FROM vw_customer_payment_summary
-            WHERE payment_id = :entity_id AND user_id = :user_id
-            LIMIT 1
-        """)
-        params = {"entity_id": entity_id, "user_id": user_id}
-    else:
-        sql = text("""
-            SELECT *
-            FROM vw_customer_payment_summary
-            WHERE user_id = :user_id
-            ORDER BY payment_date DESC
-            LIMIT :limit OFFSET :offset
-        """)
-        params = {"user_id": user_id, "limit": limit, "offset": offset}
-
-    result = await db.execute(sql, params)
-    return [dict(row) for row in result.mappings().all()]
+    return await fetch_customer_payment_summary(
+        db=db,
+        user_id=user_id,
+        limit=limit,
+        offset=offset,
+        entity_id=entity_id,
+    )
 
 
 async def get_customer_refund_summary(
@@ -83,34 +63,19 @@ async def get_customer_refund_summary(
     entity_id: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """
-    Fetch refunds for the authenticated customer from view vw_customer_refund_summary.
-
-    If entity_id is provided, treat it as refund_id and return that single row for the user.
+    Service: Fetch refunds for a customer via vw_customer_refund_summary.
     """
-    if entity_id is not None:
-        sql = text("""
-            SELECT *
-            FROM vw_customer_refund_summary
-            WHERE refund_id = :entity_id AND user_id = :user_id
-            LIMIT 1
-        """)
-        params = {"entity_id": entity_id, "user_id": user_id}
-    else:
-        sql = text("""
-            SELECT *
-            FROM vw_customer_refund_summary
-            WHERE user_id = :user_id
-            ORDER BY initiated_at DESC
-            LIMIT :limit OFFSET :offset
-        """)
-        params = {"user_id": user_id, "limit": limit, "offset": offset}
-
-    result = await db.execute(sql, params)
-    return [dict(row) for row in result.mappings().all()]
+    return await fetch_customer_refund_summary(
+        db=db,
+        user_id=user_id,
+        limit=limit,
+        offset=offset,
+        entity_id=entity_id,
+    )
 
 
 # ==========================================================
-# 🔹 ADMIN REPORTS
+# 🔹 ADMIN REPORT SERVICES
 # ==========================================================
 
 async def get_admin_booking_performance(
@@ -121,36 +86,15 @@ async def get_admin_booking_performance(
     limit: int = 500,
 ) -> List[Dict[str, Any]]:
     """
-    Fetch admin booking performance metrics from view vw_admin_booking_performance.
-    Supports optional date range and room_type filters.
+    Service: Fetch admin booking performance metrics via vw_admin_booking_performance.
     """
-    where_clauses = []
-    params: Dict[str, Any] = {}
-
-    if date_from:
-        where_clauses.append("booking_date >= :date_from")
-        params["date_from"] = date_from
-
-    if date_to:
-        where_clauses.append("booking_date <= :date_to")
-        params["date_to"] = date_to
-
-    if room_type:
-        where_clauses.append("room_type = :room_type")
-        params["room_type"] = room_type
-
-    where_sql = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
-    sql = text(f"""
-        SELECT *
-        FROM vw_admin_booking_performance
-        {where_sql}
-        ORDER BY booking_date DESC
-        LIMIT :limit
-    """)
-    params["limit"] = limit
-
-    result = await db.execute(sql, params)
-    return [dict(row) for row in result.mappings().all()]
+    return await fetch_admin_booking_performance(
+        db=db,
+        date_from=date_from,
+        date_to=date_to,
+        room_type=room_type,
+        limit=limit,
+    )
 
 
 async def get_admin_revenue_summary(
@@ -160,32 +104,14 @@ async def get_admin_revenue_summary(
     limit: int = 500,
 ) -> List[Dict[str, Any]]:
     """
-    Fetch admin revenue analytics from view vw_admin_revenue_summary.
-    Supports optional date range filters.
+    Service: Fetch admin revenue summary via vw_admin_revenue_summary.
     """
-    where_clauses = []
-    params: Dict[str, Any] = {}
-
-    if date_from:
-        where_clauses.append("payment_date >= :date_from")
-        params["date_from"] = date_from
-
-    if date_to:
-        where_clauses.append("payment_date <= :date_to")
-        params["date_to"] = date_to
-
-    where_sql = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
-    sql = text(f"""
-        SELECT *
-        FROM vw_admin_revenue_summary
-        {where_sql}
-        ORDER BY payment_date DESC
-        LIMIT :limit
-    """)
-    params["limit"] = limit
-
-    result = await db.execute(sql, params)
-    return [dict(row) for row in result.mappings().all()]
+    return await fetch_admin_revenue_summary(
+        db=db,
+        date_from=date_from,
+        date_to=date_to,
+        limit=limit,
+    )
 
 
 async def get_admin_refund_summary(
@@ -194,29 +120,13 @@ async def get_admin_refund_summary(
     entity_id: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """
-    Fetch refund SLA tracking data for admins from vw_admin_refund_summary.
-
-    If entity_id is provided, attempt to return the refund by refund_id.
+    Service: Fetch admin refund SLA tracking data via vw_admin_refund_summary.
     """
-    if entity_id is not None:
-        sql = text("""
-            SELECT *
-            FROM vw_admin_refund_summary
-            WHERE (refund_id = :entity_id)
-            LIMIT 1
-        """)
-        params = {"entity_id": entity_id}
-    else:
-        sql = text("""
-            SELECT *
-            FROM vw_admin_refund_summary
-            ORDER BY initiated_at DESC
-            LIMIT :limit
-        """)
-        params = {"limit": limit}
-
-    result = await db.execute(sql, params)
-    return [dict(row) for row in result.mappings().all()]
+    return await fetch_admin_refund_summary(
+        db=db,
+        limit=limit,
+        entity_id=entity_id,
+    )
 
 
 async def get_admin_payment_summary(
@@ -224,15 +134,12 @@ async def get_admin_payment_summary(
     limit: int = 500,
 ) -> List[Dict[str, Any]]:
     """
-    Fetch payment success/failure distribution from vw_admin_payment_summary.
+    Service: Fetch admin payment distribution data via vw_admin_payment_summary.
     """
-    sql = text("""
-        SELECT *
-        FROM vw_admin_payment_summary
-        LIMIT :limit
-    """)
-    result = await db.execute(sql, {"limit": limit})
-    return [dict(row) for row in result.mappings().all()]
+    return await fetch_admin_payment_summary(
+        db=db,
+        limit=limit,
+    )
 
 
 async def get_admin_review_summary(
@@ -240,12 +147,9 @@ async def get_admin_review_summary(
     limit: int = 500,
 ) -> List[Dict[str, Any]]:
     """
-    Fetch review analytics for room types from vw_admin_review_summary.
+    Service: Fetch admin review analytics via vw_admin_review_summary.
     """
-    sql = text("""
-        SELECT *
-        FROM vw_admin_review_summary
-        LIMIT :limit
-    """)
-    result = await db.execute(sql, {"limit": limit})
-    return [dict(row) for row in result.mappings().all()]
+    return await fetch_admin_review_summary(
+        db=db,
+        limit=limit,
+    )
