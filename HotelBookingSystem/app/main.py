@@ -149,6 +149,8 @@ def custom_docs():
                             <option value="Backups">Backups</option>
                             <option value="Restores">Restores</option>
                             <option value="Logs">Logs</option>
+                            <option value="REPORTS_ADMIN">Admin Reports</option>
+                            <option value="REPORTS_CUSTOMER">Customer Reports</option>
                         `;
 
                         dropdown.style.marginRight = '20px';
