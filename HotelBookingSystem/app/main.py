@@ -21,6 +21,7 @@ from app.routes.logs_management.audit_logs import router as audit_logs_router
 from app.routes.logs_management.booking_logs import router as booking_logs_router
 from app.routes.backup_and_restore_management.backups import router as backups_router
 from app.routes.backup_and_restore_management.restores import router as restores_router
+from app.routes.report_management import router as reports_router
 
 
 # -------------------------------------------------
@@ -69,6 +70,7 @@ app.include_router(backups_router)
 app.include_router(audit_logs_router)
 app.include_router(booking_logs_router)
 app.include_router(restores_router)
+app.include_router(reports_router)
 
 
 # -------------------------------------------------
@@ -110,10 +112,10 @@ def custom_docs():
                             if (node.nodeType === 3) {
                                 const text = node.textContent.trim();
                                 if (text.includes('username')) {
-                                    node.textContent = text.replace(/username/gi, 'Mobile');
+                                    node.textContent = text.replace(/username/gi, 'Email');
                                 }
                                 if (text.includes('password')) {
-                                    node.textContent = text.replace(/password/gi, 'OTP');
+                                    node.textContent = text.replace(/password/gi, 'Password');
                                 }
                             }
                         });
