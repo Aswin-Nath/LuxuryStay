@@ -7,7 +7,7 @@ from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
 from app.models.sqlalchemy_schemas.images import Images
 from app.models.sqlalchemy_schemas.rooms import RoomTypes
 from app.models.sqlalchemy_schemas.reviews import Reviews
-
+from app.models.sqlalchemy_schemas.issues import Issues
 
 async def create_image(
     db: AsyncSession,
@@ -35,6 +35,11 @@ async def create_image(
         review = res.scalars().first()
         if not review:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review not found")
+    elif effective_entity_type=="issue":
+        res=await db.execute(select(Issues).where(Issues.issue_id==entity_id))
+        issue=res.scalars().first()
+        if not issue:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found")
 
     # If this image is primary, unset other primary images for the same entity
     if is_primary:
@@ -84,6 +89,19 @@ async def get_images_for_review(db: AsyncSession, review_id: int) -> List[Images
         select(Images)
         .where(Images.entity_type == "review")
         .where(Images.entity_id == review_id)
+        .where(Images.is_deleted == False)
+    )
+    res = await db.execute(stmt)
+    items = res.scalars().all()
+    return items
+
+
+async def get_images_for_entity(db: AsyncSession, entity_type: str, entity_id: int) -> List[Images]:
+    """Generic getter for images for any entity type (room_type, review, issue, etc.)."""
+    stmt = (
+        select(Images)
+        .where(Images.entity_type == entity_type)
+        .where(Images.entity_id == entity_id)
         .where(Images.is_deleted == False)
     )
     res = await db.execute(stmt)

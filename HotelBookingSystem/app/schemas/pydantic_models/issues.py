@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
+from fastapi import Form
 
 
 class IssueStatus(str, Enum):
@@ -14,10 +15,27 @@ class IssueStatus(str, Enum):
 class IssueCreate(BaseModel):
 	booking_id: int
 	room_id: Optional[int] = None
-	user_id: int
 	title: str = Field(..., max_length=200)
 	description: str
-	images: Optional[List[str]] = []
+
+	@model_validator(mode="before")
+	def normalize_zero_to_none(cls, values):
+		# values may be a dict when coming via as_form or already a model
+		if not isinstance(values, dict):
+			return values
+		if values.get("room_id") == 0:
+			values["room_id"] = None
+		return values
+
+	@classmethod
+	def as_form(
+		cls,
+		booking_id: int = Form(...),
+		room_id: Optional[int] = Form(None),
+		title: str = Form(...),
+		description: str = Form(...),
+	):
+		return cls(booking_id=booking_id, room_id=room_id, title=title, description=description)
 
 
 class IssueResponse(BaseModel):
@@ -27,8 +45,7 @@ class IssueResponse(BaseModel):
 	user_id: int
 	title: str
 	description: str
-	# images now contains image IDs referencing the `images` table
-	images: List[int]
+	# images removed — handled via separate endpoints
 	status: IssueStatus
 	reported_at: datetime
 	resolved_at: Optional[datetime] = None

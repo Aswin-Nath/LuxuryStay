@@ -21,7 +21,10 @@ from app.services.issue_service.issues_service import (
     add_chat as svc_add_chat,
     list_chats as svc_list_chats,
 )
-from app.schemas.pydantic_models.issues import IssueResponse
+from app.schemas.pydantic_models.issues import IssueResponse, IssueCreate
+from app.schemas.pydantic_models.images import ImageResponse
+from app.services.room_service.images_service import create_image
+from app.core.cache import invalidate_pattern
 from app.core.exceptions import ForbiddenError
 from app.utils.audit_helper import log_audit
 
@@ -37,43 +40,62 @@ def _require_issue_write(user_permissions: dict):
 
 @router.post("/", response_model=IssueResponse, status_code=status.HTTP_201_CREATED)
 async def create_issue(
-    booking_id: int = Form(...),
-    room_id: Optional[int] = Form(None),
-    title: str = Form(...),
-    description: str = Form(...),
-    images: Optional[List[UploadFile]] = File(default=[]),
+    issue: IssueCreate = Depends(IssueCreate.as_form),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
 ):
-    urls: List[str] = []
-    user_id=current_user.user_id
-    if images:
-        coros = [save_uploaded_image(f) for f in images]
-        results = await asyncio.gather(*coros, return_exceptions=True)
-        for r in results:
-            if isinstance(r, Exception):
-                raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Image upload failed: {r}")
-        urls = [str(r) for r in results]
+    """Create an issue. Image uploads are handled by a separate endpoint:
+    POST /api/issues/{issue_id}/images (accepts multiple files).
+    """
+    user_id = current_user.user_id
 
-    payload = {
-        "booking_id": booking_id,
-        "room_id": room_id,
-        "user_id": user_id,
-        "title": title,
-        "description": description,
-        "images": urls,
-    }
+    payload = issue.model_dump()
+    payload["user_id"] = user_id
 
     obj = await svc_create_issue(db, payload)
 
     # audit issue create
     try:
-        new_val = IssueResponse.model_validate(obj,from_attributes=True).model_dump()
+        new_val = IssueResponse.model_validate(obj, from_attributes=True).model_dump()
         entity_id = f"issue:{getattr(obj, 'issue_id', None)}"
         await log_audit(entity="issue", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
     except Exception:
         pass
-    return IssueResponse.model_validate(obj,from_attributes=True).model_dump()
+    return IssueResponse.model_validate(obj, from_attributes=True).model_dump()
+
+
+@router.post("/{issue_id}/images", response_model=List[ImageResponse], status_code=status.HTTP_201_CREATED)
+async def add_issue_images(
+    issue_id: int,
+    files: List[UploadFile] = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+):
+    """Upload one or more images for an issue. Only the issue owner may upload images."""
+    obj = await svc_get_issue(db, issue_id)
+    if obj.user_id != current_user.user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to upload images for this issue")
+
+    images = []
+    for file in files:
+        url = await save_uploaded_image(file)
+        img_obj = await create_image(db, entity_type="issue", entity_id=issue_id, image_url=url, caption=None, uploaded_by=current_user.user_id)
+        images.append(img_obj)
+        # audit each image created
+        try:
+            new_val = ImageResponse.model_validate(img_obj).model_dump()
+            entity_id = f"issue:{issue_id}:image:{getattr(img_obj, 'image_id', None)}"
+            await log_audit(entity="issue_image", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
+        except Exception:
+            pass
+
+    # invalidate caches for this issue (if any)
+    try:
+        await invalidate_pattern(f"issues:*{issue_id}*")
+    except Exception:
+        pass
+
+    return [ImageResponse.model_validate(i) for i in images]
 
 
 @router.get("/", response_model=Union[IssueResponse, List[IssueResponse]])
@@ -146,15 +168,14 @@ async def update_issue(
     status: Optional[str] = Form(None),
     title: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
-    images: Optional[List[UploadFile]] = File(default=None),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
     user_permissions: dict = Depends(get_user_permissions),
 ):
-    """Unified update: admins can update status; owners can update title/description/images.
+    """Unified update: admins can update status; owners can update title/description.
 
     - If `status` is provided, requester must have ISSUE_RESOLUTION WRITE permission.
-    - Only the issue owner may update title/description/images.
+    - Only the issue owner may update title/description.
     """
     obj = await svc_get_issue(db, issue_id)
 
@@ -174,30 +195,17 @@ async def update_issue(
         payload["status"] = status
         if str(status).upper() == "RESOLVED":
             payload["resolved_by"] = current_user.user_id
-
-    # Owner-only: title/description/images
-    if title is not None or description is not None or images is not None:
+    # Owner-only: title/description
+    if title!="" or description!="":
         if not is_owner:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the issue owner can modify title/description/images")
 
-    urls = None
-    if images is not None:
-        if images:
-            coros = [save_uploaded_image(f) for f in images]
-            results = await asyncio.gather(*coros, return_exceptions=True)
-            for r in results:
-                if isinstance(r, Exception):
-                    raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Image upload failed: {r}")
-            urls = [str(r) for r in results]
-        else:
-            urls = []
 
-    if title is not None:
+
+    if title!="":
         payload["title"] = title
-    if description is not None:
+    if description!="":
         payload["description"] = description
-    if urls is not None:
-        payload["images"] = urls
 
     updated = await svc_update_issue(db, issue_id, payload)
     # audit issue update

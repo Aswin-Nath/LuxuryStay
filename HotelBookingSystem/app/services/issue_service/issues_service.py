@@ -9,7 +9,7 @@ from app.services.images_service.image_upload_service import save_uploaded_image
 from app.services.room_service.images_service import create_image
 from app.schemas.pydantic_models.notifications import NotificationCreate
 from app.services.notification_service.notifications_service import add_notification as svc_add_notification
-
+from app.models.sqlalchemy_schemas.images import Images
 
 # ===========================================================
 # CREATE ISSUE (Fixed)
@@ -19,7 +19,7 @@ async def create_issue(db: AsyncSession, payload: dict, images: Optional[List[Up
     payload: booking_id, room_id, user_id, title, description
     images: list of UploadFile objects (optional)
     """
-
+    
     issue = Issues(
         booking_id=payload["booking_id"],
         room_id=payload.get("room_id"),
@@ -81,15 +81,27 @@ async def create_issue(db: AsyncSession, payload: dict, images: Optional[List[Up
     return issue
 
 
-# ===========================================================
-# GET ISSUE
-# ===========================================================
 async def get_issue(db: AsyncSession, issue_id: int) -> Issues:
     stmt = select(Issues).where(Issues.issue_id == issue_id)
     res = await db.execute(stmt)
     obj = res.scalars().first()
     if not obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found")
+
+    # Load linked images safely (non-persistent)
+    try:
+        img_q = await db.execute(
+            select(Images)
+            .where(Images.entity_type == "issue")
+            .where(Images.entity_id == issue_id)
+            .where(Images.is_deleted.is_(False))
+        )
+        img_items = img_q.scalars().all()
+        # attach non-persistent transient attribute
+        obj.__dict__["images"] = img_items
+    except Exception:
+        obj.__dict__["images"] = []
+
     return obj
 
 
@@ -100,9 +112,26 @@ async def list_issues(db: AsyncSession, user_id: Optional[int] = None, limit: in
     stmt = select(Issues).limit(limit).offset(offset)
     if user_id is not None:
         stmt = stmt.where(Issues.user_id == user_id)
-    res = await db.execute(stmt)
-    return res.scalars().all()
 
+    res = await db.execute(stmt)
+    items = res.scalars().all()
+
+    # attach transient images list
+    try:
+        for it in items:
+            img_q = await db.execute(
+                select(Images)
+                .where(Images.entity_type == "issue")
+                .where(Images.entity_id == it.issue_id)
+                .where(Images.is_deleted.is_(False))
+            )
+            img_items = img_q.scalars().all()
+            it.__dict__["images"] = img_items
+    except Exception:
+        for it in items:
+            it.__dict__["images"] = []
+
+    return items
 
 # ===========================================================
 # UPDATE ISSUE
