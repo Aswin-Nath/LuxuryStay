@@ -1,54 +1,65 @@
 from typing import Any, Dict, List, Optional
-from datetime import datetime
+from fastapi import HTTPException, status
 
-from app.database.mongo_connnection import get_database
+from app.crud.backup_and_restore_management.restore import (
+    insert_restore_record,
+    fetch_restore_records,
+)
 from app.schemas.pydantic_models.restored_data_collections import RestoredDataCollection
 
 
-async def create_restore(doc: RestoredDataCollection) -> Dict[str, Any]:
-	db = get_database()
-	collection = db.restored_data_collections
-	payload = doc.dict(by_alias=True, exclude_none=True)
-	result = await collection.insert_one(payload)
-	inserted = await collection.find_one({"_id": result.inserted_id})
-	return inserted
+# ==========================================================
+# 🔹 CREATE RESTORE
+# ==========================================================
 
+async def create_restore(doc: RestoredDataCollection) -> Dict[str, Any]:
+    """Create a restore record using CRUD functions."""
+    payload = doc.model_dump(by_alias=True, exclude_none=True)
+
+    if not payload.get("backupRefId"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="backupRefId is required",
+        )
+
+    inserted = await insert_restore_record(payload)
+    if not inserted:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create restore record",
+        )
+
+    return inserted
+
+
+# ==========================================================
+# 🔹 LIST RESTORES
+# ==========================================================
 
 async def list_restores(
-	backupRefId: Optional[str] = None,
-	status: Optional[str] = None,
-	databaseType: Optional[str] = None,
-	start_ts: Optional[str] = None,
-	end_ts: Optional[str] = None,
-	limit: int = 50,
-	skip: int = 0,
+    backupRefId: Optional[str] = None,
+    status: Optional[str] = None,
+    databaseType: Optional[str] = None,
+    start_ts: Optional[str] = None,
+    end_ts: Optional[str] = None,
+    limit: int = 50,
+    skip: int = 0,
 ) -> List[Dict[str, Any]]:
-	db = get_database()
-	collection = db.restored_data_collections
-	filt: Dict[str, Any] = {}
-	if backupRefId:
-		filt["backupRefId"] = backupRefId
-	if status:
-		filt["status"] = status
-	if databaseType:
-		filt["databaseType"] = databaseType
+    """List restore entries with optional filters."""
+    results = await fetch_restore_records(
+        backupRefId=backupRefId,
+        status=status,
+        databaseType=databaseType,
+        start_ts=start_ts,
+        end_ts=end_ts,
+        limit=limit,
+        skip=skip,
+    )
 
-	if start_ts or end_ts:
-		ts_filter: Dict[str, Any] = {}
-		try:
-			if start_ts:
-				ts_filter["$gte"] = datetime.fromisoformat(start_ts)
-			if end_ts:
-				ts_filter["$lte"] = datetime.fromisoformat(end_ts)
-		except Exception:
-			ts_filter = {}
+    if not results:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No restore records found",
+        )
 
-		if ts_filter:
-			filt["timestamp"] = ts_filter
-
-	cursor = collection.find(filt).sort("timestamp", -1).skip(int(skip)).limit(int(limit))
-	results = []
-	async for doc in cursor:
-		results.append(doc)
-	return results
-
+    return results

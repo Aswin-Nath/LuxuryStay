@@ -1,46 +1,50 @@
 from typing import Any, Dict, List, Optional
 from datetime import datetime
+from bson import ObjectId
+
 from app.database.mongo_connnection import get_database
 
 
 # ==========================================================
 # 🔹 CREATE
 # ==========================================================
-async def insert_booking_log_record(payload: Dict[str, Any]) -> Dict[str, Any]:
-	"""Insert a booking log document into MongoDB and return it."""
+async def insert_audit_log_record(payload: Dict[str, Any]) -> Dict[str, Any]:
+	"""Insert an audit_log document and return the inserted document."""
 	db = get_database()
-	collection = db.booking_logs
+	collection = db.audit_log
 	result = await collection.insert_one(payload)
 	inserted = await collection.find_one({"_id": result.inserted_id})
+	if inserted and "_id" in inserted and isinstance(inserted["_id"], ObjectId):
+		inserted["_id"] = str(inserted["_id"])
 	return inserted
 
 
 # ==========================================================
 # 🔹 READ
 # ==========================================================
-async def fetch_booking_logs_filtered(
-	booking_id: Optional[int] = None,
-	edit_id: Optional[int] = None,
-	edit_type: Optional[str] = None,
-	approved_by: Optional[int] = None,
+async def fetch_audit_logs_filtered(
+	entity: Optional[str] = None,
+	entity_id: Optional[str] = None,
+	action: Optional[str] = None,
+	changed_by_user_id: Optional[int] = None,
 	start_ts: Optional[str] = None,
 	end_ts: Optional[str] = None,
 	limit: int = 50,
 	skip: int = 0,
 ) -> List[Dict[str, Any]]:
-	"""Fetch booking logs from MongoDB filtered by criteria."""
+	"""Fetch audit logs with filters from MongoDB."""
 	db = get_database()
-	collection = db.booking_logs
+	collection = db.audit_log
 	filt: Dict[str, Any] = {}
 
-	if booking_id is not None:
-		filt["booking_id"] = int(booking_id)
-	if edit_id is not None:
-		filt["edit_id"] = int(edit_id)
-	if edit_type:
-		filt["edit_type"] = edit_type
-	if approved_by is not None:
-		filt["approved_by"] = int(approved_by)
+	if entity:
+		filt["entity"] = entity
+	if entity_id:
+		filt["entity_id"] = entity_id
+	if action:
+		filt["action"] = action
+	if changed_by_user_id is not None:
+		filt["changed_by_user_id"] = int(changed_by_user_id)
 
 	if start_ts or end_ts:
 		ts_filter: Dict[str, Any] = {}
@@ -52,10 +56,13 @@ async def fetch_booking_logs_filtered(
 		except Exception:
 			ts_filter = {}
 		if ts_filter:
-			filt["logged_at"] = ts_filter
+			filt["created_at"] = ts_filter
 
-	cursor = collection.find(filt).sort("logged_at", -1).skip(int(skip)).limit(int(limit))
-	results = []
+	cursor = collection.find(filt).sort("created_at", -1).skip(int(skip)).limit(int(limit))
+	results: List[Dict[str, Any]] = []
 	async for doc in cursor:
+		if "_id" in doc and isinstance(doc["_id"], ObjectId):
+			doc["_id"] = str(doc["_id"])
 		results.append(doc)
+
 	return results
