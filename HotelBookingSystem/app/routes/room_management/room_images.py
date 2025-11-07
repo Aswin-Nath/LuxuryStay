@@ -22,7 +22,7 @@ from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
 from app.utils.audit_helper import log_audit
 
 
-router = APIRouter(prefix="/api/rooms/{room_id}/images", tags=["ROOM_IMAGES"])
+router = APIRouter(prefix="/rooms/{room_id}/images", tags=["ROOM_IMAGES"])
 
 
 # ==============================================================

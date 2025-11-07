@@ -9,7 +9,7 @@ from app.schemas.pydantic_models.notifications import NotificationCreate, Notifi
 from app.services.notification_service.notifications_service import add_notification as svc_add, list_user_notifications as svc_list, mark_notification_as_read as svc_mark_read
 from app.utils.audit_helper import log_audit
 
-router = APIRouter(prefix="/api/notifications", tags=["NOTIFICATIONS"])
+router = APIRouter(prefix="/notifications", tags=["NOTIFICATIONS"])
 
 
 

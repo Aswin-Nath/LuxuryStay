@@ -11,7 +11,7 @@ from app.core.cache import get_cached, set_cached, invalidate_pattern
 from app.utils.audit_helper import log_audit
 
 
-router = APIRouter(prefix="/api/wishlist", tags=["WISHLIST"])
+router = APIRouter(prefix="/wishlist", tags=["WISHLIST"])
 
 
 @router.post("/", response_model=WishlistResponse, status_code=status.HTTP_201_CREATED)

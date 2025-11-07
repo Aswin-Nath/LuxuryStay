@@ -17,7 +17,7 @@ from app.services.room_service.room_types_service import (
 from app.core.cache import get_cached, set_cached, invalidate_pattern
 from app.utils.audit_helper import log_audit
 
-router = APIRouter(prefix="/api/room-types", tags=["ROOM_TYPES"])
+router = APIRouter(prefix="/room-types", tags=["ROOM_TYPES"])
 
 
 @router.post("/", response_model=RoomTypeResponse, status_code=status.HTTP_201_CREATED)

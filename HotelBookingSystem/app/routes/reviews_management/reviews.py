@@ -21,7 +21,7 @@ from app.core.cache import get_cached, set_cached, invalidate_pattern
 from app.utils.audit_helper import log_audit
 
 
-router = APIRouter(prefix="/api/reviews", tags=["REVIEWS"])
+router = APIRouter(prefix="/reviews", tags=["REVIEWS"])
 
 
 @router.post("/", response_model=ReviewResponse, status_code=status.HTTP_201_CREATED)

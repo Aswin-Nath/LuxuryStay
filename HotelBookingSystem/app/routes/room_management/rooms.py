@@ -17,7 +17,7 @@ from app.services.room_service.rooms_service import (
 from app.core.cache import get_cached, set_cached, invalidate_pattern
 from app.utils.audit_helper import log_audit
 
-router = APIRouter(prefix="/api/rooms", tags=["ROOMS"])
+router = APIRouter(prefix="/rooms", tags=["ROOMS"])
 
 
 def _require_permissions(user_permissions: dict, required_resources: list, perm: PermissionTypes, require_all: bool = True):

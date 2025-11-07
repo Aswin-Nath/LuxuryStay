@@ -11,7 +11,7 @@ from app.services.authentication_service.authentication_usecases import change_p
 from app.core.cache import invalidate_pattern, get_cached, set_cached
 from app.utils.audit_helper import log_audit
 
-router = APIRouter(prefix="/api/profile", tags=["PROFILE"])
+router = APIRouter(prefix="/profile", tags=["PROFILE"])
 
 @router.get("/", response_model=ProfileResponse)
 async def get_my_profile(current_user: Users = Depends(get_current_user)) -> Any:

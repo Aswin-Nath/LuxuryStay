@@ -4,7 +4,7 @@ from typing import List, Optional
 from app.services.audit_service.audit_service import list_audits
 from app.schemas.pydantic_models.audit_log import AuditLogModel
 
-router = APIRouter(prefix="/audit", tags=["AUDIT LOGS"])
+router = APIRouter(prefix="/audit", tags=["LOGS"])
 # POST for creating audit logs is handled by middleware (app/middlewares/logs_middleware.py)
 @router.get("/", response_model=List[dict])
 async def get_audits(

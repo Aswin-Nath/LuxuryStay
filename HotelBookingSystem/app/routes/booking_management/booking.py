@@ -15,7 +15,7 @@ from app.core.cache import get_cached, set_cached, invalidate_pattern
 from app.utils.audit_helper import log_audit
 
 
-router = APIRouter(prefix="/api/bookings", tags=["BOOKINGS"])
+router = APIRouter(prefix="/bookings", tags=["BOOKINGS"])
 
 
 

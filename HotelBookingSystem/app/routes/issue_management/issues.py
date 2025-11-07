@@ -29,7 +29,7 @@ from app.core.exceptions import ForbiddenError
 from app.utils.audit_helper import log_audit
 
 
-router = APIRouter(prefix="/api/issues", tags=["ISSUES"])
+router = APIRouter(prefix="/issues", tags=["ISSUES"])
 
 
 def _require_issue_write(user_permissions: dict):

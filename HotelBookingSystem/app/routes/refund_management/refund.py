@@ -10,11 +10,11 @@ from app.models.sqlalchemy_schemas.users import Users
 from app.utils.audit_helper import log_audit
 
 
-router = APIRouter(prefix="/api", tags=["REFUNDS"])
+router = APIRouter(prefix="/refunds", tags=["REFUNDS"])
 
 
 
-@router.put("/refunds/{refund_id}/transaction", response_model=RefundResponse)
+@router.put("/{refund_id}", response_model=RefundResponse)
 async def complete_refund(refund_id: int, payload: RefundTransactionUpdate, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user), _ok: bool = Depends(ensure_not_basic_user)):
     # Admin-only endpoint to update refund transaction details and status (restricted fields only)
     obj = await svc_update_refund(db, refund_id, payload, current_user)
@@ -32,7 +32,7 @@ async def complete_refund(refund_id: int, payload: RefundTransactionUpdate, db: 
     return RefundResponse.model_validate(obj)
 
 
-@router.get("/refunds", response_model=list[RefundResponse])
+@router.get("/", response_model=list[RefundResponse])
 async def get_refunds(
     refund_id: int | None = None,
     booking_id: int | None = None,

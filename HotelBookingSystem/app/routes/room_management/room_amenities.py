@@ -14,7 +14,7 @@ from app.services.room_service.room_amenities_service import (
 )
 from app.utils.audit_helper import log_audit
 
-router = APIRouter(prefix="/api/room-amenities", tags=["ROOM_AMENITIES"])
+router = APIRouter(prefix="/room-amenities", tags=["ROOM_AMENITIES"])
 
 
 @router.post("/", response_model=RoomAmenityMapResponse, status_code=status.HTTP_201_CREATED)
