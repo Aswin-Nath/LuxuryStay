@@ -1,7 +1,7 @@
 from fastapi import (
-    APIRouter, Depends, UploadFile, File, Form, status, HTTPException
+    APIRouter, Depends, UploadFile, File, Form, status, HTTPException, Query
 )
-from typing import List, Optional
+from typing import List, Optional, Union
 from sqlalchemy.ext.asyncio import AsyncSession
 import asyncio
 
@@ -29,20 +29,12 @@ from app.utils.audit_helper import log_audit
 router = APIRouter(prefix="/api/issues", tags=["ISSUES"])
 
 
-# ────────────────────────────────────────────────
-#  🔐 Permission Utility
-# ────────────────────────────────────────────────
 def _require_issue_write(user_permissions: dict):
-    if not (
+    return (
         Resources.ISSUE_RESOLUTION.value in user_permissions
         and PermissionTypes.WRITE.value in user_permissions[Resources.ISSUE_RESOLUTION.value]
-    ):
-        raise ForbiddenError("Insufficient permissions to manage issues")
+    )
 
-
-# ────────────────────────────────────────────────
-#  🧍 Customer Endpoints
-# ────────────────────────────────────────────────
 @router.post("/", response_model=IssueResponse, status_code=status.HTTP_201_CREATED)
 async def create_issue(
     booking_id: int = Form(...),
@@ -84,43 +76,109 @@ async def create_issue(
     return IssueResponse.model_validate(obj,from_attributes=True).model_dump()
 
 
-@router.get("/", response_model=List[IssueResponse])
-async def list_my_issues(
+@router.get("/", response_model=Union[IssueResponse, List[IssueResponse]])
+async def issues(
+    issue_id: Optional[int] = Query(None, description="If provided, returns the single issue."),
     limit: int = 50,
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
+    user_permissions: dict = Depends(get_user_permissions),
 ):
-    items = await svc_list_issues(db, user_id=current_user.user_id, limit=limit, offset=offset)
+    """Unified issues endpoint.
+
+    - If `issue_id` is provided: returns that issue. Admins (issue-write) may fetch any issue;
+      non-admins can fetch only their own.
+    - If `issue_id` is not provided: admins get all issues; non-admins get only their own issues (paged).
+    """
+    is_admin = _require_issue_write(user_permissions)
+
+    if issue_id is not None:
+        obj = await svc_get_issue(db, issue_id)
+        if not is_admin and obj.user_id != current_user.user_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to view this issue")
+        return IssueResponse.model_validate(obj).model_dump()
+
+    # list
+    if is_admin:
+        items = await svc_list_issues(db, limit=limit, offset=offset)
+    else:
+        items = await svc_list_issues(db, user_id=current_user.user_id, limit=limit, offset=offset)
 
     result = [IssueResponse.model_validate(i).model_dump() for i in items]
     return result
 
-
-@router.get("/{issue_id}", response_model=IssueResponse)
-async def get_my_issue(
+@router.get("/{issue_id}/chat")
+async def get_chats(
     issue_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
+    user_permissions: dict = Depends(get_user_permissions),
 ):
+    """Return chats for an issue.
+
+    Allowed for admins (issue-write) or the owning user.
+    """
     obj = await svc_get_issue(db, issue_id)
-    if obj.user_id != current_user.user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to view this issue")
-    return IssueResponse.model_validate(obj).model_dump()
+
+    is_admin = _require_issue_write(user_permissions)
+
+
+    if not is_admin and obj.user_id != current_user.user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to view chats for this issue")
+
+    items = await svc_list_chats(db, issue_id)
+    return [
+        {
+            "chat_id": i.chat_id,
+            "issue_id": i.issue_id,
+            "sender_id": i.sender_id,
+            "message": i.message,
+            "sent_at": i.sent_at,
+        }
+        for i in items
+    ]
 
 
 @router.put("/{issue_id}", response_model=IssueResponse)
-async def update_my_issue(
+async def update_issue(
     issue_id: int,
+    status: Optional[str] = Form(None),
     title: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
     images: Optional[List[UploadFile]] = File(default=None),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
+    user_permissions: dict = Depends(get_user_permissions),
 ):
+    """Unified update: admins can update status; owners can update title/description/images.
+
+    - If `status` is provided, requester must have ISSUE_RESOLUTION WRITE permission.
+    - Only the issue owner may update title/description/images.
+    """
     obj = await svc_get_issue(db, issue_id)
-    if obj.user_id != current_user.user_id:
+
+    is_admin = _require_issue_write(user_permissions)
+
+    is_owner = obj.user_id == current_user.user_id
+
+    if not is_admin and not is_owner:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to edit this issue")
+
+    payload = {}
+
+    # Admin-only: status
+    if status is not None:
+        if not is_admin:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to change status")
+        payload["status"] = status
+        if str(status).upper() == "RESOLVED":
+            payload["resolved_by"] = current_user.user_id
+
+    # Owner-only: title/description/images
+    if title is not None or description is not None or images is not None:
+        if not is_owner:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the issue owner can modify title/description/images")
 
     urls = None
     if images is not None:
@@ -131,8 +189,9 @@ async def update_my_issue(
                 if isinstance(r, Exception):
                     raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Image upload failed: {r}")
             urls = [str(r) for r in results]
+        else:
+            urls = []
 
-    payload = {}
     if title is not None:
         payload["title"] = title
     if description is not None:
@@ -157,10 +216,15 @@ async def post_chat(
     message: str = Form(...),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
+    user_permissions: dict = Depends(get_user_permissions),
 ):
     obj = await svc_get_issue(db, issue_id)
-    if obj.user_id != current_user.user_id:
+
+    is_admin = _require_issue_write(user_permissions)
+
+    if not is_admin and obj.user_id != current_user.user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to post chat to this issue")
+
     chat = await svc_add_chat(db, issue_id, current_user.user_id, message)
 
     # audit chat message create
@@ -176,126 +240,3 @@ async def post_chat(
         "message": chat.message,
         "sent_at": chat.sent_at,
     }
-
-
-@router.get("/{issue_id}/chat")
-async def list_chats(
-    issue_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: Users = Depends(get_current_user),
-):
-    obj = await svc_get_issue(db, issue_id)
-    if obj.user_id != current_user.user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to view chats for this issue")
-    items = await svc_list_chats(db, issue_id)
-
-    result = [
-        {
-            "chat_id": i.chat_id,
-            "issue_id": i.issue_id,
-            "sender_id": i.sender_id,
-            "message": i.message,
-            "sent_at": i.sent_at,
-        }
-        for i in items
-    ]
-    return result
-
-
-# ────────────────────────────────────────────────
-#  🧑‍💼 Admin Endpoints
-# ────────────────────────────────────────────────
-@router.get("/admin/", response_model=List[IssueResponse])
-async def admin_list_issues(
-    limit: int = 100,
-    offset: int = 0,
-    db: AsyncSession = Depends(get_db),
-    user_permissions: dict = Depends(get_user_permissions),
-):
-    _require_issue_write(user_permissions)
-    items = await svc_list_issues(db, limit=limit, offset=offset)
-
-    result = [IssueResponse.model_validate(i).model_dump() for i in items]
-    return result
-
-
-@router.get("/admin/{issue_id}", response_model=IssueResponse)
-async def admin_get_issue(
-    issue_id: int,
-    db: AsyncSession = Depends(get_db),
-    user_permissions: dict = Depends(get_user_permissions),
-):
-    _require_issue_write(user_permissions)
-    obj = await svc_get_issue(db, issue_id)
-    return IssueResponse.model_validate(obj).model_dump()
-
-
-@router.put("/admin/{issue_id}", response_model=IssueResponse)
-async def admin_update_issue(
-    issue_id: int,
-    status: Optional[str] = Form(None),
-    db: AsyncSession = Depends(get_db),
-    user_permissions: dict = Depends(get_user_permissions),
-    current_user: Users = Depends(get_current_user),
-):
-    _require_issue_write(user_permissions)
-    payload = {}
-    if status is not None:
-        payload["status"] = status
-        if str(status).upper() == "RESOLVED":
-            payload["resolved_by"] = current_user.user_id
-
-    updated = await svc_update_issue(db, issue_id, payload)
-    # audit admin issue update
-    try:
-        new_val = IssueResponse.model_validate(updated).model_dump()
-        entity_id = f"issue:{getattr(updated, 'issue_id', None)}"
-        await log_audit(entity="issue", entity_id=entity_id, action="UPDATE", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
-    except Exception:
-        pass
-    return IssueResponse.model_validate(updated).model_dump()
-
-
-@router.post("/admin/{issue_id}/chat", status_code=status.HTTP_201_CREATED)
-async def admin_post_chat(
-    issue_id: int,
-    message: str = Form(...),
-    db: AsyncSession = Depends(get_db),
-    user_permissions: dict = Depends(get_user_permissions),
-    current_user: Users = Depends(get_current_user),
-):
-    _require_issue_write(user_permissions)
-    chat = await svc_add_chat(db, issue_id, current_user.user_id, message)
-    # audit admin chat
-    try:
-        entity_id = f"issue:{issue_id}:chat:{getattr(chat, 'chat_id', None)}"
-        await log_audit(entity="issue_chat", entity_id=entity_id, action="INSERT", new_value={"message": chat.message}, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
-    except Exception:
-        pass
-    return {
-        "chat_id": chat.chat_id,
-        "issue_id": chat.issue_id,
-        "sender_id": chat.sender_id,
-        "message": chat.message,
-        "sent_at": chat.sent_at,
-    }
-
-
-@router.get("/admin/{issue_id}/chat")
-async def admin_list_chats(
-    issue_id: int,
-    db: AsyncSession = Depends(get_db),
-    user_permissions: dict = Depends(get_user_permissions),
-):
-    _require_issue_write(user_permissions)
-    items = await svc_list_chats(db, issue_id)
-    return [
-        {
-            "chat_id": i.chat_id,
-            "issue_id": i.issue_id,
-            "sender_id": i.sender_id,
-            "message": i.message,
-            "sent_at": i.sent_at,
-        }
-        for i in items
-    ]

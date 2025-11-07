@@ -12,7 +12,7 @@ Base path: `/auth`
 - POST `/login` — OAuth2 login (form-data) — returns tokens (`TokenResponse`)
 - POST `/refresh` — Rotate tokens using refresh token (`TokenResponse`)
 - POST `/logout` — Logout (blacklist/revoke token)
-- POST `/admin/register` — Create admin user (permission-protected; requires Admin_Creation/WRITE)
+- POST `/register` — Create admin user (permission-protected; requires Admin_Creation/WRITE)
 
 ## Roles
 Base path: `/roles`
