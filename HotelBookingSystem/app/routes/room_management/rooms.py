@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends, status, Query
+from fastapi import APIRouter, Depends, status, Query, UploadFile, File
 from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.postgres_connection import get_db
-from app.schemas.pydantic_models.room import RoomCreate, RoomResponse, Room, RoomUpdate
+from app.schemas.pydantic_models.room import (
+    RoomCreate, RoomResponse, Room, RoomUpdate, BulkRoomUploadResponse
+)
 from app.dependencies.authentication import get_user_permissions, get_current_user, ensure_not_basic_user
 from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
 from app.core.exceptions import ForbiddenError
@@ -13,6 +15,7 @@ from app.services.room_service.rooms_service import (
     get_room as svc_get_room,
     update_room as svc_update_room,
     delete_room as svc_delete_room,
+    bulk_upload_rooms as svc_bulk_upload_rooms,
 )
 from app.core.cache import get_cached, set_cached, invalidate_pattern
 from app.utils.audit_helper import log_audit
@@ -120,3 +123,63 @@ async def delete_room(room_id: int, db: AsyncSession = Depends(get_db), user_per
     # invalidate rooms cache after delete
     await invalidate_pattern("rooms:*")
     return {"message": "Room deleted"}
+
+
+@router.post("/bulk-upload", response_model=BulkRoomUploadResponse, status_code=status.HTTP_200_OK)
+async def bulk_upload_rooms(
+    file: UploadFile = File(..., description="Excel file with columns: room_no, room_type_id, room_status, freeze_reason"),
+    db: AsyncSession = Depends(get_db),
+    user_permissions: dict = Depends(get_user_permissions),
+    _ok: bool = Depends(ensure_not_basic_user),
+):
+    """
+    Bulk upload rooms from an Excel file (only ADMIN/MANAGER allowed).
+    
+    **Excel File Requirements:**
+    - Column 1: `room_no` (required, string) - Room number
+    - Column 2: `room_type_id` (required, integer) - ID of the room type
+    - Column 3: `room_status` (optional, default: AVAILABLE) - One of: AVAILABLE, BOOKED, MAINTENANCE, FROZEN
+    - Column 4: `freeze_reason` (optional, default: NONE) - One of: NONE, CLEANING, ADMIN_LOCK, SYSTEM_HOLD
+    
+    **Response:**
+    - `total_processed`: Total rows in Excel
+    - `successfully_created`: Count of rooms created
+    - `skipped`: Count of rooms skipped
+    - `created_rooms`: List of successfully created rooms with their new IDs
+    - `skipped_rooms`: List of skipped rooms with reasons why
+    
+    **Access Control:** Only non-basic users (admins/managers) can access this endpoint.
+    
+    **Example curl:**
+    ```bash
+    curl -X POST http://localhost:8000/api/rooms/bulk-upload \\
+      -H "Authorization: Bearer <token>" \\
+      -F "file=@rooms.xlsx"
+    ```
+    """
+    # Require WRITE on both Booking and Room_Management
+    _require_permissions(user_permissions, [Resources.BOOKING, Resources.ROOM_MANAGEMENT], PermissionTypes.WRITE, require_all=True)
+    
+    # Read file content
+    content = await file.read()
+    
+    # Call service function to handle bulk upload
+    result = await svc_bulk_upload_rooms(db, content)
+    
+    # Invalidate rooms cache after bulk upload
+    await invalidate_pattern("rooms:*")
+    
+    # Log audit entry for bulk upload operation
+    try:
+        await log_audit(
+            entity="room_bulk_upload",
+            entity_id=f"bulk_upload:{result['successfully_created']}_rooms",
+            action="INSERT",
+            new_value={"total": result["total_processed"], "created": result["successfully_created"], "skipped": result["skipped"]},
+            changed_by_user_id=None,
+            user_id=None
+        )
+    except Exception:
+        pass
+    
+    return BulkRoomUploadResponse(**result)

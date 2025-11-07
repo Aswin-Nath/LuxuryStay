@@ -3,7 +3,7 @@
 # Purpose: Pydantic models for Room Management module
 # ==============================================================
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from enum import Enum
 
@@ -162,5 +162,33 @@ class RoomUpdate(BaseModel):
     room_type_id: Optional[int] = None
     room_status: Optional[RoomStatus] = None
     freeze_reason: Optional[FreezeReason] = None
+
+    model_config = {"from_attributes": True}
+
+
+# ==============================================================
+# BULK UPLOAD MODELS
+# ==============================================================
+class CreatedRoomInfo(BaseModel):
+    """Info about a successfully created room from bulk upload"""
+    room_no: str
+    room_id: int
+    room_type_id: int
+
+
+class SkippedRoomInfo(BaseModel):
+    """Info about a skipped room during bulk upload"""
+    room_no: str
+    reason: str
+
+
+class BulkRoomUploadResponse(BaseModel):
+    """Response for bulk room upload endpoint"""
+    total_processed: int = Field(..., description="Total rows processed from Excel")
+    successfully_created: int = Field(..., description="Count of successfully created rooms")
+    skipped: int = Field(..., description="Count of skipped rooms")
+    created_rooms: List[CreatedRoomInfo] = Field(default_factory=list, description="List of created rooms with IDs")
+    skipped_rooms: List[SkippedRoomInfo] = Field(default_factory=list, description="List of skipped rooms with reasons")
+    message: str = "Bulk upload completed"
 
     model_config = {"from_attributes": True}
