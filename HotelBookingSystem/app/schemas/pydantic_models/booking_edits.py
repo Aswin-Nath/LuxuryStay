@@ -24,8 +24,29 @@ class BookingEditBase(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class BookingEditCreate(BookingEditBase):
-    """Used when user submits a new edit request."""
+class BookingEditCreate(BaseModel):
+    """Used when user submits a new edit request.
+
+    This model intentionally does NOT accept `user_id` (it will be derived from the authenticated user).
+    """
+    booking_id: int
+    primary_customer_name: str = Field(..., max_length=150)
+    primary_customer_phno: str = Field(..., max_length=20)
+    primary_customer_dob: date
+    check_in_date: date
+    check_out_date: date
+    check_in_time: Optional[datetime] = None
+    check_out_time: Optional[datetime] = None
+    total_price: Optional[float] = Field(None, gt=0)
+    edit_type: Optional[Literal["PRE", "POST"]] = None
+    requested_by: Optional[int] = None
+
+    requested_room_changes: Optional[Dict[int, int]] = Field(
+        None,
+        description="Mapping of room_id -> requested new room_type_id by customer",
+    )
+
+    model_config = {"from_attributes": True}
 
 
 class BookingEditResponse(BookingEditBase):

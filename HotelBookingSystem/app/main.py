@@ -20,6 +20,7 @@ from app.routes.profile_management.profile import router as profile_router
 from app.routes.logs_management.audit_logs import router as audit_logs_router
 from app.routes.logs_management.booking_logs import router as booking_logs_router
 from app.routes.backup_and_restore_management.backups import router as backups_router
+from app.routes.backup_and_restore_management.restores import router as restores_router
 
 
 app = FastAPI()
@@ -52,6 +53,5 @@ app.include_router(profile_router)
 app.include_router(backups_router)
 app.include_router(audit_logs_router)
 app.include_router(booking_logs_router)
-from app.routes.backup_and_restore_management.restores import router as restores_router
 app.include_router(restores_router)
 

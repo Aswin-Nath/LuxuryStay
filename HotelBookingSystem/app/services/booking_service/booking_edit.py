@@ -4,7 +4,7 @@ from sqlalchemy import select,delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.sqlalchemy_schemas.refunds import Refunds, RefundRoomMap
 from app.models.sqlalchemy_schemas.bookings import Bookings, BookingEdits, BookingRoomMap
-from app.models.sqlalchemy_schemas.rooms import Rooms
+from app.models.sqlalchemy_schemas.rooms import Rooms, RoomStatus, FreezeReason
 from app.schemas.pydantic_models.booking_edits import BookingEditCreate, BookingEditResponse,ReviewPayload,DecisionPayload
 from decimal import Decimal
 
@@ -22,7 +22,7 @@ async def create_booking_edit_service(payload: BookingEditCreate, db: AsyncSessi
     # room_id:[room_type_id] this is for wanted rooms
     new_edit = BookingEdits(
         booking_id=payload.booking_id,
-        user_id=payload.user_id,
+        user_id=getattr(current_user, 'user_id', None),
         primary_customer_name=payload.primary_customer_name,
         primary_customer_phno=payload.primary_customer_phno,
         primary_customer_dob=payload.primary_customer_dob,
@@ -33,31 +33,15 @@ async def create_booking_edit_service(payload: BookingEditCreate, db: AsyncSessi
         total_price=payload.total_price,
         edit_type=edit_type,
         edit_status="PENDING",
-        requested_by=payload.requested_by or current_user.user_id,
+        requested_by=payload.requested_by or getattr(current_user, 'user_id', None),
         requested_room_changes=payload.requested_room_changes or None,
     )
 
-    async with db.begin():
-        db.add(new_edit)
-
+    db.add(new_edit)
+    await db.flush()
     await db.refresh(new_edit)
+    await db.commit()
     return BookingEditResponse.model_validate(new_edit)
-
-
-# ✅ Get Active Booking Edit
-async def get_active_booking_edit_service(booking_id: int, db: AsyncSession):
-    stmt = (
-        select(BookingEdits)
-        .where(
-            BookingEdits.booking_id == booking_id,
-            BookingEdits.edit_status.in_(["PENDING", "AWAITING_CUSTOMER_RESPONSE"]),
-            BookingEdits.is_deleted == False,
-        )
-        .order_by(BookingEdits.requested_at.desc())
-    )
-    res = await db.execute(stmt)
-    edit = res.scalars().first()
-    return BookingEditResponse.model_validate(edit) if edit else None
 
 
 # ✅ Get All Booking Edits
@@ -92,19 +76,13 @@ async def review_booking_edit_service(edit_id: int, payload: ReviewPayload, db: 
     br_rows = q.scalars().all()
 
     # Update matching booking_room_map rows in-memory
-    modified = False
     for key_str, room_ids in suggested.items():
-        try:
-            key = int(key_str)
-        except Exception:
-            # skip invalid keys
-            continue
+        key = int(key_str)
         for br in br_rows:
             # match either by room_id or room_type_id (flexible)
-            if getattr(br, "room_id", None) == key == key:
+            if getattr(br, "room_id")==key:
                 br.edit_suggested_rooms = room_ids
                 db.add(br)
-                modified = True
 
     # Update edit record
     edit.reviewed_by = current_user.user_id
@@ -120,15 +98,6 @@ async def review_booking_edit_service(edit_id: int, payload: ReviewPayload, db: 
 
 
 
-
-
-
-
-
-
-
-
-
 async def decision_on_booking_edit_service(edit_id: int, payload: DecisionPayload, db: AsyncSession, current_user):
     """
     Handles customer decisioning on booking edits.
@@ -137,6 +106,11 @@ async def decision_on_booking_edit_service(edit_id: int, payload: DecisionPayloa
     - REFUND → create refund + delete old room entry.
     """
 
+    """
+    Input format for rooms decisions room_id:[ACCEPT,new_room_id],[REFUND,-1],[KEEP,-1]
+    """
+
+    
     # 1️⃣ Fetch edit record
     stmt = select(BookingEdits).where(
         BookingEdits.edit_id == edit_id, BookingEdits.is_deleted == False
@@ -290,3 +264,52 @@ async def decision_on_booking_edit_service(edit_id: int, payload: DecisionPayloa
         "refund_rooms": refund_rooms,
         "message": f"Processed room-level decisions for edit #{edit_id}"
     }
+
+
+# -----------------------
+# Room lock/unlock helpers
+# -----------------------
+async def lock_room(db: AsyncSession, room_id: int):
+    """Lock a room (set status to FROZEN and freeze_reason to ADMIN_LOCK).
+
+    Raises HTTPException 404 if room not found.
+    Returns the updated room object.
+    """
+    stmt = select(Rooms).where(Rooms.room_id == room_id)
+    res = await db.execute(stmt)
+    room = res.scalars().first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    # Only lock if currently available
+    if room.room_status!="AVAILABLE":
+        return {"message":"room not available"}
+    room.room_status = 'FROZEN'
+    room.freeze_reason = 'ADMIN_LOCK'
+    db.add(room)
+    await db.commit()
+    return room
+
+
+async def unlock_room(db: AsyncSession, room_id: int):
+    """Unlock a room (set status to AVAILABLE and freeze_reason to NONE).
+
+    Raises HTTPException 404 if room not found.
+    Returns the updated room object.
+    """
+    stmt = select(Rooms).where(Rooms.room_id == room_id)
+    res = await db.execute(stmt)
+    room = res.scalars().first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    room.room_status = 'AVAILABLE'
+    room.freeze_reason = 'NONE'
+    db.add(room)
+    await db.commit()
+    return room
+
+
+async def change_room_status(db: AsyncSession, room_id: int, lock: bool):
+    """Convenience wrapper: lock if lock==True, otherwise unlock."""
+    if lock:
+        return await lock_room(db, room_id)
+    return await unlock_room(db, room_id)

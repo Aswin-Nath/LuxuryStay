@@ -5,8 +5,8 @@ from decimal import Decimal
 from datetime import datetime
 
 from app.models.sqlalchemy_schemas.refunds import Refunds, RefundRoomMap
-from app.models.sqlalchemy_schemas.bookings import Bookings
-from app.models.sqlalchemy_schemas.rooms import Rooms
+from app.models.sqlalchemy_schemas.bookings import Bookings, BookingRoomMap
+from app.models.sqlalchemy_schemas.rooms import Rooms, RoomStatus
 from app.models.sqlalchemy_schemas.payment_method import PaymentMethodUtility
 
 
@@ -27,17 +27,46 @@ async def cancel_booking_and_create_refund(db: AsyncSession, booking_id: int, pa
 
     data = payload.model_dump() if hasattr(payload, 'model_dump') else dict(payload)
 
-    full_cancel = bool(data.get('full_cancellation', False))
+    # If refund_rooms not provided, treat as full cancellation
+    refund_rooms = data.get('refund_rooms') or []
+    full_cancel = bool(data.get('full_cancellation', False)) or (len(refund_rooms) == 0)
 
-    # Determine refund amount
+    # determine number of nights for per-room price calculations
+    nights = (booking.check_out - booking.check_in).days
+    if nights <= 0:
+        nights = 1
+    # Fetch booking room mappings to compute per-room prices
+    qbr = await db.execute(select(BookingRoomMap).where(BookingRoomMap.booking_id == booking.booking_id))
+    brm_items = qbr.scalars().all()
+    # Map room_id -> BookingRoomMap
+    brm_by_room = {b.room_id: b for b in brm_items}
+
+    # Helper to compute room total price (price_per_night * nights)
+    async def room_total_price(room_id: int) -> Decimal:
+        q = await db.execute(select(Rooms).where(Rooms.room_id == room_id))
+        room = q.scalars().first()
+        if not room:
+            return Decimal('0')
+        return (Decimal(str(room.price_per_night)) * Decimal(nights)).quantize(Decimal('0.01'))
+
+    # Determine refund amount and per-room breakdown
+    per_room_refunds: dict[int, Decimal] = {}
     if full_cancel:
-        refund_amount = booking.total_price
+        # full: refund is booking total, and every room gets its full room price
+        refund_amount = Decimal(str(booking.total_price))
+        for b in brm_items:
+            amt = await room_total_price(b.room_id)
+            per_room_refunds[b.room_id] = amt
     else:
-        # partial: client must provide refund_amount or refund_rooms (and refund_amount)
-        refund_amount = data.get('refund_amount')
-        if refund_amount is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="refund_amount is required for partial cancellations")
-        refund_amount = Decimal(str(refund_amount))
+        # partial: refund_rooms must be provided and each room's refund is its room price
+        if not refund_rooms:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="refund_rooms must be provided for partial cancellations")
+        total = Decimal('0')
+        for rid in refund_rooms:
+            amt = await room_total_price(rid)
+            per_room_refunds[rid] = amt
+            total += amt
+        refund_amount = total.quantize(Decimal('0.01'))
 
     # Create Refunds entry (transaction fields nullable)
     rf = Refunds(
@@ -53,21 +82,20 @@ async def cancel_booking_and_create_refund(db: AsyncSession, booking_id: int, pa
     db.add(rf)
     await db.flush()
 
-    # If refund_rooms provided, create mapping rows and mark rooms available
-    refund_rooms = data.get('refund_rooms') or []
-    if refund_rooms:
-        # If refund_amount provided, split equally among rooms
-        per_room_amount = None
-        if refund_amount is not None and len(refund_rooms) > 0:
-            per_room_amount = (refund_amount / Decimal(len(refund_rooms))).quantize(Decimal('0.01'))
-        for rid in refund_rooms:
-            rmap = RefundRoomMap(refund_id=rf.refund_id, booking_id=booking.booking_id, room_id=rid, refund_amount=per_room_amount or Decimal('0'))
-            db.add(rmap)
-            # mark room available
-            q = await db.execute(select(Rooms).where(Rooms.room_id == rid))
-            room = q.scalars().first()
-            if room:
-                room.room_status = 'AVAILABLE'
+    # Create RefundRoomMap rows according to per-room breakdown and mark rooms available
+    for rid, amt in per_room_refunds.items():
+        rmap = RefundRoomMap(refund_id=rf.refund_id, booking_id=booking.booking_id, room_id=rid, refund_amount=amt)
+        db.add(rmap)
+        q = await db.execute(select(Rooms).where(Rooms.room_id == rid))
+        room = q.scalars().first()
+        if room:
+            room.room_status = 'AVAILABLE'
+
+    # If full cancellation, mark booking-room mappings as inactive
+    if full_cancel:
+        for b in brm_items:
+            b.is_room_active = False
+
 
     # Update booking status to Cancelled
     booking.status = 'Cancelled'

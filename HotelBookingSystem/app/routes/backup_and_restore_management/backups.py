@@ -6,7 +6,7 @@ from app.schemas.pydantic_models.backup_data_collections import BackupDataCollec
 from app.dependencies.authentication import ensure_not_basic_user
 from app.utils.audit_helper import log_audit
 
-router = APIRouter(prefix="/backups", tags=["backup"])
+router = APIRouter(prefix="/backups", tags=["BACKUP"])
 
 
 @router.post("/", response_model=dict)

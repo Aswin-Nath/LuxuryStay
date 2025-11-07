@@ -6,7 +6,7 @@ from app.schemas.pydantic_models.restored_data_collections import RestoredDataCo
 from app.dependencies.authentication import ensure_not_basic_user
 from app.utils.audit_helper import log_audit
 
-router = APIRouter(prefix="/restores", tags=["restore"])
+router = APIRouter(prefix="/restores", tags=["RESTORE"])
 
 
 @router.post("/", response_model=dict)

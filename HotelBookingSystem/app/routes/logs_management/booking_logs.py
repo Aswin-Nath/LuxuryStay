@@ -4,7 +4,7 @@ from typing import List, Optional
 from app.services.logger_service.logs_service import list_booking_logs
 from app.schemas.pydantic_models.booking_logs import BookingLogModel
 
-router = APIRouter(prefix="/booking_logs", tags=["logs"])
+router = APIRouter(prefix="/booking_logs", tags=["LOGS"])
 
 # POST for creating booking logs is handled by middleware (app/middlewares/logs_middleware.py)
 @router.get("/", response_model=List[dict])

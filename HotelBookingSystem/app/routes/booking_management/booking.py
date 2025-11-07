@@ -63,73 +63,56 @@ async def cancel_booking(booking_id: int, payload: RefundCreate, db: AsyncSessio
 
 @router.get("/", response_model=List[BookingResponse])
 async def get_bookings(
-	booking_id: Optional[int] = Query(None),
-	status: Optional[str] = Query(None),
-	limit: int = Query(20, ge=1, le=200),
-	offset: int = Query(0, ge=0),
-	db: AsyncSession = Depends(get_db),
-	user_permissions: dict = Depends(get_user_permissions),
-	current_user: Users = Depends(get_current_user),
+    booking_id: Optional[int] = None,
+    status: Optional[str] = Query(None),
+    limit: int = Query(20, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    user_permissions: dict = Depends(get_user_permissions),
+    current_user: Users = Depends(get_current_user),
 ):
-	"""
-	Unified GET for bookings.
+    """
+    Unified GET for bookings (simplified).
 
-	- If requester is NOT a basic user and no query params are present -> return all bookings (paginated).
-	- If query params (booking_id/status) are provided -> perform query. Basic users are restricted to their own bookings (user_id from token).
-	- Basic users (role_id == 1) always receive only their own bookings.
-	"""
+    - Basic user (role_id == 1):
+        • If booking_id → return that booking (must own it)
+        • Else → return all their own bookings (filter by status if given)
+    - Privileged user (has booking WRITE permission):
+        • If booking_id → return that booking
+        • Else → return all bookings (filter by status if given, else paginated)
+    - Others → 403
+    """
 
-	has_query_params = booking_id is not None or status is not None
-	is_basic_user = getattr(current_user, "role_id", None) == 1
+    is_basic_user = getattr(current_user, "role_id", None) == 1
+    has_booking_write = (
+        Resources.BOOKING.value in user_permissions
+        and PermissionTypes.WRITE.value in user_permissions[Resources.BOOKING.value]
+    )
 
-	# If a specific booking is requested, fetch and enforce ownership for basic users
-	if booking_id is not None:
-		obj = await svc_get_booking(db, booking_id)
-		if is_basic_user and obj.user_id != current_user.user_id:
-			raise ForbiddenError("Insufficient privileges to access this booking")
-		return [BookingResponse.model_validate(obj).model_dump(exclude={"created_at"})]
+    # BASIC USER LOGIC
+    if is_basic_user:
+        if booking_id:
+            obj = await svc_get_booking(db, booking_id)
+            if obj.user_id != current_user.user_id:
+                raise ForbiddenError("Insufficient privileges to access this booking")
+            return [BookingResponse.model_validate(obj).model_dump(exclude={"created_at"})]
 
-	# Basic user: only their bookings (optionally filtered by status)
-	if is_basic_user:
-		cache_key = f"bookings:query:user:{current_user.user_id}:status:{status}"
-		cached = await get_cached(cache_key)
-		if cached is not None:
-			return cached
+        # All their own bookings (optional status filter)
+        items = await svc_query_bookings(db, user_id=current_user.user_id, status=status)
+        return [BookingResponse.model_validate(i).model_dump(exclude={"created_at"}) for i in items]
 
-		items = await svc_query_bookings(db, user_id=current_user.user_id, status=status)
-		result = [BookingResponse.model_validate(i).model_dump(exclude={"created_at"}) for i in items]
-		await set_cached(cache_key, result, ttl=60)
-		return result
+    # PRIVILEGED USER LOGIC
+    if not has_booking_write:
+        raise ForbiddenError("Insufficient permissions to access bookings")
 
-	# Non-basic user
-	if has_query_params:
-		# Privileged users can query across all bookings using provided params
-		cache_key = f"bookings:query:user:ALL:status:{status}"
-		cached = await get_cached(cache_key)
-		if cached is not None:
-			return cached
+    if booking_id:
+        obj = await svc_get_booking(db, booking_id)
+        return [BookingResponse.model_validate(obj).model_dump(exclude={"created_at"})]
 
-		items = await svc_query_bookings(db, user_id=None, status=status)
-		result = [BookingResponse.model_validate(i).model_dump(exclude={"created_at"}) for i in items]
-		await set_cached(cache_key, result, ttl=60)
-		return result
+    # List all bookings (filtered or paginated)
+    if status:
+        items = await svc_query_bookings(db, user_id=None, status=status)
+    else:
+        items = await svc_list_bookings(db, limit=limit, offset=offset)
 
-	# No params and privileged user -> paginated list
-	cache_key = f"bookings:limit:{limit}:offset:{offset}"
-	cached = await get_cached(cache_key)
-	if cached is not None:
-		return cached
-
-	items = await svc_list_bookings(db, limit=limit, offset=offset)
-	result = [BookingResponse.model_validate(i).model_dump(exclude={"created_at"}) for i in items]
-	await set_cached(cache_key, result, ttl=120)
-	return result
-
-
-@router.get("/{booking_id}", response_model=BookingResponse)
-async def get_booking(booking_id: int, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)):
-	obj = await svc_get_booking(db, booking_id)
-	# Enforce ownership for basic users
-	if getattr(current_user, "role_id", None) == 1 and obj.user_id != current_user.user_id:
-		raise ForbiddenError("Insufficient privileges to access this booking")
-	return BookingResponse.model_validate(obj).model_dump(exclude={"created_at"})
+    return [BookingResponse.model_validate(i).model_dump(exclude={"created_at"}) for i in items]
