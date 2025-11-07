@@ -1,33 +1,66 @@
 from typing import Optional
 from datetime import datetime
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# CRUD Imports
+from app.crud.authentication.authentication import (
+    get_user_by_email,
+    get_user_by_id,
+    get_session_by_access_token,
+    revoke_session_record,
+)
+
+# Core Modules
 from app.services.authentication_service import authentication_core
-from app.core.exceptions import NotFoundError, BadRequestError, UnauthorizedError, ConflictError
+from app.core.exceptions import (
+    NotFoundError,
+    BadRequestError,
+    UnauthorizedError,
+    ConflictError,
+)
+
+# Schemas & Models
 from app.schemas.pydantic_models.users import UserCreate, TokenResponse
 from app.models.sqlalchemy_schemas.users import Users
-from app.models.sqlalchemy_schemas.authentication import VerificationType, Sessions
+from app.models.sqlalchemy_schemas.authentication import VerificationType
 
+
+# ==========================================================
+# 🔹 USER SIGNUP
+# ==========================================================
 
 async def signup(db: AsyncSession, payload: UserCreate, created_by: Optional[int] = None) -> Users:
-    # Enforce only normal user role can signup
     if payload.role_id is not None and payload.role_id != 1:
         raise BadRequestError("Cannot create admin users via this endpoint")
 
-    # check existing email
-    result = await db.execute(select(Users).where(Users.email == payload.email))
-    existing = result.scalars().first()
+    existing = await get_user_by_email(db, payload.email)
     if existing:
         raise ConflictError("Email already registered")
 
-    user_obj = await authentication_core.create_user(db, full_name=payload.full_name, email=payload.email, password=payload.password, phone_number=payload.phone_number, role_id=1, status_id=1, created_by=created_by)
+    user_obj = await authentication_core.create_user(
+        db=db,
+        full_name=payload.full_name,
+        email=payload.email,
+        password=payload.password,
+        phone_number=payload.phone_number,
+        role_id=1,
+        status_id=1,
+        created_by=created_by,
+    )
     return user_obj
 
 
-async def request_otp(db: AsyncSession, email: str, verification_type: Optional[str], client_host: Optional[str] = None):
-    result = await db.execute(select(Users).where(Users.email == email))
-    user = result.scalars().first()
+# ==========================================================
+# 🔹 OTP GENERATION
+# ==========================================================
+
+async def request_otp(
+    db: AsyncSession,
+    email: str,
+    verification_type: Optional[str],
+    client_host: Optional[str] = None,
+):
+    user = await get_user_by_email(db, email)
     if not user:
         raise NotFoundError("User not found")
 
@@ -38,7 +71,6 @@ async def request_otp(db: AsyncSession, email: str, verification_type: Optional[
         raise BadRequestError("Invalid verification_type")
 
     ver = await authentication_core.create_verification(db, user.user_id, vtype, ip=client_host)
-
     subject = "Your OTP Code"
     body = f"Your OTP is: {ver.otp_code}. It expires at {ver.expires_at} UTC."
     sent = authentication_core._send_email(user.email, subject, body)
@@ -49,9 +81,18 @@ async def request_otp(db: AsyncSession, email: str, verification_type: Optional[
     return response
 
 
-async def verify_otp_flow(db: AsyncSession, email: str, otp: str, verification_type: Optional[str] = None, new_password: Optional[str] = None):
-    result = await db.execute(select(Users).where(Users.email == email))
-    user = result.scalars().first()
+# ==========================================================
+# 🔹 OTP VERIFICATION & PASSWORD RESET
+# ==========================================================
+
+async def verify_otp_flow(
+    db: AsyncSession,
+    email: str,
+    otp: str,
+    verification_type: Optional[str] = None,
+    new_password: Optional[str] = None,
+):
+    user = await get_user_by_email(db, email)
     if not user:
         raise NotFoundError("User not found")
 
@@ -72,8 +113,19 @@ async def verify_otp_flow(db: AsyncSession, email: str, otp: str, verification_t
     return {"message": "OTP verified"}
 
 
-async def change_password(db: AsyncSession, current_user: Users, current_password: str, new_password: str):
-    auth_user = await authentication_core.authenticate_user(db, email=current_user.email, password=current_password)
+# ==========================================================
+# 🔹 PASSWORD CHANGE
+# ==========================================================
+
+async def change_password(
+    db: AsyncSession,
+    current_user: Users,
+    current_password: str,
+    new_password: str,
+):
+    auth_user = await authentication_core.authenticate_user(
+        db, email=current_user.email, password=current_password
+    )
     if not auth_user:
         raise UnauthorizedError("Current password incorrect")
 
@@ -81,12 +133,24 @@ async def change_password(db: AsyncSession, current_user: Users, current_passwor
     return {"message": "Password changed successfully"}
 
 
-async def login_flow(db: AsyncSession, email: str, password: str, device_info: Optional[str] = None, client_host: Optional[str] = None) -> TokenResponse:
+# ==========================================================
+# 🔹 LOGIN
+# ==========================================================
+
+async def login_flow(
+    db: AsyncSession,
+    email: str,
+    password: str,
+    device_info: Optional[str] = None,
+    client_host: Optional[str] = None,
+) -> TokenResponse:
     user = await authentication_core.authenticate_user(db, email=email, password=password)
     if not user:
         raise UnauthorizedError("Invalid credentials")
 
-    session = await authentication_core.create_session(db, user, device_info=device_info, ip=client_host)
+    session = await authentication_core.create_session(
+        db, user, device_info=device_info, ip=client_host
+    )
 
     expires_in = (
         int((session.access_token_expires_at - session.login_time).total_seconds())
@@ -103,18 +167,25 @@ async def login_flow(db: AsyncSession, email: str, password: str, device_info: O
     )
 
 
+# ==========================================================
+# 🔹 TOKEN REFRESH
+# ==========================================================
+
 async def refresh_tokens(db: AsyncSession, access_token: str) -> TokenResponse:
     try:
         session = await authentication_core.refresh_access_token(db, access_token)
     except Exception as e:
         raise UnauthorizedError(str(e))
 
-    result = await db.execute(select(Users).where(Users.user_id == session.user_id))
-    user = result.scalars().first()
+    user = await get_user_by_id(db, session.user_id)
     if not user:
         raise NotFoundError("User not found")
 
-    expires_in = int((session.access_token_expires_at - datetime.utcnow()).total_seconds()) if session.access_token_expires_at else 3600
+    expires_in = (
+        int((session.access_token_expires_at - datetime.utcnow()).total_seconds())
+        if session.access_token_expires_at
+        else 3600
+    )
 
     return TokenResponse(
         access_token=session.access_token,
@@ -125,26 +196,36 @@ async def refresh_tokens(db: AsyncSession, access_token: str) -> TokenResponse:
     )
 
 
+# ==========================================================
+# 🔹 LOGOUT
+# ==========================================================
+
 async def logout_flow(db: AsyncSession, access_token: str):
-    # find session by access token
-    result = await db.execute(select(Sessions).where(Sessions.access_token == access_token))
-    session = result.scalars().first()
+    session = await get_session_by_access_token(db, access_token)
     if not session:
         raise NotFoundError("Session not found")
 
-    await authentication_core.revoke_session(db, session=session, reason="user_logout")
+    await revoke_session_record(db, session=session, reason="user_logout")
+    await db.commit()
     return {"message": "Logged out"}
 
 
-async def register_admin(db: AsyncSession, payload: UserCreate, current_user_id: int, user_permissions: dict):
-    # permission check is expected to be done by route (dependency). We still enforce here minimally.
-    # check email conflict
-    result = await db.execute(select(Users).where(Users.email == payload.email))
-    if result.scalars().first():
+# ==========================================================
+# 🔹 ADMIN REGISTRATION
+# ==========================================================
+
+async def register_admin(
+    db: AsyncSession,
+    payload: UserCreate,
+    current_user_id: int,
+    user_permissions: dict,
+):
+    existing = await get_user_by_email(db, payload.email)
+    if existing:
         raise ConflictError("Email already registered")
 
     user_obj = await authentication_core.create_user(
-        db,
+        db=db,
         full_name=payload.full_name,
         email=payload.email,
         password=payload.password,

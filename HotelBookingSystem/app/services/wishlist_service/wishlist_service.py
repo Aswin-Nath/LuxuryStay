@@ -1,65 +1,83 @@
 from typing import List, Optional
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.sqlalchemy_schemas.wishlist import Wishlist
 
+# CRUD imports
+from app.crud.wishlist_management.wishlist import (
+    create_wishlist_entry,
+    get_wishlist_by_user_and_item,
+    get_user_wishlist,
+    get_wishlist_by_id,
+    soft_delete_wishlist_entry,
+)
 
-async def add_to_wishlist(db: AsyncSession, payload,current_user) -> Wishlist:
+
+# ==========================================================
+# 🔹 ADD TO WISHLIST
+# ==========================================================
+
+async def add_to_wishlist(db: AsyncSession, payload, current_user) -> Wishlist:
     """Create a wishlist entry. Enforce uniqueness per user+item (room_type or offer)."""
     data = payload.model_dump()
     user_id = current_user.user_id
     room_type_id = data.get("room_type_id")
     offer_id = data.get("offer_id")
 
-    # Convert 0 → None for optional FKs
+    # Normalize optional FKs (0 → None)
     room_type_id = None if room_type_id == 0 else room_type_id
     offer_id = None if offer_id == 0 else offer_id
 
     if not room_type_id and not offer_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Either room_type_id or offer_id must be provided")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Either room_type_id or offer_id must be provided",
+        )
 
-    stmt = select(Wishlist).where(Wishlist.user_id == user_id, Wishlist.is_deleted == False)
-    if room_type_id:
-        stmt = stmt.where(Wishlist.room_type_id == room_type_id)
-    if offer_id:
-        stmt = stmt.where(Wishlist.offer_id == offer_id)
-
-    res = await db.execute(stmt)
-    existing = res.scalars().first()
+    # Check uniqueness
+    existing = await get_wishlist_by_user_and_item(db, user_id, room_type_id, offer_id)
     if existing:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Item already in wishlist")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Item already in wishlist",
+        )
 
-    obj = Wishlist(user_id=user_id, room_type_id=room_type_id, offer_id=offer_id)
-    db.add(obj)
-    await db.flush()
+    # Create entry
+    obj = await create_wishlist_entry(db, user_id, room_type_id, offer_id)
     await db.commit()
-
-    # Refresh
-    await db.refresh(obj)
     return obj
 
 
-async def list_user_wishlist(db: AsyncSession, user_id: int, include_deleted: bool = False) -> List[Wishlist]:
-    stmt = select(Wishlist).where(Wishlist.user_id == user_id)
-    if not include_deleted:
-        stmt = stmt.where(Wishlist.is_deleted == False)
+# ==========================================================
+# 🔹 LIST USER WISHLIST
+# ==========================================================
 
-    res = await db.execute(stmt)
-    items = res.scalars().all()
-    return items
+async def list_user_wishlist(
+    db: AsyncSession, user_id: int, include_deleted: bool = False
+) -> List[Wishlist]:
+    """Return all wishlist items for the user."""
+    return await get_user_wishlist(db, user_id, include_deleted)
 
+
+# ==========================================================
+# 🔹 REMOVE WISHLIST ITEM
+# ==========================================================
 
 async def remove_wishlist(db: AsyncSession, wishlist_id: int, user_id: int):
-    stmt = select(Wishlist).where(Wishlist.wishlist_id == wishlist_id)
-    res = await db.execute(stmt)
-    obj = res.scalars().first()
+    """Soft-delete a wishlist item for a user."""
+    obj = await get_wishlist_by_id(db, wishlist_id)
     if not obj:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wishlist item not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Wishlist item not found",
+        )
     if obj.user_id != user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed to remove this wishlist item")
-    obj.is_deleted = True
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not allowed to remove this wishlist item",
+        )
+
+    await soft_delete_wishlist_entry(db, obj)
     await db.commit()
-    return 
+    return {"message": "Wishlist item removed"}

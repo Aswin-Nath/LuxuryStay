@@ -92,4 +92,4 @@ async def mark_notification_as_read(db: AsyncSession, notification_id: int, user
     db.add(obj)
     await db.commit()
     await db.refresh(obj)
-    return None
+    return {"message":"marked as read"}

@@ -101,4 +101,4 @@ async def delete_offer(offer_id: int, db: AsyncSession = Depends(get_db), user_p
 
     await svc_soft_delete_offer(db, offer_id)
     await invalidate_pattern("offers:*")
-    return None
+    return {"message":"offer deleted"}

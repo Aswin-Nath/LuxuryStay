@@ -182,4 +182,4 @@ async def set_image_primary(db: AsyncSession, image_id: int, requester_id: int |
     db.add(obj)
     await db.commit()
     await db.refresh(obj)
-    return None
+    return {"message":"setted as primary"}
