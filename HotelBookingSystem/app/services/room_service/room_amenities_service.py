@@ -1,65 +1,62 @@
 from typing import List
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.sqlalchemy_schemas.rooms import RoomAmenityMap, Rooms, RoomAmenities
+from app.models.sqlalchemy_schemas.rooms import Rooms, RoomAmenities
+from app.crud.room_management.room_amenities import (
+	fetch_room_by_id,
+	fetch_amenity_by_id,
+	fetch_mapping_exists,
+	insert_room_amenity_map,
+	fetch_amenities_by_room_id,
+	fetch_rooms_by_amenity_id,
+	fetch_mapping_by_ids,
+	delete_room_amenity_map,
+)
 
 
+# ==========================================================
+# 🔹 MAP AMENITY TO ROOM
+# ==========================================================
 async def map_amenity(db: AsyncSession, payload) -> None:
-    r = await db.execute(select(Rooms).where(Rooms.room_id == payload.room_id))
-    room = r.scalars().first()
-    if not room:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
-    a = await db.execute(select(RoomAmenities).where(RoomAmenities.amenity_id == payload.amenity_id))
-    amen = a.scalars().first()
-    if not amen:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Amenity not found")
+	room = await fetch_room_by_id(db, payload.room_id)
+	if not room:
+		raise HTTPException(status_code=404, detail="Room not found")
 
-    existing = await db.execute(
-        select(RoomAmenityMap).where(
-            RoomAmenityMap.room_id == payload.room_id,
-            RoomAmenityMap.amenity_id == payload.amenity_id,
-        )
-    )
-    if existing.scalars().first():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Mapping already exists")
+	amen = await fetch_amenity_by_id(db, payload.amenity_id)
+	if not amen:
+		raise HTTPException(status_code=404, detail="Amenity not found")
 
-    obj = RoomAmenityMap(**payload.model_dump())
-    db.add(obj)
-    await db.commit()
-    return obj
+	existing = await fetch_mapping_exists(db, payload.room_id, payload.amenity_id)
+	if existing:
+		raise HTTPException(status_code=409, detail="Mapping already exists")
 
+	obj = await insert_room_amenity_map(db, payload.model_dump())
+	await db.commit()
+	return obj
+
+
+# ==========================================================
+# 🔹 GET AMENITIES FOR A ROOM
+# ==========================================================
 async def get_amenities_for_room(db: AsyncSession, room_id: int) -> List[RoomAmenities]:
-    res = await db.execute(
-        select(RoomAmenities)
-        .join(RoomAmenityMap, RoomAmenityMap.amenity_id == RoomAmenities.amenity_id)
-        .where(RoomAmenityMap.room_id == room_id)
-    )
-    items = res.scalars().all()
-    return items
+	return await fetch_amenities_by_room_id(db, room_id)
 
 
+# ==========================================================
+# 🔹 GET ROOMS FOR AN AMENITY
+# ==========================================================
 async def get_rooms_for_amenity(db: AsyncSession, amenity_id: int) -> List[Rooms]:
-    """Return Rooms that are mapped to the given amenity_id."""
-    res = await db.execute(
-        select(Rooms)
-        .join(RoomAmenityMap, RoomAmenityMap.room_id == Rooms.room_id)
-        .where(RoomAmenityMap.amenity_id == amenity_id)
-    )
-    items = res.scalars().all()
-    return items
+	return await fetch_rooms_by_amenity_id(db, amenity_id)
 
 
+# ==========================================================
+# 🔹 UNMAP AMENITY FROM ROOM
+# ==========================================================
 async def unmap_amenity(db: AsyncSession, room_id: int, amenity_id: int) -> None:
-    res = await db.execute(
-        select(RoomAmenityMap).where(
-            RoomAmenityMap.room_id == room_id,
-            RoomAmenityMap.amenity_id == amenity_id,
-        )
-    )
-    obj = res.scalars().first()
-    if not obj:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mapping not found")
-    await db.delete(obj)
-    await db.commit()
+	obj = await fetch_mapping_by_ids(db, room_id, amenity_id)
+	if not obj:
+		raise HTTPException(status_code=404, detail="Mapping not found")
+
+	await delete_room_amenity_map(db, obj)
+	await db.commit()

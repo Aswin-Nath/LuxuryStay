@@ -1,42 +1,59 @@
 from typing import List
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.sqlalchemy_schemas.rooms import RoomAmenities
+from app.crud.room_management.amenities import (
+	insert_amenity,
+	fetch_all_amenities,
+	fetch_amenity_by_id,
+	fetch_amenity_by_name,
+	remove_amenity,
+)
 
 
+# ==========================================================
+# 🔹 CREATE AMENITY
+# ==========================================================
 async def create_amenity(db: AsyncSession, payload) -> RoomAmenities:
-    q = await db.execute(select(RoomAmenities).where(RoomAmenities.amenity_name == payload.amenity_name))
-    if q.scalars().first():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Amenity already exists")
-    obj = RoomAmenities(**payload.model_dump())
-    db.add(obj)
-    await db.commit()
-    await db.refresh(obj)
-    return obj
+	existing = await fetch_amenity_by_name(db, payload.amenity_name)
+	if existing:
+		raise HTTPException(status_code=409, detail="Amenity already exists")
+
+	obj = await insert_amenity(db, payload.model_dump())
+	await db.commit()
+	await db.refresh(obj)
+	return obj
 
 
+# ==========================================================
+# 🔹 LIST AMENITIES
+# ==========================================================
 async def list_amenities(db: AsyncSession) -> List[RoomAmenities]:
-    res = await db.execute(select(RoomAmenities))
-    items = res.scalars().all()
-    return items
+	return await fetch_all_amenities(db)
 
 
+# ==========================================================
+# 🔹 GET AMENITY
+# ==========================================================
 async def get_amenity(db: AsyncSession, amenity_id: int) -> RoomAmenities:
-    res = await db.execute(select(RoomAmenities).where(RoomAmenities.amenity_id == amenity_id))
-    obj = res.scalars().first()
-    if not obj:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Amenity not found")
-    return obj
+	obj = await fetch_amenity_by_id(db, amenity_id)
+	if not obj:
+		raise HTTPException(status_code=404, detail="Amenity not found")
+	return obj
 
 
+# ==========================================================
+# 🔹 DELETE AMENITY
+# ==========================================================
 async def delete_amenity(db: AsyncSession, amenity_id: int) -> None:
-    res = await db.execute(select(RoomAmenities).where(RoomAmenities.amenity_id == amenity_id))
-    obj = res.scalars().first()
-    if not obj:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Amenity not found")
-    if obj.rooms:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Amenity is mapped to rooms; unmap first")
-    await db.delete(obj)
-    await db.commit()
+	obj = await fetch_amenity_by_id(db, amenity_id)
+	if not obj:
+		raise HTTPException(status_code=404, detail="Amenity not found")
+
+	# check if amenity is mapped to any rooms
+	if getattr(obj, "rooms", None):
+		raise HTTPException(status_code=400, detail="Amenity is mapped to rooms; unmap first")
+
+	await remove_amenity(db, obj)
+	await db.commit()

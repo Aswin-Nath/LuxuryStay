@@ -1,64 +1,72 @@
 from typing import List, Optional
-from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.sqlalchemy_schemas.rooms import RoomTypes
+from app.crud.room_management.room_types import (
+	insert_room_type,
+	fetch_room_type_by_name,
+	fetch_all_room_types,
+	fetch_room_type_by_id,
+	update_room_type_by_id,
+	mark_room_type_deleted,
+)
 
 
+# ==========================================================
+# 🔹 CREATE ROOM TYPE
+# ==========================================================
 async def create_room_type(db: AsyncSession, payload) -> RoomTypes:
-    q = await db.execute(select(RoomTypes).where(RoomTypes.type_name == payload.type_name))
-    if q.scalars().first():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Room type already exists")
+	existing = await fetch_room_type_by_name(db, payload.type_name)
+	if existing:
+		raise HTTPException(status_code=409, detail="Room type already exists")
 
-    obj = RoomTypes(**payload.model_dump())
-    db.add(obj)
-    await db.commit()
-    await db.refresh(obj)
-    return obj
+	obj = await insert_room_type(db, payload.model_dump())
+	await db.commit()
+	await db.refresh(obj)
+	return obj
 
 
+# ==========================================================
+# 🔹 LIST ROOM TYPES
+# ==========================================================
 async def list_room_types(db: AsyncSession, include_deleted: Optional[bool] = False) -> List[RoomTypes]:
-    stmt = select(RoomTypes)
-    if not include_deleted:
-        stmt = stmt.where(RoomTypes.is_deleted == False)
-    res = await db.execute(stmt)
-    items = res.scalars().all()
-    return items
+	return await fetch_all_room_types(db, include_deleted)
 
 
+# ==========================================================
+# 🔹 GET ROOM TYPE
+# ==========================================================
 async def get_room_type(db: AsyncSession, room_type_id: int) -> RoomTypes:
-    res = await db.execute(select(RoomTypes).where(RoomTypes.room_type_id == room_type_id))
-    obj = res.scalars().first()
-    if not obj:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room type not found")
-    return obj
+	obj = await fetch_room_type_by_id(db, room_type_id)
+	if not obj:
+		raise HTTPException(status_code=404, detail="Room type not found")
+	return obj
 
 
+# ==========================================================
+# 🔹 UPDATE ROOM TYPE
+# ==========================================================
 async def update_room_type(db: AsyncSession, room_type_id: int, payload) -> RoomTypes:
-    res = await db.execute(select(RoomTypes).where(RoomTypes.room_type_id == room_type_id))
-    obj = res.scalars().first()
-    if not obj:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room type not found")
+	obj = await fetch_room_type_by_id(db, room_type_id)
+	if not obj:
+		raise HTTPException(status_code=404, detail="Room type not found")
 
-    # Only update fields provided by the client to avoid overwriting existing values.
-    data = payload.model_dump(exclude_unset=True)
-    if data:
-        await db.execute(
-            update(RoomTypes)
-            .where(RoomTypes.room_type_id == room_type_id)
-            .values(**data)
-        )
-    await db.commit()
-    res = await db.execute(select(RoomTypes).where(RoomTypes.room_type_id == room_type_id))
-    obj = res.scalars().first()
-    return obj
+	data = payload.model_dump(exclude_unset=True)
+	await update_room_type_by_id(db, room_type_id, data)
+	await db.commit()
+
+	obj = await fetch_room_type_by_id(db, room_type_id)
+	return obj
 
 
+# ==========================================================
+# 🔹 SOFT DELETE ROOM TYPE
+# ==========================================================
 async def soft_delete_room_type(db: AsyncSession, room_type_id: int) -> None:
-    res = await db.execute(select(RoomTypes).where(RoomTypes.room_type_id == room_type_id))
-    obj = res.scalars().first()
-    if not obj:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room type not found")
-    await db.execute(update(RoomTypes).where(RoomTypes.room_type_id == room_type_id).values(is_deleted=True))
-    await db.commit()
+	obj = await fetch_room_type_by_id(db, room_type_id)
+	if not obj:
+		raise HTTPException(status_code=404, detail="Room type not found")
+
+	await mark_room_type_deleted(db, room_type_id)
+	await db.commit()
