@@ -69,7 +69,7 @@ async def list_backups(
 
     if not results:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=404,
             detail="No backup records found",
         )
 
