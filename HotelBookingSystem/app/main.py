@@ -22,7 +22,7 @@ from app.routes.logs_management.booking_logs import router as booking_logs_route
 from app.routes.backup_and_restore_management.backups import router as backups_router
 from app.routes.backup_and_restore_management.restores import router as restores_router
 from app.routes.report_management import router as reports_router
-# from app.routes.content_management.content import router as content_router
+from app.routes.content_management.content import router as content_router
 
 # -------------------------------------------------
 # ✅ FastAPI App Configuration
@@ -71,7 +71,7 @@ app.include_router(audit_logs_router)
 app.include_router(booking_logs_router)
 app.include_router(restores_router)
 app.include_router(reports_router)
-# app.include_router(content_router)
+app.include_router(content_router)
 
 # -------------------------------------------------
 # ✅ Custom Swagger UI Endpoint with Tag Filter + Field Rename
@@ -151,6 +151,8 @@ def custom_docs():
                             <option value="Logs">Logs</option>
                             <option value="REPORTS_ADMIN">Admin Reports</option>
                             <option value="REPORTS_CUSTOMER">Customer Reports</option>
+                            <option value="content">Content Management</option>
+
                         `;
 
                         dropdown.style.marginRight = '20px';
