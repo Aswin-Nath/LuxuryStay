@@ -15,16 +15,17 @@ from app.services.backup_restore_service.backup_service import list_backups
 # ───────────────────────────────
 # Configuration
 # ───────────────────────────────
-BACKUP_ROOT_DIR = os.getenv("POSTGRES_BACKUP_DIR", "./db_backups")
-ZIP_ROOT_DIR = os.getenv("POSTGRES_ZIP_DIR", "./db_zip_backups")
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "hotel_booking_system")
+BACKUP_ROOT_DIR = os.getenv("POSTGRES_BACKUP_DIR")
+ZIP_ROOT_DIR = os.getenv("POSTGRES_ZIP_DIR")
+MONGO_URI = os.getenv("MONGO_URI")
+MONGO_DB_NAME = os.getenv("MONGO_DB_NAME")
 
-PG_USER = os.getenv("POSTGRES_USER", "postgres")
-PG_PASSWORD = os.getenv("POSTGRES_PASSWORD", "")
-PG_HOST = os.getenv("POSTGRES_HOST", "localhost")
-PG_PORT = os.getenv("POSTGRES_PORT", "1024")
-PG_DATABASE = os.getenv("POSTGRES_DB", "hotel_booking_system")
+PG_USER = os.getenv("POSTGRES_USER")
+PG_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+PG_HOST = os.getenv("POSTGRES_HOST")
+PG_PORT = os.getenv("POSTGRES_PORT")
+PG_DATABASE = os.getenv("POSTGRES_DB")
+
 
 router = APIRouter(prefix="/backups", tags=["BACKUPS"])
 

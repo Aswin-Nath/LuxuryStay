@@ -16,3 +16,4 @@ loguru
 redis[asyncio]
 openpyxl
 pandas
+reportlab

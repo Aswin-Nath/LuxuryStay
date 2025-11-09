@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # CRUD imports
@@ -12,6 +12,9 @@ from app.crud.report_management.reports import (
     fetch_admin_payment_summary,
     fetch_admin_review_summary,
 )
+
+# PDF service import
+from app.services.report_management.pdf_service import generate_report_pdf
 
 # ==========================================================
 # 🔹 CUSTOMER REPORT SERVICES
@@ -153,3 +156,42 @@ async def get_admin_review_summary(
         db=db,
         limit=limit,
     )
+
+
+# ==========================================================
+# 🔹 PDF EXPORT HELPER FUNCTIONS
+# ==========================================================
+
+def convert_to_pdf(data: List[Dict[str, Any]], report_title: str) -> bytes:
+    """
+    Convert report data to PDF format.
+    
+    Args:
+        data: List of report records
+        report_title: Title for the PDF report
+        
+    Returns:
+        PDF as bytes
+    """
+    return generate_report_pdf(data, report_title=report_title)
+
+
+async def format_report_response(
+    data: List[Dict[str, Any]],
+    export_pdf: bool = False,
+    report_title: str = "Report"
+) -> Union[Dict[str, Any], bytes]:
+    """
+    Format report response - either as JSON or PDF.
+    
+    Args:
+        data: List of report records
+        export_pdf: If True, return as PDF bytes; if False, return as JSON dict
+        report_title: Title for PDF export
+        
+    Returns:
+        Either a dict with count and items, or PDF bytes
+    """
+    if export_pdf:
+        return convert_to_pdf(data, report_title)
+    return {"count": len(data), "items": data}
