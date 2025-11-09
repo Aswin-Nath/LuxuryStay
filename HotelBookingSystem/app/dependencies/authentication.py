@@ -139,6 +139,19 @@ async def ensure_not_basic_user(current_user: Users = Depends(get_current_user))
     return True
 
 
+async def ensure_only_basic_user(current_user: Users = Depends(get_current_user)):
+    """Dependency that permits only users with the basic 'customer' role (role_id == 1).
+
+    Use this dependency on routes that should only be accessible to regular/basic users.
+    """
+    if getattr(current_user, "role_id", None) != 1:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This action is only available for basic users",
+        )
+    return True
+
+
 async def ensure_admin(current_user: Users = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Dependency that permits only users whose role name is 'ADMIN'.
 

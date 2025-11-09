@@ -131,9 +131,43 @@ class RoomAmenityMapCreate(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class RoomAmenityMapResponse(RoomAmenityMapCreate):
-    message:str="mapping created successfully"
+class RoomAmenityMapBulk(BaseModel):
+    """Model for mapping multiple amenities to a room at once."""
+    room_id: int
+    amenity_ids: List[int] = Field(..., min_items=1, description="List of amenity IDs to map")
+
     model_config = {"from_attributes": True}
+
+
+class RoomAmenityUnmapBulk(BaseModel):
+    """Model for unmapping multiple amenities from a room at once."""
+    room_id: int
+    amenity_ids: List[int] = Field(..., min_items=1, description="List of amenity IDs to unmap")
+
+    model_config = {"from_attributes": True}
+
+
+class RoomAmenityMapResponse(RoomAmenityMapCreate):
+    message: str = "mapping created successfully"
+    model_config = {"from_attributes": True}
+
+
+class RoomAmenityBulkResponse(BaseModel):
+    """Response for bulk amenity mapping operations."""
+    room_id: int
+    successfully_mapped: List[int] = []
+    already_existed: List[int] = []
+    failed: List[dict] = []
+    message: str = "Bulk mapping completed"
+
+
+class RoomAmenityBulkUnmapResponse(BaseModel):
+    """Response for bulk amenity unmapping operations."""
+    room_id: int
+    successfully_unmapped: List[int] = []
+    not_found: List[int] = []
+    failed: List[dict] = []
+    message: str = "Bulk unmapping completed"
 
 
 class RoomAmenityMap(BaseModel):

@@ -22,7 +22,7 @@ from app.models.sqlalchemy_schemas.offers import Offer
 
 async def create_offer(db: AsyncSession, payload, created_by: Optional[int] = None) -> Offer:
     data = payload.model_dump()
-    rooms = data.pop("rooms", [])
+    room_types = data.pop("room_types", [])  # Extract room_types list of IDs
     if created_by:
         data["created_by"] = created_by
 
@@ -30,8 +30,8 @@ async def create_offer(db: AsyncSession, payload, created_by: Optional[int] = No
     if existing:
         raise HTTPException(status_code=409, detail="Offer with this name already exists")
 
-    room_type_ids = set(data.get("room_types", []))
-    provided_ids = {r.get("room_type_id") for r in rooms if r.get("room_type_id")}
+    room_type_ids = set(room_types)
+    provided_ids = {r.get("room_type_id") for r in [] if r.get("room_type_id")}
 
     # --- Auto-calc pricing if not provided
     if not provided_ids:
@@ -97,7 +97,7 @@ async def update_offer(db: AsyncSession, offer_id: int, payload, updated_by: Opt
         raise HTTPException(status_code=404, detail="Offer not found")
 
     data = payload.model_dump()
-    rooms = data.pop("rooms", [])
+    room_types = data.pop("room_types", [])  # Extract room_types list of IDs
     if updated_by:
         data["created_by"] = updated_by
 
@@ -116,8 +116,8 @@ async def update_offer(db: AsyncSession, offer_id: int, payload, updated_by: Opt
 
     await delete_offer_room_mappings(db, offer.offer_id)
 
-    room_type_ids = set(data.get("room_types", []))
-    provided_ids = {r.get("room_type_id") for r in rooms if r.get("room_type_id")}
+    room_type_ids = set(room_types)
+    provided_ids = set()  # No pre-provided pricing in update
 
     if not provided_ids and room_type_ids:
         room_type_objs = await fetch_room_types_by_ids(db, list(room_type_ids))

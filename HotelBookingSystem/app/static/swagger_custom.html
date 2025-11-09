@@ -1,31 +1,159 @@
 <!DOCTYPE html>
 <html>
 <head>
-<link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
-<link rel="shortcut icon" href="https://fastapi.tiangolo.com/img/favicon.png">
-<title>FastAPI - Swagger UI</title>
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+    <link rel="shortcut icon" href="https://fastapi.tiangolo.com/img/favicon.png">
+    <title>Hotel Booking System API Docs</title>
+    <style>
+        body { background: #f8fafc; font-family: 'Inter', sans-serif; }
+        .custom-toolbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 10px 0;
+            padding: 10px;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .custom-toolbar input, .custom-toolbar select {
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 8px 10px;
+            font-size: 14px;
+            outline: none;
+        }
+        .custom-toolbar input:focus, .custom-toolbar select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 1px #3b82f6;
+        }
+        .custom-toolbar input {
+            flex-grow: 1;
+            width: 400px;
+        }
+    </style>
 </head>
 <body>
-<div id="swagger-ui">
-</div>
-<script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
-<!-- `SwaggerUIBundle` is now available on the page -->
-<script>
-const ui = SwaggerUIBundle({
-    url: '/openapi.json',
-"dom_id": "#swagger-ui",
-"layout": "BaseLayout",
-"deepLinking": true,
-"showExtensions": true,
-"showCommonExtensions": true,
-oauth2RedirectUrl: window.location.origin + '/docs/oauth2-redirect',
-    presets: [
-        SwaggerUIBundle.presets.apis,
-        SwaggerUIBundle.SwaggerUIStandalonePreset
-        ],
-})
-</script>
+    <div id="swagger-ui"></div>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
 
-<script src="/static/swagger_custom.js"></script>
+    <script>
+    const ui = SwaggerUIBundle({
+        url: '/openapi.json',
+        dom_id: '#swagger-ui',
+        layout: 'BaseLayout',
+        deepLinking: true,
+        showExtensions: true,
+        showCommonExtensions: true,
+        presets: [
+            SwaggerUIBundle.presets.apis,
+            SwaggerUIBundle.SwaggerUIStandalonePreset
+        ],
+        onComplete: () => {
+
+            // Rename username/password → Email/Password dynamically
+            setInterval(() => {
+                const modal = document.querySelector('.modal-ux');
+                if (!modal) return;
+                modal.querySelectorAll('*').forEach(el => {
+                    el.childNodes.forEach(node => {
+                        if (node.nodeType === 3) {
+                            const text = node.textContent.trim();
+                            if (text.includes('username')) node.textContent = text.replace(/username/gi, 'Email');
+                            if (text.includes('password')) node.textContent = text.replace(/password/gi, 'Password');
+                        }
+                    });
+                });
+            }, 1000);
+
+
+            // Add search + filter toolbar
+            setTimeout(() => {
+                const authWrapper = document.querySelector('.auth-wrapper');
+                if (!authWrapper) return;
+
+                const toolbar = document.createElement('div');
+                toolbar.className = 'custom-toolbar';
+
+                // 🔹 Search Bar
+                const search = document.createElement('input');
+                search.type = 'text';
+                search.placeholder = 'Search endpoint or module...';
+
+                // 🔹 Dropdown
+                const dropdown = document.createElement('select');
+                dropdown.innerHTML = `
+<option value=""> 🧭 Show All </option>
+
+<!-- 🟢 Core Functional Modules -->
+<option value="Rooms" style="background:#22c55e;color:white;">🟢 Rooms</option>
+<option value="Amenities" style="background:#22c55e;color:white;">🟢 Amenities</option>
+<option value="Room_types" style="background:#22c55e;color:white;">🟢 Room Types</option>
+<option value="Room_Images" style="background:#22c55e;color:white;">🟢 Room Images</option>
+<option value="Bookings" style="background:#22c55e;color:white;">🟢 Bookings</option>
+<option value="Booking-Edits" style="background:#22c55e;color:white;">🟢 Edit Booking</option>
+
+<!-- 🟡 Intermediate -->
+<option value="Offers" style="background:#eab308;color:white;">🟡 Offers</option>
+<option value="Profile" style="background:#eab308;color:white;">🟡 Profile</option>
+<option value="wishlist" style="background:#eab308;color:white;">🟡 Wishlist</option>
+
+<!-- 🔴 Admin / Critical -->
+<option value="Refunds" style="background:#ef4444;color:white;">🔴 Refunds</option>
+<option value="Issues" style="background:#ef4444;color:white;">🔴 Issues</option>
+<option value="Logs" style="background:#ef4444;color:white;">🔴 Logs</option>
+<option value="REPORTS_ADMIN" style="background:#ef4444;color:white;">🔴 Admin Reports</option>
+
+<!-- 🔵 System -->
+<option value="Notifications" style="background:#3b82f6;color:white;">🔵 Notifications</option>
+<option value="Backups" style="background:#3b82f6;color:white;">🔵 Backups</option>
+<option value="Restores" style="background:#3b82f6;color:white;">🔵 Restores</option>
+<option value="REPORTS_CUSTOMER" style="background:#3b82f6;color:white;">🔵 Customer Reports</option>
+
+<!-- 🟣 Access -->
+<option value="ROLES" style="background:#a855f7;color:white;">🟣 Roles</option>
+<option value="Auth" style="background:#a855f7;color:white;">🟣 Auth</option>
+
+<!-- ⚫ Misc -->
+<option value="content" style="background:#6b7280;color:white;">⚫ Content Management</option>
+<option value="payments" style="background:#6b7280;color:white;">⚫ Payments</option>
+                `;
+
+                // 🔹 Filter by dropdown
+                dropdown.onchange = function() {
+                    const tag = this.value.toLowerCase();
+                    document.querySelectorAll('.opblock-tag-section').forEach(sec => {
+                        const tagName = sec.querySelector('.opblock-tag').textContent.trim().toLowerCase();
+                        sec.style.display = (!tag || tagName.includes(tag)) ? '' : 'none';
+                    });
+                };
+
+                // 🔹 Live search filter
+                search.addEventListener('input', function() {
+                    const query = this.value.toLowerCase();
+                    document.querySelectorAll('.opblock-tag-section').forEach(sec => {
+                        const tagText = sec.querySelector('.opblock-tag').textContent.toLowerCase();
+                        const matchesTag = tagText.includes(query);
+                        const endpoints = sec.querySelectorAll('.opblock-summary');
+                        let matchesEndpoint = false;
+                        endpoints.forEach(ep => {
+                            const txt = ep.textContent.toLowerCase();
+                            ep.style.display = txt.includes(query) ? '' : 'none';
+                            if (txt.includes(query)) matchesEndpoint = true;
+                        });
+                        sec.style.display = (matchesTag || matchesEndpoint || query === '') ? '' : 'none';
+                    });
+                });
+
+                // Assemble toolbar
+                toolbar.appendChild(search);
+                toolbar.appendChild(dropdown);
+
+                authWrapper.parentNode.insertBefore(toolbar, authWrapper);
+            }, 1000);
+        }
+    });
+    </script>
 </body>
 </html>

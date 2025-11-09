@@ -60,3 +60,92 @@ async def unmap_amenity(db: AsyncSession, room_id: int, amenity_id: int) -> None
 
 	await delete_room_amenity_map(db, obj)
 	await db.commit()
+
+
+# ==========================================================
+# 🔹 MAP MULTIPLE AMENITIES TO ROOM (BULK)
+# ==========================================================
+async def map_amenities_bulk(db: AsyncSession, room_id: int, amenity_ids: List[int]) -> dict:
+	"""
+	Map multiple amenities to a room.
+	Returns a summary of successfully mapped, already existing, and failed mappings.
+	"""
+	room = await fetch_room_by_id(db, room_id)
+	if not room:
+		raise HTTPException(status_code=404, detail="Room not found")
+
+	result = {
+		"room_id": room_id,
+		"successfully_mapped": [],
+		"already_existed": [],
+		"failed": []
+	}
+
+	for amenity_id in amenity_ids:
+		try:
+			# Check if amenity exists
+			amen = await fetch_amenity_by_id(db, amenity_id)
+			if not amen:
+				result["failed"].append({
+					"amenity_id": amenity_id,
+					"reason": "Amenity not found"
+				})
+				continue
+
+			# Check if mapping already exists
+			existing = await fetch_mapping_exists(db, room_id, amenity_id)
+			if existing:
+				result["already_existed"].append(amenity_id)
+				continue
+
+			# Create the mapping
+			await insert_room_amenity_map(db, {"room_id": room_id, "amenity_id": amenity_id})
+			result["successfully_mapped"].append(amenity_id)
+
+		except Exception as e:
+			result["failed"].append({
+				"amenity_id": amenity_id,
+				"reason": str(e)
+			})
+
+	await db.commit()
+	return result
+
+
+# ==========================================================
+# 🔹 UNMAP MULTIPLE AMENITIES FROM ROOM (BULK)
+# ==========================================================
+async def unmap_amenities_bulk(db: AsyncSession, room_id: int, amenity_ids: List[int]) -> dict:
+	"""
+	Unmap multiple amenities from a room.
+	Returns a summary of successfully unmapped, not found, and failed unmappings.
+	"""
+	room = await fetch_room_by_id(db, room_id)
+	if not room:
+		raise HTTPException(status_code=404, detail="Room not found")
+
+	result = {
+		"room_id": room_id,
+		"successfully_unmapped": [],
+		"not_found": [],
+		"failed": []
+	}
+
+	for amenity_id in amenity_ids:
+		try:
+			obj = await fetch_mapping_by_ids(db, room_id, amenity_id)
+			if not obj:
+				result["not_found"].append(amenity_id)
+				continue
+
+			await delete_room_amenity_map(db, obj)
+			result["successfully_unmapped"].append(amenity_id)
+
+		except Exception as e:
+			result["failed"].append({
+				"amenity_id": amenity_id,
+				"reason": str(e)
+			})
+
+	await db.commit()
+	return result

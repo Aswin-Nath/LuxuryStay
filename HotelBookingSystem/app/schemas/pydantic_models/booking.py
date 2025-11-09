@@ -8,7 +8,6 @@ from app.schemas.pydantic_models.payments import BookingPaymentCreate
 # BOOKING CREATION
 # ─────────────────────────────────────────────
 class BookingCreate(BaseModel):
-    user_id: int
     rooms: Optional[List[int]] = []
     room_count: int = Field(..., ge=1)
     check_in: date

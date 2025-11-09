@@ -14,6 +14,9 @@ async def insert_backup_record(payload: Dict[str, Any]) -> Dict[str, Any]:
     collection = db.backup_data_collections
     result = await collection.insert_one(payload)
     inserted = await collection.find_one({"_id": result.inserted_id})
+    # Convert ObjectId to string for serialization
+    if inserted and "_id" in inserted:
+        inserted["_id"] = str(inserted["_id"])
     return inserted
 
 
@@ -67,5 +70,8 @@ async def fetch_backup_records(
 
     results = []
     async for doc in cursor:
+        # Convert ObjectId to string for serialization
+        if "_id" in doc:
+            doc["_id"] = str(doc["_id"])
         results.append(doc)
     return results

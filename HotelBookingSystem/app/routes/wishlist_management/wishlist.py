@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.postgres_connection import get_db
 from app.schemas.pydantic_models.wishlist import WishlistCreate, WishlistResponse
 from app.services.wishlist_service.wishlist_service import add_to_wishlist as svc_add, list_user_wishlist as svc_list, remove_wishlist as svc_remove
-from app.dependencies.authentication import get_current_user
+from app.dependencies.authentication import get_current_user, ensure_only_basic_user
 from app.models.sqlalchemy_schemas.users import Users
 from app.core.cache import get_cached, set_cached, invalidate_pattern
 from app.utils.audit_helper import log_audit
@@ -15,10 +15,16 @@ router = APIRouter(prefix="/wishlist", tags=["WISHLIST"])
 
 
 @router.post("/", response_model=WishlistResponse, status_code=status.HTTP_201_CREATED)
-async def add_wishlist(payload: WishlistCreate, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)):
+async def add_wishlist(
+    payload: WishlistCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    _basic_user_check: bool = Depends(ensure_only_basic_user),
+):
+    """Add item to wishlist - only available for basic/customer users"""
     # enforce ownership
 
-    obj = await svc_add(db, payload,current_user)
+    obj = await svc_add(db, payload, current_user)
     # audit wishlist create
     try:
         new_val = WishlistResponse.model_validate(obj).model_dump()

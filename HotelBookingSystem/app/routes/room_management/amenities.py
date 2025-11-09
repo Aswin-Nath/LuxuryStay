@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, status, Query
-from typing import Optional
+from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel
 
 from app.database.postgres_connection import get_db
 from app.schemas.pydantic_models.room import (
@@ -25,8 +26,19 @@ from app.services.room_service.room_amenities_service import (
     get_rooms_for_amenity as svc_get_rooms_for_amenity,
     get_amenities_for_room as svc_get_amenities_for_room,
     unmap_amenity as svc_unmap_amenity,
+    map_amenities_bulk as svc_map_amenities_bulk,
+    unmap_amenities_bulk as svc_unmap_amenities_bulk,
 )
 from app.utils.audit_helper import log_audit
+
+
+# ===============================================
+# HELPER MODELS FOR FLEXIBLE INPUT
+# ===============================================
+class RoomAmenityMapFlexible(BaseModel):
+    """Model for mapping list of amenities to a room"""
+    room_id: int
+    amenity_ids: List[int]
 
 
 router = APIRouter(prefix="/amenities", tags=["AMENITIES"])
@@ -75,44 +87,77 @@ async def get_amenities(
     return [Amenity.model_validate(a) for a in items]
 
 
-@router.delete("/{amenity_id}")
-async def delete_amenity(
-    amenity_id: int,
-    db: AsyncSession = Depends(get_db),
-    user_permissions: dict = Depends(get_user_permissions),
-):
-    if not (
-        Resources.ROOM_MANAGEMENT.value in user_permissions
-        and PermissionTypes.WRITE.value in user_permissions[Resources.ROOM_MANAGEMENT.value]
-    ):
-        raise ForbiddenError("Insufficient permissions to delete amenities")
-
-    await svc_delete_amenity(db, amenity_id)
-    return {"message": "Amenity deleted"}
-
-
 # ------------------- ROOM-AMENITY MAPPING -------------------
 
-@router.post("/map", response_model=RoomAmenityMapResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/map", status_code=status.HTTP_201_CREATED)
 async def map_amenity(
-    payload: RoomAmenityMapCreate,
+    payload: RoomAmenityMapFlexible,
     db: AsyncSession = Depends(get_db),
     user_permissions: dict = Depends(get_user_permissions),
 ):
+    """
+    Map amenities to a room. Accepts a list of amenity IDs.
+    
+    Request:
+    {
+        "room_id": 1,
+        "amenity_ids": [1, 2, 3, 4]
+    }
+    
+    For single amenity, just provide a list with one item:
+    {
+        "room_id": 1,
+        "amenity_ids": [5]
+    }
+    """
     if not (
         Resources.ROOM_MANAGEMENT.value in user_permissions
         and PermissionTypes.WRITE.value in user_permissions[Resources.ROOM_MANAGEMENT.value]
     ):
         raise ForbiddenError("Insufficient permissions to map amenities")
 
-    obj = await svc_map_amenity(db, payload)
+    amenity_ids = payload.amenity_ids
+
+    # If only one amenity, use single mapping for simplicity
+    if len(amenity_ids) == 1:
+        amenity_id = amenity_ids[0]
+        single_payload = RoomAmenityMapCreate(room_id=payload.room_id, amenity_id=amenity_id)
+        obj = await svc_map_amenity(db, single_payload)
+        try:
+            entity_id = f"room:{obj.room_id}:amenity:{obj.amenity_id}"
+            await log_audit(entity="room_amenity", entity_id=entity_id, action="INSERT", new_value=obj.__dict__)
+        except Exception:
+            pass
+        return RoomAmenityMapResponse.model_validate(obj).model_copy(update={"message": "Mapped successfully"})
+
+    # Multiple amenities - use bulk mapping
+    result = await svc_map_amenities_bulk(db, payload.room_id, amenity_ids)
+    
     try:
-        entity_id = f"room:{obj.room_id}:amenity:{obj.amenity_id}"
-        await log_audit(entity="room_amenity", entity_id=entity_id, action="INSERT", new_value=obj.__dict__)
+        await log_audit(
+            entity="room_amenity",
+            entity_id=f"room:{payload.room_id}",
+            action="INSERT",
+            new_value={
+                "room_id": payload.room_id,
+                "amenity_ids": amenity_ids,
+                "result_summary": {
+                    "successfully_mapped": len(result["successfully_mapped"]),
+                    "already_existed": len(result["already_existed"]),
+                    "failed": len(result["failed"]),
+                }
+            }
+        )
     except Exception:
         pass
 
-    return RoomAmenityMapResponse.model_validate(obj).model_copy(update={"message": "Mapped successfully"})
+    return {
+        "room_id": result["room_id"],
+        "successfully_mapped": result["successfully_mapped"],
+        "already_existed": result["already_existed"],
+        "failed": result["failed"],
+        "message": f"Mapping completed: {len(result['successfully_mapped'])} mapped, {len(result['already_existed'])} already existed, {len(result['failed'])} failed"
+    }
 
 
 @router.get("/room/{room_id}")
@@ -128,7 +173,75 @@ async def get_amenities_for_room(room_id: int, db: AsyncSession = Depends(get_db
 
 @router.delete("/unmap")
 async def unmap_amenity(
-    room_id: int,
+    payload: RoomAmenityMapFlexible,
+    db: AsyncSession = Depends(get_db),
+    user_permissions: dict = Depends(get_user_permissions),
+):
+    """
+    Unmap amenities from a room. Accepts a list of amenity IDs.
+    
+    Single amenity:
+    {
+        "room_id": 1,
+        "amenity_ids": [5]
+    }
+    
+    Multiple amenities:
+    {
+        "room_id": 1,
+        "amenity_ids": [1, 2, 3]
+    }
+    """
+    if not (
+        Resources.ROOM_MANAGEMENT.value in user_permissions
+        and PermissionTypes.WRITE.value in user_permissions[Resources.ROOM_MANAGEMENT.value]
+    ):
+        raise ForbiddenError("Insufficient permissions to unmap amenities")
+
+    amenity_ids = payload.amenity_ids
+
+    # If only one amenity, use single unmapping for simplicity
+    if len(amenity_ids) == 1:
+        await svc_unmap_amenity(db, payload.room_id, amenity_ids[0])
+        try:
+            entity_id = f"room:{payload.room_id}:amenity:{amenity_ids[0]}"
+            await log_audit(entity="room_amenity", entity_id=entity_id, action="DELETE")
+        except Exception:
+            pass
+        return {"message": "Unmapped successfully"}
+
+    # Multiple amenities - use bulk unmapping
+    result = await svc_unmap_amenities_bulk(db, payload.room_id, amenity_ids)
+    
+    try:
+        await log_audit(
+            entity="room_amenity",
+            entity_id=f"room:{payload.room_id}",
+            action="DELETE",
+            new_value={
+                "room_id": payload.room_id,
+                "amenity_ids": amenity_ids,
+                "result_summary": {
+                    "successfully_unmapped": len(result["successfully_unmapped"]),
+                    "not_found": len(result["not_found"]),
+                    "failed": len(result["failed"]),
+                }
+            }
+        )
+    except Exception:
+        pass
+
+    return {
+        "room_id": result["room_id"],
+        "successfully_unmapped": result["successfully_unmapped"],
+        "not_found": result["not_found"],
+        "failed": result["failed"],
+        "message": f"Unmapping completed: {len(result['successfully_unmapped'])} unmapped, {len(result['not_found'])} not found, {len(result['failed'])} failed"
+    }
+
+
+@router.delete("/{amenity_id}")
+async def delete_amenity(
     amenity_id: int,
     db: AsyncSession = Depends(get_db),
     user_permissions: dict = Depends(get_user_permissions),
@@ -137,7 +250,8 @@ async def unmap_amenity(
         Resources.ROOM_MANAGEMENT.value in user_permissions
         and PermissionTypes.WRITE.value in user_permissions[Resources.ROOM_MANAGEMENT.value]
     ):
-        raise ForbiddenError("Insufficient permissions to unmap amenities")
+        raise ForbiddenError("Insufficient permissions to delete amenities")
 
-    await svc_unmap_amenity(db, room_id, amenity_id)
-    return {"message": "Unmapped successfully"}
+    await svc_delete_amenity(db, amenity_id)
+    return {"message": "Amenity deleted"}
+

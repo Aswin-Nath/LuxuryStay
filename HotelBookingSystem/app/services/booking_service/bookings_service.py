@@ -24,9 +24,10 @@ from app.models.sqlalchemy_schemas.payments import Payments as PaymentsModel
 from app.schemas.pydantic_models.payments import BookingPaymentCreate
 
 
-async def create_booking(db: AsyncSession, payload) -> Bookings:
+async def create_booking(db: AsyncSession, payload, user_id: int) -> Bookings:
     """Create booking, allocate rooms, map tax, create notification, attach payment."""
     data = payload.model_dump()
+    data["user_id"] = user_id  # Enforce user_id from authenticated user
     requested_room_type_ids = data.pop("rooms", []) or []
 
     if "offer_id" in data and (data.get("offer_id") == 0):

@@ -7,7 +7,7 @@ from app.schemas.pydantic_models.refunds import RefundCreate, RefundResponse
 from app.schemas.pydantic_models.booking import BookingCreate, BookingResponse
 from app.services.booking_service.bookings_service import create_booking as svc_create_booking, get_booking as svc_get_booking, list_bookings as svc_list_bookings, query_bookings as svc_query_bookings
 from app.models.sqlalchemy_schemas.users import Users
-from app.dependencies.authentication import get_current_user, get_user_permissions
+from app.dependencies.authentication import get_current_user, get_user_permissions, ensure_only_basic_user
 from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
 from app.core.exceptions import ForbiddenError
 from app.services.refunds_service.refunds_service import cancel_booking_and_create_refund as svc_cancel_booking
@@ -20,7 +20,13 @@ router = APIRouter(prefix="/bookings", tags=["BOOKINGS"])
 
 
 @router.post("/", response_model=BookingResponse, status_code=status.HTTP_201_CREATED)
-async def create_booking(payload: BookingCreate, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions), current_user: Users = Depends(get_current_user)):
+async def create_booking(
+	payload: BookingCreate,
+	db: AsyncSession = Depends(get_db),
+	user_permissions: dict = Depends(get_user_permissions),
+	current_user: Users = Depends(get_current_user),
+	_basic_user_check: bool = Depends(ensure_only_basic_user),
+):
 	# Permission check: require BOOKING.WRITE
 	if not (
 		Resources.BOOKING.value in user_permissions
@@ -28,17 +34,13 @@ async def create_booking(payload: BookingCreate, db: AsyncSession = Depends(get_
 	):
 		raise ForbiddenError("Insufficient permissions to create bookings")
 
-	# Use authenticated user as the booking user if they didn't supply or to enforce ownership
-	if payload.user_id != current_user.user_id:
-		# Prefer using current_user to avoid spoofing
-		payload.user_id = current_user.user_id
-
-	obj = await svc_create_booking(db, payload)
+	# Pass user_id to service (enforced from authenticated user)
+	obj = await svc_create_booking(db, payload, user_id=current_user.user_id)
 	# create audit log for booking creation
 	try:
 		new_val = BookingResponse.model_validate(obj).model_dump(exclude={"created_at"})
 		entity_id = f"booking:{getattr(obj, 'booking_id', None)}"
-		changed_by = getattr(locals().get('current_user'), 'user_id', None) or getattr(payload, 'user_id', None)
+		changed_by = current_user.user_id
 		await log_audit(entity="booking", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=changed_by, user_id=changed_by)
 	except Exception:
 		# auditing must not break main flow; swallow errors
