@@ -11,8 +11,6 @@
 6. [Implementation Checklist](#implementation-checklist)
 7. [Reference: Common Permission Checks](#reference-common-permission-checks)
 
-**Note:** This document focuses on **Authorization** only. For authentication topics (JWT, tokens, login), see `AUTHENTICATION.md`.
-
 ---
 
 ## Role-Based Access Control (RBAC)
@@ -523,8 +521,3 @@ if role_id not in [2, 3]:  # super_admin, normal_admin
 if booking.user_id != current_user.user_id:
     raise ForbiddenError("Cannot access other user's booking")
 ```
-
----
-
-**Last Updated**: November 2025
-**Version**: 1.0.0
