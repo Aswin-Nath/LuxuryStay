@@ -24,15 +24,44 @@ from app.schemas.pydantic_models.users import UserCreate, TokenResponse
 from app.models.sqlalchemy_schemas.users import Users
 from app.models.sqlalchemy_schemas.authentication import VerificationType
 
+# Utilities for validation
+from app.utils.auth_utils import is_valid_email, is_strong_password, is_valid_indian_phone
+
 
 # ==========================================================
 # 🔹 USER SIGNUP
 # ==========================================================
 
 async def signup(db: AsyncSession, payload: UserCreate, created_by: Optional[int] = None) -> Users:
+    """
+    User signup with email, password, and phone validation.
+    
+    Validations:
+    - Email: standard email format
+    - Password: strong password requirements (uppercase, lowercase, digit, special char)
+    - Phone: Indian format (10 digits starting with 6-9)
+    """
+    
     if payload.role_id is not None and payload.role_id != 1:
         raise BadRequestError("Cannot create admin users via this endpoint")
 
+    # ✅ Validate Email
+    email_valid, email_error = is_valid_email(payload.email)
+    if not email_valid:
+        raise BadRequestError(f"Invalid email: {email_error}")
+
+    # ✅ Validate Password
+    password_valid, password_error = is_strong_password(payload.password)
+    if not password_valid:
+        raise BadRequestError(f"Weak password: {password_error}")
+
+    # ✅ Validate Phone (if provided)
+    if payload.phone_number:
+        phone_valid, phone_error = is_valid_indian_phone(payload.phone_number)
+        if not phone_valid:
+            raise BadRequestError(f"Invalid phone number: {phone_error}")
+
+    # ✅ Check if email already exists
     existing_user = await get_user_by_email(db, payload.email)
     if existing_user:
         raise ConflictError("Email already registered")
@@ -220,6 +249,32 @@ async def register_admin(
     current_user_id: int,
     user_permissions: dict,
 ):
+    """
+    Admin registration with email, password, and phone validation.
+    
+    Validations:
+    - Email: standard email format
+    - Password: strong password requirements (uppercase, lowercase, digit, special char)
+    - Phone: Indian format (10 digits starting with 6-9)
+    """
+    
+    # ✅ Validate Email
+    email_valid, email_error = is_valid_email(payload.email)
+    if not email_valid:
+        raise BadRequestError(f"Invalid email: {email_error}")
+
+    # ✅ Validate Password
+    password_valid, password_error = is_strong_password(payload.password)
+    if not password_valid:
+        raise BadRequestError(f"Weak password: {password_error}")
+
+    # ✅ Validate Phone (if provided)
+    if payload.phone_number:
+        phone_valid, phone_error = is_valid_indian_phone(payload.phone_number)
+        if not phone_valid:
+            raise BadRequestError(f"Invalid phone number: {phone_error}")
+
+    # ✅ Check if email already exists
     existing_user = await get_user_by_email(db, payload.email)
     if existing_user:
         raise ConflictError("Email already registered")

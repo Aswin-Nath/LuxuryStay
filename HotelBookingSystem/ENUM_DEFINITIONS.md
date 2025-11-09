@@ -360,29 +360,3 @@ class MyRequest(BaseModel):
 | `PermissionTypes` | permissions.py | 6 | RBAC permission types |
 
 ---
-
-## Key Notes
-
-1. **Dual Definition**: Some enums (e.g., `RoomStatus`, `IssueStatus`, `GenderTypes`) are defined in both SQLAlchemy schemas and Pydantic models. Keep them synchronized.
-
-2. **PostgreSQL ENUM**: `NotificationType` and `EntityType` are defined using PostgreSQL's native ENUM type with `create_type=False` (already created in DB via migrations).
-
-3. **String-based Enums**: Pydantic models use `str` mixins (`class X(str, Enum)`) for better JSON serialization and validation.
-
-4. **Database Constraints**: SQLAlchemy enums enforce database-level constraints ensuring only valid values are stored.
-
-5. **Migration Consideration**: Changes to enum values require database migrations to update existing PostgreSQL ENUM types.
-
----
-
-## Migration Tracking
-
-Database migrations defining these enums:
-- File: `migrations/versions/c7f919222ca5_init_base_schema.py`
-- Contains original ENUM definitions for all database-level enums
-
-To add or modify enums:
-1. Update the Python enum class
-2. Create a new Alembic migration
-3. Update the PostgreSQL ENUM type if necessary
-4. Test thoroughly in development before production deployment

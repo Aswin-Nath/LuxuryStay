@@ -9,7 +9,6 @@ class UserCreate(BaseModel):
     email: str
     password: str
     phone_number: Optional[str] = None
-    role_id: Optional[int] = 1
 
 
 class LoginRequest(BaseModel):
