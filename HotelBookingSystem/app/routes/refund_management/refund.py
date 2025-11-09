@@ -14,6 +14,9 @@ router = APIRouter(prefix="/refunds", tags=["REFUNDS"])
 
 
 
+# ============================================================================
+# 🔹 UPDATE - Process/complete a refund transaction
+# ============================================================================
 @router.put("/{refund_id}", response_model=RefundResponse)
 async def complete_refund(refund_id: int, payload: RefundTransactionUpdate, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user), _ok: bool = Depends(ensure_not_basic_user)):
     # Admin-only endpoint to update refund transaction details and status (restricted fields only)
@@ -32,6 +35,9 @@ async def complete_refund(refund_id: int, payload: RefundTransactionUpdate, db: 
     return RefundResponse.model_validate(refund_record)
 
 
+# ============================================================================
+# 🔹 READ - Fetch refund details (single or list with filters)
+# ============================================================================
 @router.get("/", response_model=list[RefundResponse])
 async def get_refunds(
     refund_id: int | None = None,

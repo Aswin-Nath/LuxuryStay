@@ -44,6 +44,9 @@ async def _get_user_bookings(db: AsyncSession, user_id: int) -> List[int]:
     return result.scalars().all()
 
 
+# ============================================================================
+# 🔹 READ - Fetch payments with flexible filters (admin or own bookings)
+# ============================================================================
 @router.get("/", response_model=List[PaymentResponse], status_code=status.HTTP_200_OK)
 async def get_payments(
     payment_id: Optional[int] = Query(None, description="Filter by payment ID"),

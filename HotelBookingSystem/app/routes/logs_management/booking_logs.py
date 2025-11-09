@@ -7,6 +7,10 @@ from app.schemas.pydantic_models.booking_logs import BookingLogModel
 router = APIRouter(prefix="/booking_logs", tags=["LOGS"])
 
 # POST for creating booking logs is handled by middleware (app/middlewares/logs_middleware.py)
+
+# ============================================================================
+# 🔹 READ - Fetch booking logs with filters
+# ============================================================================
 @router.get("/", response_model=List[dict])
 async def get_booking_logs(
     booking_id: Optional[int] = Query(None),

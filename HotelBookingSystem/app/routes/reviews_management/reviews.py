@@ -24,6 +24,9 @@ from app.utils.audit_helper import log_audit
 router = APIRouter(prefix="/reviews", tags=["REVIEWS"])
 
 
+# ============================================================================
+# 🔹 CREATE - Submit a new review for a booking
+# ============================================================================
 @router.post("/", response_model=ReviewResponse, status_code=status.HTTP_201_CREATED)
 async def create_review(
     booking_id: int = Form(...),
@@ -56,6 +59,9 @@ async def create_review(
     return ReviewResponse.model_validate(review_record)
 
 
+# ============================================================================
+# 🔹 READ - Fetch reviews (single or list with filters)
+# ============================================================================
 @router.get("/", response_model=Union[ReviewResponse, List[ReviewResponse]])
 async def list_or_get_reviews(review_id: Optional[int] = None, booking_id: Optional[int] = None, room_id: Optional[int] = None, user_id: Optional[int] = None, db: AsyncSession = Depends(get_db)):
     """If review_id is provided return that single review (with images), otherwise return list (optionally filtered by booking_id).
@@ -83,6 +89,9 @@ async def list_or_get_reviews(review_id: Optional[int] = None, booking_id: Optio
     return out
 
 
+# ============================================================================
+# 🔹 UPDATE - Add admin response to a review
+# ============================================================================
 @router.put("/{review_id}/respond", response_model=ReviewResponse)
 async def respond_review(review_id: int, payload: AdminResponseCreate, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user), _ok: bool = Depends(ensure_not_basic_user)):
     # payload validated by Pydantic: {"admin_response": "..."}
@@ -98,6 +107,9 @@ async def respond_review(review_id: int, payload: AdminResponseCreate, db: Async
     return ReviewResponse.model_validate(review_record)
 
 
+# ============================================================================
+# 🔹 UPDATE - Modify user's own review (rating/comment)
+# ============================================================================
 @router.put("/{review_id}", response_model=ReviewResponse)
 async def update_review(review_id: int, payload: ReviewUpdate, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)):
     """Allow the authenticated reviewer to update their review's rating/comment."""
@@ -113,6 +125,9 @@ async def update_review(review_id: int, payload: ReviewUpdate, db: AsyncSession 
     return ReviewResponse.model_validate(review_record)
 
 
+# ============================================================================
+# 🔹 CREATE - Upload images for a review
+# ============================================================================
 @router.post("/{review_id}/images", response_model=List[ImageResponse], status_code=status.HTTP_201_CREATED)
 async def add_review_image(
     review_id: int,
@@ -148,12 +163,18 @@ async def add_review_image(
     return [ImageResponse.model_validate(i) for i in images]
 
 
+# ============================================================================
+# 🔹 READ - Fetch all images for a review
+# ============================================================================
 @router.get("/{review_id}/images", response_model=List[ImageResponse])
 async def list_review_images(review_id: int, db: AsyncSession = Depends(get_db)):
     items = await get_images_for_review(db, review_id)
     return [ImageResponse.model_validate(i) for i in items]
 
 
+# ============================================================================
+# 🔹 DELETE - Remove images from review
+# ============================================================================
 @router.delete("/{review_id}/images")
 async def delete_review_images(review_id: int, image_ids: List[int], db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user), user_permissions: dict = Depends(get_user_permissions)):
     """Delete specified image ids attached to a review. Only the uploader/review-owner or ROOM_MANAGEMENT.WRITE may delete.

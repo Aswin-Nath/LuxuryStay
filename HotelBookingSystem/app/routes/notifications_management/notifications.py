@@ -13,6 +13,9 @@ router = APIRouter(prefix="/notifications", tags=["NOTIFICATIONS"])
 
 
 
+# ============================================================================
+# 🔹 READ - Fetch user's notifications (with filters)
+# ============================================================================
 @router.get("/", response_model=List[NotificationResponse])
 async def list_notifications(
     include_read: bool = True,
@@ -26,6 +29,9 @@ async def list_notifications(
     return [NotificationResponse.model_validate(i).model_dump() for i in items]
 
 
+# ============================================================================
+# 🔹 UPDATE - Mark notification as read
+# ============================================================================
 @router.put("/{notification_id}/read", status_code=status.HTTP_200_OK)
 async def mark_read(notification_id: int, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)):
     """Mark the authenticated user's notification as read."""

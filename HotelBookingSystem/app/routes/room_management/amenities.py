@@ -46,6 +46,9 @@ router = APIRouter(prefix="/amenities", tags=["AMENITIES"])
 
 # ------------------- AMENITY CRUD -------------------
 
+# ============================================================================
+# 🔹 CREATE - Add a new amenity to the system
+# ============================================================================
 @router.post("/", response_model=AmenityResponse, status_code=status.HTTP_201_CREATED)
 async def create_amenity(
     payload: AmenityCreate,
@@ -69,6 +72,9 @@ async def create_amenity(
     return AmenityResponse.model_validate(amenity_record).model_copy(update={"message": "Amenity created"})
 
 
+# ============================================================================
+# 🔹 READ - Fetch amenity details (single or list)
+# ============================================================================
 @router.get("/")
 async def get_amenities(
     amenity_id: Optional[int] = Query(None, description="If provided, return this amenity and its linked rooms"),
@@ -89,6 +95,9 @@ async def get_amenities(
 
 # ------------------- ROOM-AMENITY MAPPING -------------------
 
+# ============================================================================
+# 🔹 MAP - Link amenities to a room
+# ============================================================================
 @router.post("/map", status_code=status.HTTP_201_CREATED)
 async def map_amenity(
     payload: RoomAmenityMapFlexible,
@@ -160,6 +169,9 @@ async def map_amenity(
     }
 
 
+# ============================================================================
+# 🔹 READ - Get all amenities for a specific room
+# ============================================================================
 @router.get("/room/{room_id}")
 async def get_amenities_for_room(room_id: int, db: AsyncSession = Depends(get_db)):
     items = await svc_get_amenities_for_room(db, room_id)
@@ -171,6 +183,9 @@ async def get_amenities_for_room(room_id: int, db: AsyncSession = Depends(get_db
     }
 
 
+# ============================================================================
+# 🔹 DELETE - Unmap amenities from a room
+# ============================================================================
 @router.delete("/unmap")
 async def unmap_amenity(
     payload: RoomAmenityMapFlexible,
@@ -240,6 +255,9 @@ async def unmap_amenity(
     }
 
 
+# ============================================================================
+# 🔹 DELETE - Remove amenity from system
+# ============================================================================
 @router.delete("/{amenity_id}")
 async def delete_amenity(
     amenity_id: int,

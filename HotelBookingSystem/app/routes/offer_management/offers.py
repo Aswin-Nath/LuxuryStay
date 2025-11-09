@@ -19,6 +19,9 @@ router = APIRouter(prefix="/offers", tags=["OFFERS"])
 
 
 
+# ============================================================================
+# 🔹 CREATE - Create a new offer with room mappings
+# ============================================================================
 @router.post("/", response_model=OfferResponse, status_code=status.HTTP_201_CREATED)
 async def create_offer(payload: OfferCreate, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions), current_user: Users = Depends(get_current_user)):
     """Create an offer and its room mappings via the service layer.
@@ -48,6 +51,9 @@ async def create_offer(payload: OfferCreate, db: AsyncSession = Depends(get_db),
     return OfferResponse.model_validate(offer_record).model_dump(exclude={"created_at"})
 
 
+# ============================================================================
+# 🔹 READ - Fetch single offer by ID
+# ============================================================================
 @router.get("/{offer_id}", response_model=OfferResponse)
 async def get_offer(offer_id: int, db: AsyncSession = Depends(get_db)):
     offer_record = await svc_get_offer(db, offer_id)
@@ -55,6 +61,9 @@ async def get_offer(offer_id: int, db: AsyncSession = Depends(get_db)):
     return OfferResponse.model_validate(offer_record).model_dump(exclude={"created_at"})
 
 
+# ============================================================================
+# 🔹 READ - Fetch list of all offers (paginated)
+# ============================================================================
 @router.get("/", response_model=List[OfferResponse])
 async def list_offers(limit: int = Query(20, ge=1, le=200), offset: int = Query(0, ge=0), db: AsyncSession = Depends(get_db)):
     cache_key = f"offers:limit:{limit}:offset:{offset}"
@@ -68,6 +77,9 @@ async def list_offers(limit: int = Query(20, ge=1, le=200), offset: int = Query(
     return result
 
 
+# ============================================================================
+# 🔹 UPDATE - Modify existing offer details
+# ============================================================================
 @router.put("/{offer_id}", response_model=OfferResponse)
 async def edit_offer(offer_id: int, payload: OfferCreate, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions), current_user: Users = Depends(get_current_user)):
     # Permission check: require OFFER_MANAGEMENT.WRITE
@@ -90,6 +102,9 @@ async def edit_offer(offer_id: int, payload: OfferCreate, db: AsyncSession = Dep
     return OfferResponse.model_validate(offer_record).model_dump(exclude={"created_at"})
 
 
+# ============================================================================
+# 🔹 DELETE - Remove offer from system (soft delete)
+# ============================================================================
 @router.delete("/{offer_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_offer(offer_id: int, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
     # Permission check: require OFFER_MANAGEMENT.WRITE

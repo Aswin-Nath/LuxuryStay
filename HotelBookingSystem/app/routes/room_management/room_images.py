@@ -26,7 +26,7 @@ router = APIRouter(prefix="/rooms/{room_id}/images", tags=["ROOM_IMAGES"])
 
 
 # ==============================================================
-# POST: Upload Image For Room
+# 🔹 CREATE - Upload a new image for room
 # ==============================================================
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=ImageResponse)
 async def upload_image_for_room(
@@ -80,7 +80,7 @@ async def upload_image_for_room(
 
 
 # ==============================================================
-# GET: List Images For Room
+# 🔹 READ - Get all images for a room
 # ==============================================================
 @router.get("/", response_model=List[ImageResponse])
 async def list_images_for_room(room_id: int, db: AsyncSession = Depends(get_db)):
@@ -91,6 +91,9 @@ async def list_images_for_room(room_id: int, db: AsyncSession = Depends(get_db))
     return [ImageResponse.model_validate(i) for i in items]
 
 
+# ==============================================================
+# 🔹 DELETE - Remove images from room
+# ==============================================================
 @router.delete("/", status_code=status.HTTP_200_OK)
 async def delete_images_for_room(
     image_ids: List[int] = Query(..., description="List of image IDs to delete"),
@@ -105,6 +108,9 @@ async def delete_images_for_room(
     return {"message":"images deleted"}
 
 
+# ==============================================================
+# 🔹 UPDATE - Mark image as primary for room
+# ==============================================================
 @router.put("/{image_id}/primary", status_code=status.HTTP_200_OK)
 async def mark_image_primary(
     image_id: int,

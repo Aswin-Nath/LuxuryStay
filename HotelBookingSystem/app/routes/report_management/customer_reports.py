@@ -13,6 +13,9 @@ from app.services.report_management.report_management_service import (
 
 router = APIRouter(prefix="/reports/customer", tags=["REPORTS_CUSTOMER"])
 
+# ============================================================================
+# 🔹 READ - Customer booking summary report
+# ============================================================================
 @router.get("/bookings")
 async def customer_bookings(
 	limit: int = Query(50, ge=1, le=1000),
@@ -28,6 +31,9 @@ async def customer_bookings(
 		return items[0] if items else {}
 	return {"count": len(items), "items": items}
 
+# ============================================================================
+# 🔹 READ - Customer payment summary report
+# ============================================================================
 @router.get("/payments")
 async def customer_payments(
 	limit: int = Query(50, ge=1, le=1000),
@@ -42,6 +48,9 @@ async def customer_payments(
 		return items[0] if items else {}
 	return {"count": len(items), "items": items}
 
+# ============================================================================
+# 🔹 READ - Customer refund summary report
+# ============================================================================
 @router.get("/refunds")
 async def customer_refunds(
 	limit: int = Query(50, ge=1, le=1000),

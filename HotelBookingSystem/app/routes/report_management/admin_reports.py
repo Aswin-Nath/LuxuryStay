@@ -14,6 +14,9 @@ from app.services.report_management.report_management_service import (
 
 router = APIRouter(prefix="/reports/admin", tags=["REPORTS_ADMIN"], dependencies=[Depends(ensure_not_basic_user)])
 
+# ============================================================================
+# 🔹 READ - Admin booking performance report
+# ============================================================================
 @router.get("/booking_performance")
 async def booking_performance(
 	date_from: Optional[str] = Query(None, description="YYYY-MM-DD"),
@@ -25,6 +28,9 @@ async def booking_performance(
 	items = await get_admin_booking_performance(db, date_from=date_from, date_to=date_to, room_type=room_type, limit=limit)
 	return {"count": len(items), "items": items}
 
+# ============================================================================
+# 🔹 READ - Admin revenue summary report
+# ============================================================================
 @router.get("/revenue_summary")
 async def revenue_summary(
 	date_from: Optional[str] = Query(None, description="YYYY-MM-DD"),
@@ -35,6 +41,9 @@ async def revenue_summary(
 	items = await get_admin_revenue_summary(db, date_from=date_from, date_to=date_to, limit=limit)
 	return {"count": len(items), "items": items}
 
+# ============================================================================
+# 🔹 READ - Admin refund summary report
+# ============================================================================
 @router.get("/refunds_summary")
 async def refunds_summary(
 	limit: int = Query(200, ge=1, le=2000),
@@ -46,11 +55,17 @@ async def refunds_summary(
 		return items[0] if items else {}
 	return {"count": len(items), "items": items}
 
+# ============================================================================
+# 🔹 READ - Admin payment summary report
+# ============================================================================
 @router.get("/payment_summary")
 async def payment_summary(limit: int = Query(200, ge=1, le=2000), db: AsyncSession = Depends(get_db)):
 	items = await get_admin_payment_summary(db, limit=limit)
 	return {"count": len(items), "items": items}
 
+# ============================================================================
+# 🔹 READ - Admin review summary report
+# ============================================================================
 @router.get("/review_summary")
 async def review_summary(limit: int = Query(200, ge=1, le=2000), db: AsyncSession = Depends(get_db)):
 	items = await get_admin_review_summary(db, limit=limit)

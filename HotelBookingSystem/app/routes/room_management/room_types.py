@@ -20,6 +20,9 @@ from app.utils.audit_helper import log_audit
 router = APIRouter(prefix="/room-types", tags=["ROOM_TYPES"])
 
 
+# ============================================================================
+# 🔹 CREATE - Add a new room type to the system
+# ============================================================================
 @router.post("/", response_model=RoomTypeResponse, status_code=status.HTTP_201_CREATED)
 async def create_room_type(payload: RoomTypeCreate, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
     # Permission check: require room_service.WRITE
@@ -43,6 +46,9 @@ async def create_room_type(payload: RoomTypeCreate, db: AsyncSession = Depends(g
     return RoomTypeResponse.model_validate(room_type_record).model_copy(update={"message": "Room type created"})
 
 
+# ============================================================================
+# 🔹 READ - Fetch room types (single or list)
+# ============================================================================
 @router.get("/")
 async def get_room_types(
     room_type_id: Optional[int] = Query(None, description="If provided, returns the single room type with this ID"),
@@ -72,6 +78,9 @@ async def get_room_types(
     return response_list
 
 
+# ============================================================================
+# 🔹 UPDATE - Modify existing room type details
+# ============================================================================
 @router.put("/{room_type_id}", response_model=RoomTypeResponse)
 async def update_room_type(room_type_id: int, payload: RoomTypeUpdate, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
     if not (
@@ -93,6 +102,9 @@ async def update_room_type(room_type_id: int, payload: RoomTypeUpdate, db: Async
     return RoomTypeResponse.model_validate(room_type_record).model_copy(update={"message": "Updated successfully"})
 
 
+# ============================================================================
+# 🔹 DELETE - Remove room type from system (soft delete)
+# ============================================================================
 @router.delete("/{room_type_id}")
 async def soft_delete_room_type(room_type_id: int, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
     if not (

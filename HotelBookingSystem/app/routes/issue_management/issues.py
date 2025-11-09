@@ -38,6 +38,9 @@ def _require_issue_write(user_permissions: dict):
         and PermissionTypes.WRITE.value in user_permissions[Resources.ISSUE_RESOLUTION.value]
     )
 
+# ============================================================================
+# 🔹 CREATE - Submit a new issue/complaint
+# ============================================================================
 @router.post("/", response_model=IssueResponse, status_code=status.HTTP_201_CREATED)
 async def create_issue(
     issue: IssueCreate = Depends(IssueCreate.as_form),
@@ -64,6 +67,9 @@ async def create_issue(
     return IssueResponse.model_validate(issue_record, from_attributes=True).model_dump()
 
 
+# ============================================================================
+# 🔹 CREATE - Upload images for an issue
+# ============================================================================
 @router.post("/{issue_id}/images", response_model=List[ImageResponse], status_code=status.HTTP_201_CREATED)
 async def add_issue_images(
     issue_id: int,
@@ -98,6 +104,9 @@ async def add_issue_images(
     return [ImageResponse.model_validate(i) for i in images]
 
 
+# ============================================================================
+# 🔹 READ - Fetch issues (single or list)
+# ============================================================================
 @router.get("/", response_model=Union[IssueResponse, List[IssueResponse]])
 async def issues(
     issue_id: Optional[int] = Query(None, description="If provided, returns the single issue."),
@@ -130,6 +139,9 @@ async def issues(
     result = [IssueResponse.model_validate(i).model_dump() for i in items]
     return result
 
+# ============================================================================
+# 🔹 READ - Fetch all chat messages for an issue
+# ============================================================================
 @router.get("/{issue_id}/chat")
 async def get_chats(
     issue_id: int,
@@ -162,6 +174,9 @@ async def get_chats(
     ]
 
 
+# ============================================================================
+# 🔹 UPDATE - Modify issue status/details
+# ============================================================================
 @router.put("/{issue_id}", response_model=IssueResponse)
 async def update_issue(
     issue_id: int,
@@ -218,6 +233,9 @@ async def update_issue(
     return IssueResponse.model_validate(updated).model_dump()
 
 
+# ============================================================================
+# 🔹 CREATE - Post a chat message on an issue thread
+# ============================================================================
 @router.post("/{issue_id}/chat", status_code=status.HTTP_201_CREATED)
 async def post_chat(
     issue_id: int,

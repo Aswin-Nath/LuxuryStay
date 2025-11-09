@@ -44,6 +44,9 @@ def _require_permissions(user_permissions: dict, required_resources: list, perm:
         raise ForbiddenError("Insufficient permissions")
 
 
+# ============================================================================
+# 🔹 CREATE - Add a new room to the system
+# ============================================================================
 @router.post("/", response_model=RoomResponse, status_code=status.HTTP_201_CREATED)
 async def create_room(payload: RoomCreate, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
     # Require WRITE on both Booking and Room_Management
@@ -62,6 +65,9 @@ async def create_room(payload: RoomCreate, db: AsyncSession = Depends(get_db), u
     return RoomResponse.model_validate(room_record).model_copy(update={"message": "Room created"})
 
 
+# ============================================================================
+# 🔹 READ - Fetch room details (single or list with filters)
+# ============================================================================
 @router.get("/")
 async def get_rooms(
     # If client provides room_id as query param, return single room. Otherwise return list filtered by other params.
@@ -97,6 +103,9 @@ async def get_rooms(
     return response_list
 
 
+# ============================================================================
+# 🔹 UPDATE - Modify existing room details
+# ============================================================================
 @router.put("/{room_id}", response_model=RoomResponse)
 async def update_room(room_id: int, payload: RoomUpdate, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
     # Require WRITE on both Booking and Room_Management
@@ -115,6 +124,9 @@ async def update_room(room_id: int, payload: RoomUpdate, db: AsyncSession = Depe
     return RoomResponse.model_validate(room_record).model_copy(update={"message": "Updated successfully"})
 
 
+# ============================================================================
+# 🔹 DELETE - Remove room from system
+# ============================================================================
 @router.delete("/{room_id}")
 async def delete_room(room_id: int, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
     # Require WRITE on both Booking and Room_Management
@@ -125,6 +137,9 @@ async def delete_room(room_id: int, db: AsyncSession = Depends(get_db), user_per
     return {"message": "Room deleted"}
 
 
+# ============================================================================
+# 🔹 CREATE (BULK) - Upload multiple rooms from Excel file
+# ============================================================================
 @router.post("/bulk-upload", response_model=BulkRoomUploadResponse, status_code=status.HTTP_200_OK)
 async def bulk_upload_rooms(
     file: UploadFile = File(..., description="Excel file with columns: room_no, room_type_id, room_status, freeze_reason"),

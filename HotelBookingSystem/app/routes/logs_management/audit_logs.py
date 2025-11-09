@@ -6,6 +6,10 @@ from app.schemas.pydantic_models.audit_log import AuditLogModel
 
 router = APIRouter(prefix="/audit", tags=["LOGS"])
 # POST for creating audit logs is handled by middleware (app/middlewares/logs_middleware.py)
+
+# ============================================================================
+# 🔹 READ - Fetch audit logs with filters
+# ============================================================================
 @router.get("/", response_model=List[dict])
 async def get_audits(
     entity: Optional[str] = Query(None),

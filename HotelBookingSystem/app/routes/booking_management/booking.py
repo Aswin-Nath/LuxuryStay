@@ -19,6 +19,9 @@ router = APIRouter(prefix="/bookings", tags=["BOOKINGS"])
 
 
 
+# ============================================================================
+# 🔹 CREATE - Create a new booking
+# ============================================================================
 @router.post("/", response_model=BookingResponse, status_code=status.HTTP_201_CREATED)
 async def create_booking(
 	payload: BookingCreate,
@@ -49,6 +52,9 @@ async def create_booking(
 	await invalidate_pattern("bookings:*")
 	return BookingResponse.model_validate(booking_record).model_dump(exclude={"created_at"})
 
+# ============================================================================
+# 🔹 UPDATE - Cancel a booking and initiate refund
+# ============================================================================
 @router.post("/{booking_id}/cancel", response_model=RefundResponse, status_code=status.HTTP_201_CREATED)
 async def cancel_booking(booking_id: int, payload: RefundCreate, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)):
 	refund_record = await svc_cancel_booking(db, booking_id, payload, current_user)
@@ -63,6 +69,9 @@ async def cancel_booking(booking_id: int, payload: RefundCreate, db: AsyncSessio
 	return RefundResponse.model_validate(refund_record)
 
 
+# ============================================================================
+# 🔹 READ - Fetch booking details (single or list with filters)
+# ============================================================================
 @router.get("/", response_model=List[BookingResponse])
 async def get_bookings(
     booking_id: Optional[int] = None,

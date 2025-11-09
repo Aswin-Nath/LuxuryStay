@@ -22,6 +22,8 @@ roles_and_permissions_router = APIRouter(prefix="/roles", tags=["ROLES"])
 
 
 # ==============================================================
+# 🔹 CREATE - Assign permissions to a role
+# ==============================================================
 # 2️⃣ ASSIGN PERMISSIONS TO A ROLE
 # ==============================================================
 @roles_and_permissions_router.post("/assign", response_model=RolePermissionResponse)
@@ -40,6 +42,8 @@ async def assign_permissions_to_role(payload: RolePermissionAssign, db: AsyncSes
     return RolePermissionResponse.model_validate(assignment_result)
 
 
+# ==============================================================
+# 🔹 READ - Fetch permissions by role, resource, or permission_id
 # ==============================================================
 # Consolidated GET endpoint for permissions
 # Supports three modes (provide exactly one):
@@ -85,6 +89,8 @@ async def get_permissions(
 
 
 # ==============================================================
+# 🔹 CREATE - Create a new role
+# ==============================================================
 @roles_and_permissions_router.post("/", response_model=RoleResponse)
 async def create_new_role(payload: RoleCreate, db: AsyncSession = Depends(get_db),
                           _ok: bool = Depends(ensure_not_basic_user),
@@ -106,6 +112,9 @@ async def create_new_role(payload: RoleCreate, db: AsyncSession = Depends(get_db
     return schema_data.model_copy(update={"message": "Role created successfully"})
 
 
+# ==============================================================
+# 🔹 READ - Fetch list of all roles
+# ==============================================================
 @roles_and_permissions_router.get("/", response_model=List[RoleResponse])
 async def list_roles(db: AsyncSession = Depends(get_db), _ok: bool = Depends(ensure_not_basic_user), user_perms: dict = Depends(get_user_permissions)):
     # Require ADMIN_CREATION:READ permission to access roles endpoints

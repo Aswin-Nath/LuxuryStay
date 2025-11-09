@@ -22,6 +22,8 @@ router = APIRouter(prefix="/profile", tags=["PROFILE"])
 
 
 # ==========================================================
+# 🔹 READ - Get authenticated user's profile
+# ==========================================================
 # 🔹 GET PROFILE
 # ==========================================================
 
@@ -30,6 +32,8 @@ async def get_my_profile(current_user: Users = Depends(get_current_user), db: As
     return await get_my_profile_service(db, current_user)
 
 
+# ==========================================================
+# 🔹 UPDATE - Modify user profile details
 # ==========================================================
 # 🔹 UPDATE PROFILE
 # ==========================================================
@@ -52,6 +56,8 @@ async def update_my_profile(
 
 
 # ==========================================================
+# 🔹 UPDATE - Upload user profile image
+# ==========================================================
 # 🔹 UPLOAD PROFILE IMAGE
 # ==========================================================
 
@@ -64,6 +70,8 @@ async def upload_profile_image(
     return await upload_profile_image_service(db, current_user, file)
 
 
+# ==========================================================
+# 🔹 UPDATE - Change user password
 # ==========================================================
 # 🔹 CHANGE PASSWORD
 # ==========================================================

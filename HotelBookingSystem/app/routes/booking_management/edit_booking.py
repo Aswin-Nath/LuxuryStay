@@ -19,6 +19,9 @@ from app.utils.audit_helper import log_audit
 router = APIRouter(prefix="/booking-edits", tags=["BOOKING-EDITS"])
 
 
+# ============================================================================
+# 🔹 CREATE - Submit a booking edit request
+# ============================================================================
 # ✅ 1️⃣ Create Booking Edit
 @router.post("/", response_model=BookingEditResponse, status_code=status.HTTP_201_CREATED)
 async def create_booking_edit(
@@ -40,6 +43,9 @@ async def create_booking_edit(
     return booking_edit_record
 
 
+# ============================================================================
+# 🔹 READ - Fetch booking edit requests for a booking
+# ============================================================================
 @router.get("/{booking_id}", response_model=BookingEditResponse | list[BookingEditResponse])
 async def get_booking_edits(
     booking_id: int,
@@ -75,6 +81,9 @@ async def get_booking_edits(
 
 
 
+# ============================================================================
+# 🔹 UPDATE - Lock or unlock a room status
+# ============================================================================
 @router.post("/rooms/{room_id}/status")
 async def change_room_status_route(
     room_id: int,
@@ -108,6 +117,9 @@ async def change_room_status_route(
 
 
 
+# ============================================================================
+# 🔹 UPDATE - Admin review and suggest new rooms for booking edit
+# ============================================================================
 # ✅ Admin Review (Suggest rooms & lock edit)
 @router.post("/{edit_id}/review")
 async def review_booking_edit(
@@ -138,6 +150,9 @@ async def review_booking_edit(
     return booking_edit_record
 
 
+# ============================================================================
+# 🔹 UPDATE - Customer accept/reject proposed booking edit
+# ============================================================================
 # ✅ Customer Decision (Accept or Reject)
 @router.post("/{edit_id}/decision")
 async def decision_booking_edit(

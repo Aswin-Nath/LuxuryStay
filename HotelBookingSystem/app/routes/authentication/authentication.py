@@ -43,12 +43,17 @@ class RefreshRequest(BaseModel):
     access_token: str
 
 
+# ============================================================================
+# 🔹 CREATE - Register new user account
+# ============================================================================
 @auth_router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def signup(payload: UserCreate, db: AsyncSession = Depends(get_db)):
     user_obj = await svc_signup(db, payload)
     return UserResponse.model_validate(user_obj)
 
 
+# ==================================================
+# 🔹 CREATE - Request OTP for password reset or verification
 # ==================================================
 # OTP / PASSWORD RESET / CHANGE PASSWORD endpoints
 # ==================================================
@@ -62,6 +67,9 @@ async def request_otp(payload: OTPRequest, request: Request = None, db: AsyncSes
     return await svc_request_otp(db, payload.email, payload.verification_type, client_host=request.client.host if request.client else None)
 
 
+# ============================================================================
+# 🔹 UPDATE - Verify OTP and optionally reset password
+# ============================================================================
 @auth_router.post("/otp/verify")
 async def verify_otp_endpoint(payload: OTPVerify, db: AsyncSession = Depends(get_db)):
     """Verify an OTP. If verification_type is PASSWORD_RESET and new_password is provided,

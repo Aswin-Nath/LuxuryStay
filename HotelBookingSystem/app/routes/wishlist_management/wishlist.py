@@ -14,6 +14,9 @@ from app.utils.audit_helper import log_audit
 router = APIRouter(prefix="/wishlist", tags=["WISHLIST"])
 
 
+# ============================================================================
+# 🔹 CREATE - Add room to user's wishlist
+# ============================================================================
 @router.post("/", response_model=WishlistResponse, status_code=status.HTTP_201_CREATED)
 async def add_wishlist(
     payload: WishlistCreate,
@@ -37,6 +40,9 @@ async def add_wishlist(
     return WishlistResponse.model_validate(wishlist_record).model_dump()
 
 
+# ============================================================================
+# 🔹 READ - Fetch user's wishlist items
+# ============================================================================
 @router.get("/", response_model=List[WishlistResponse])
 async def list_wishlist(db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)):
     cache_key = f"wishlist:user:{current_user.user_id}"
@@ -52,6 +58,9 @@ async def list_wishlist(db: AsyncSession = Depends(get_db), current_user: Users 
 
 
 
+# ============================================================================
+# 🔹 DELETE - Remove room from user's wishlist
+# ============================================================================
 @router.delete("/{wishlist_id}", status_code=status.HTTP_201_CREATED)
 async def delete_wishlist(wishlist_id: int, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)):
     await svc_remove(db, wishlist_id, current_user.user_id)
