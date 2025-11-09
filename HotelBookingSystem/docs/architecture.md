@@ -4,7 +4,9 @@
 
 **Version:** 1.0.0
 
-**Last Updated:** 9th November 2025
+**Last Updated:** November 9, 2025
+
+**Author:** Aswinnath TE
 
 ---
 

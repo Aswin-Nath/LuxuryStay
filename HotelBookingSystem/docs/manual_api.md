@@ -4,7 +4,9 @@
 
 **Framework:** FastAPI + SQLAlchemy + Motor
 
-**Last Updated:** November 2025
+**Last Updated:** November 9, 2025
+
+**Author:** Aswinnath TE
 
 **Authentication:** JWT Bearer Token (`Authorization: Bearer <access_token>`)
 

@@ -1,5 +1,7 @@
 # Hotel Booking System - Authorization Documentation
 
+**Author:** Aswinnath TE | **Date:** November 9, 2025
+
 ## 📋 Table of Contents
 1. [Role-Based Access Control (RBAC)](#role-based-access-control-rbac)
 2. [Permission Model](#permission-model)
