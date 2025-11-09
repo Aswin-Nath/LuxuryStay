@@ -15,8 +15,8 @@ from app.models.sqlalchemy_schemas.rooms import Rooms, RoomStatus
 
 async def get_booking_by_id(db: AsyncSession, booking_id: int) -> Optional[Bookings]:
     stmt = select(Bookings).where(Bookings.booking_id == booking_id)
-    res = await db.execute(stmt)
-    return res.scalars().first()
+    query_result = await db.execute(stmt)
+    return query_result.scalars().first()
 
 
 async def update_booking_flags(db: AsyncSession, booking: Bookings, is_pre_edit: bool, is_post_edit: bool):
@@ -45,8 +45,8 @@ async def create_booking_edit(db: AsyncSession, edit_obj: BookingEdits) -> Booki
 async def get_booking_edit_by_id(db: AsyncSession, edit_id: int) -> Optional[BookingEdits]:
     """Retrieve a booking edit by ID."""
     stmt = select(BookingEdits).where(BookingEdits.edit_id == edit_id, BookingEdits.is_deleted == False)
-    res = await db.execute(stmt)
-    return res.scalars().first()
+    query_result = await db.execute(stmt)
+    return query_result.scalars().first()
 
 
 async def list_booking_edits_for_booking(db: AsyncSession, booking_id: int) -> List[BookingEdits]:
@@ -56,8 +56,8 @@ async def list_booking_edits_for_booking(db: AsyncSession, booking_id: int) -> L
         .where(BookingEdits.booking_id == booking_id, BookingEdits.is_deleted == False)
         .order_by(BookingEdits.requested_at.desc())
     )
-    res = await db.execute(stmt)
-    return res.scalars().all()
+    query_result = await db.execute(stmt)
+    return query_result.scalars().all()
 
 
 async def update_booking_edit_status(
@@ -89,8 +89,8 @@ async def update_booking_edit_status(
 
 async def get_booking_room_maps(db: AsyncSession, booking_id: int) -> List[BookingRoomMap]:
     stmt = select(BookingRoomMap).where(BookingRoomMap.booking_id == booking_id)
-    res = await db.execute(stmt)
-    return res.scalars().all()
+    query_result = await db.execute(stmt)
+    return query_result.scalars().all()
 
 
 async def delete_booking_room_map(db: AsyncSession, booking_id: int, room_id: int):
@@ -131,8 +131,8 @@ async def create_refund_room_map(db: AsyncSession, refund_room_map_obj: RefundRo
 
 async def get_room_by_id(db: AsyncSession, room_id: int) -> Optional[Rooms]:
     stmt = select(Rooms).where(Rooms.room_id == room_id)
-    res = await db.execute(stmt)
-    return res.scalars().first()
+    query_result = await db.execute(stmt)
+    return query_result.scalars().first()
 
 
 async def lock_room(db: AsyncSession, room_id: int):

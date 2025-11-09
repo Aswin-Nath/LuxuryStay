@@ -19,8 +19,8 @@ async def insert_issue(db: AsyncSession, payload: dict) -> Issues:
 
 async def get_issue_by_id(db: AsyncSession, issue_id: int) -> Optional[Issues]:
     stmt = select(Issues).where(Issues.issue_id == issue_id)
-    res = await db.execute(stmt)
-    return res.scalars().first()
+    query_result = await db.execute(stmt)
+    return query_result.scalars().first()
 
 
 async def update_issue_fields(db: AsyncSession, issue: Issues, payload: dict):
@@ -37,8 +37,8 @@ async def list_issues_records(db: AsyncSession, user_id: Optional[int] = None, l
     stmt = select(Issues).limit(limit).offset(offset)
     if user_id:
         stmt = stmt.where(Issues.user_id == user_id)
-    res = await db.execute(stmt)
-    return res.scalars().all()
+    query_result = await db.execute(stmt)
+    return query_result.scalars().all()
 
 
 # ==========================================================
@@ -52,8 +52,8 @@ async def get_issue_images(db: AsyncSession, issue_id: int) -> List[Images]:
         .where(Images.entity_id == issue_id)
         .where(Images.is_deleted.is_(False))
     )
-    res = await db.execute(stmt)
-    return res.scalars().all()
+    query_result = await db.execute(stmt)
+    return query_result.scalars().all()
 
 
 # ==========================================================
@@ -74,5 +74,5 @@ async def list_chat_messages(db: AsyncSession, issue_id: int) -> List[IssueChat]
         .where(IssueChat.issue_id == issue_id)
         .order_by(IssueChat.sent_at)
     )
-    res = await db.execute(stmt)
-    return res.scalars().all()
+    query_result = await db.execute(stmt)
+    return query_result.scalars().all()

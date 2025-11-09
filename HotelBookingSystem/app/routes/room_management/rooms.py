@@ -48,18 +48,18 @@ def _require_permissions(user_permissions: dict, required_resources: list, perm:
 async def create_room(payload: RoomCreate, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
     # Require WRITE on both Booking and Room_Management
     _require_permissions(user_permissions, [Resources.BOOKING, Resources.ROOM_MANAGEMENT], PermissionTypes.WRITE, require_all=True)
-    obj = await svc_create_room(db, payload)
+    room_record = await svc_create_room(db, payload)
     # create audit log for room creation
     try:
-        new_val = RoomResponse.model_validate(obj).model_dump()
-        entity_id = f"room:{getattr(obj, 'room_id', None)}"
+        new_val = RoomResponse.model_validate(room_record).model_dump()
+        entity_id = f"room:{getattr(room_record, 'room_id', None)}"
         changed_by = getattr(locals().get('current_user'), 'user_id', None) or getattr(payload, 'user_id', None)
         await log_audit(entity="room", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=changed_by, user_id=changed_by)
     except Exception:
         pass
     # invalidate rooms cache
     await invalidate_pattern("rooms:*")
-    return RoomResponse.model_validate(obj).model_copy(update={"message": "Room created"})
+    return RoomResponse.model_validate(room_record).model_copy(update={"message": "Room created"})
 
 
 @router.get("/")
@@ -83,8 +83,8 @@ async def get_rooms(
     Access control: only non-basic users (admins/managers) may access this endpoint.
     """
     if room_id is not None:
-        obj = await svc_get_room(db, room_id)
-        return RoomResponse.model_validate(obj)
+        room_record = await svc_get_room(db, room_id)
+        return RoomResponse.model_validate(room_record)
 
     cache_key = f"rooms:room_type:{room_type_id}:status:{status_filter}:is_freezed:{is_freezed}"
     cached = await get_cached(cache_key)
@@ -92,27 +92,27 @@ async def get_rooms(
         return cached
 
     items = await svc_list_rooms(db, room_type_id=room_type_id, status_filter=status_filter, is_freezed=is_freezed)
-    result = [Room.model_validate(r) for r in items]
-    await set_cached(cache_key, result, ttl=120)
-    return result
+    response_list = [Room.model_validate(r) for r in items]
+    await set_cached(cache_key, response_list, ttl=120)
+    return response_list
 
 
 @router.put("/{room_id}", response_model=RoomResponse)
 async def update_room(room_id: int, payload: RoomUpdate, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
     # Require WRITE on both Booking and Room_Management
     _require_permissions(user_permissions, [Resources.BOOKING, Resources.ROOM_MANAGEMENT], PermissionTypes.WRITE, require_all=True)
-    obj = await svc_update_room(db, room_id, payload)
+    room_record = await svc_update_room(db, room_id, payload)
     # audit update
     try:
-        new_val = RoomResponse.model_validate(obj).model_dump()
-        entity_id = f"room:{getattr(obj, 'room_id', None)}"
+        new_val = RoomResponse.model_validate(room_record).model_dump()
+        entity_id = f"room:{getattr(room_record, 'room_id', None)}"
         changed_by = getattr(locals().get('current_user'), 'user_id', None)
         await log_audit(entity="room", entity_id=entity_id, action="UPDATE", new_value=new_val, changed_by_user_id=changed_by, user_id=changed_by)
     except Exception:
         pass
     # invalidate rooms cache after update
     await invalidate_pattern("rooms:*")
-    return RoomResponse.model_validate(obj).model_copy(update={"message": "Updated successfully"})
+    return RoomResponse.model_validate(room_record).model_copy(update={"message": "Updated successfully"})
 
 
 @router.delete("/{room_id}")

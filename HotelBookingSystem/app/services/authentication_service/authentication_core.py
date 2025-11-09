@@ -75,7 +75,7 @@ def create_refresh_token(data: dict, expires_delta: timedelta | None = None, jti
 # =====================================================
 async def create_user(db, *, full_name: str, email: str, password: str, phone_number: str | None, role_id: int, status_id: int,created_by:int):
     hashed = _hash_password(password)
-    user_obj = Users(
+    user_record = Users(
         full_name=full_name,
         email=email,
         hashed_password=hashed,
@@ -84,10 +84,10 @@ async def create_user(db, *, full_name: str, email: str, password: str, phone_nu
         status_id=status_id,
         created_by=created_by
     )
-    db.add(user_obj)
+    db.add(user_record)
     await db.commit()
-    await db.refresh(user_obj)
-    return user_obj
+    await db.refresh(user_record)
+    return user_record
 
 
 # =====================================================
@@ -95,8 +95,8 @@ async def create_user(db, *, full_name: str, email: str, password: str, phone_nu
 # =====================================================
 async def authenticate_user(db, *, email: str, password: str):
     from sqlalchemy import select
-    result = await db.execute(select(Users).where(Users.email == email))
-    user = result.scalars().first()
+    query_result = await db.execute(select(Users).where(Users.email == email))
+    user = query_result.scalars().first()
     if not user:
         return None
     if not _verify_password(user.hashed_password, password):
@@ -160,27 +160,27 @@ async def verify_otp(db: AsyncSession, user_id: int, otp: str, verification_type
     """Verify an OTP for a user. Returns (True, verification_obj) on success, (False, reason) on failure.
     Marks record as verified when successful.
     """
-    result = await db.execute(
+    query_result = await db.execute(
         select(Verifications).where(
             Verifications.user_id == user_id,
             Verifications.verification_type == verification_type,
         ).order_by(Verifications.created_at.desc())
     )
-    v = result.scalars().first()
-    if not v:
+    verification_record = query_result.scalars().first()
+    if not verification_record:
         return False, "No verification found"
     # check expiration
-    if v.expires_at and datetime.utcnow() > v.expires_at:
+    if verification_record.expires_at and datetime.utcnow() > verification_record.expires_at:
         return False, "OTP expired"
     # check attempts
-    if v.attempt_count >= max_attempts:
+    if verification_record.attempt_count >= max_attempts:
         return False, "Max attempts exceeded"
     # verify
-    if v.otp_code != otp:
+    if verification_record.otp_code != otp:
         # increment attempt_count
         await db.execute(
             update(Verifications)
-            .where(Verifications.verification_id == v.verification_id)
+            .where(Verifications.verification_id == verification_record.verification_id)
             .values(attempt_count=Verifications.attempt_count + 1)
         )
         await db.commit()
@@ -189,11 +189,11 @@ async def verify_otp(db: AsyncSession, user_id: int, otp: str, verification_type
     # success: mark verified
     await db.execute(
         update(Verifications)
-        .where(Verifications.verification_id == v.verification_id)
+        .where(Verifications.verification_id == verification_record.verification_id)
         .values(is_verified=True, verified_at=datetime.utcnow())
     )
     await db.commit()
-    return True, v
+    return True, verification_record
 
 
 async def update_user_password(db: AsyncSession, user: Users, new_password: str):

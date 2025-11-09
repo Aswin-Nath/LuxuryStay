@@ -30,8 +30,8 @@ async def fetch_offer_by_id(db: AsyncSession, offer_id: int, include_deleted: bo
     )
     if not include_deleted:
         stmt = stmt.where(Offer.is_deleted == False)
-    res = await db.execute(stmt)
-    return res.scalars().first()
+    query_result = await db.execute(stmt)
+    return query_result.scalars().first()
 
 
 async def fetch_offers_list(db: AsyncSession, limit: int = 20, offset: int = 0, include_deleted: bool = False) -> List[Offer]:
@@ -43,8 +43,8 @@ async def fetch_offers_list(db: AsyncSession, limit: int = 20, offset: int = 0, 
     )
     if not include_deleted:
         stmt = stmt.where(Offer.is_deleted == False)
-    res = await db.execute(stmt)
-    return res.unique().scalars().all()
+    query_result = await db.execute(stmt)
+    return query_result.unique().scalars().all()
 
 
 async def delete_offer_room_mappings(db: AsyncSession, offer_id: int):
@@ -53,20 +53,20 @@ async def delete_offer_room_mappings(db: AsyncSession, offer_id: int):
 
 async def insert_offer_room_map(db: AsyncSession, offer_id: int, rooms: List[dict]):
     seen = set()
-    for r in rooms:
-        rt_id = r["room_type_id"]
-        if rt_id in seen:
+    for room_mapping in rooms:
+        room_type_id = room_mapping["room_type_id"]
+        if room_type_id in seen:
             continue
-        seen.add(rt_id)
-        orm = OfferRoomMap(
+        seen.add(room_type_id)
+        offer_room_map = OfferRoomMap(
             offer_id=offer_id,
-            room_type_id=rt_id,
-            actual_price=Decimal(str(r["actual_price"])),
-            discounted_price=Decimal(str(r["discounted_price"])),
+            room_type_id=room_type_id,
+            actual_price=Decimal(str(room_mapping["actual_price"])),
+            discounted_price=Decimal(str(room_mapping["discounted_price"])),
         )
-        db.add(orm)
+        db.add(offer_room_map)
 
 
 async def fetch_room_types_by_ids(db: AsyncSession, room_type_ids: List[int]) -> List[RoomTypes]:
-    q = await db.execute(select(RoomTypes).where(RoomTypes.room_type_id.in_(room_type_ids)))
-    return q.scalars().all()
+    query = await db.execute(select(RoomTypes).where(RoomTypes.room_type_id.in_(room_type_ids)))
+    return query.scalars().all()

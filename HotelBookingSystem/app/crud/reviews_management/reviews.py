@@ -9,23 +9,23 @@ from app.models.sqlalchemy_schemas.bookings import Bookings, BookingRoomMap
 # CREATE
 # ==========================================================
 async def insert_review_record(db: AsyncSession, data: dict) -> Reviews:
-    obj = Reviews(**data)
-    db.add(obj)
+    review_record = Reviews(**data)
+    db.add(review_record)
     await db.flush()
-    return obj
+    return review_record
 
 
 # ==========================================================
 # READ
 # ==========================================================
 async def fetch_review_by_id(db: AsyncSession, review_id: int) -> Optional[Reviews]:
-    res = await db.execute(select(Reviews).where(Reviews.review_id == review_id))
-    return res.scalars().first()
+    query_result = await db.execute(select(Reviews).where(Reviews.review_id == review_id))
+    return query_result.scalars().first()
 
 
 async def fetch_booking_by_id(db: AsyncSession, booking_id: int) -> Optional[Bookings]:
-    res = await db.execute(select(Bookings).where(Bookings.booking_id == booking_id))
-    return res.scalars().first()
+    query_result = await db.execute(select(Bookings).where(Bookings.booking_id == booking_id))
+    return query_result.scalars().first()
 
 
 async def fetch_booking_room_map(db: AsyncSession, booking_id: int, room_type_id: Optional[int] = None, room_id: Optional[int] = None):
@@ -34,15 +34,15 @@ async def fetch_booking_room_map(db: AsyncSession, booking_id: int, room_type_id
         stmt = stmt.where(BookingRoomMap.room_type_id == room_type_id)
     if room_id is not None:
         stmt = stmt.where(BookingRoomMap.room_id == room_id)
-    res = await db.execute(stmt)
-    return res.scalars().first()
+    query_result = await db.execute(stmt)
+    return query_result.scalars().first()
 
 
 async def fetch_reviews_by_user(db: AsyncSession, booking_id: int, user_id: int) -> List[Reviews]:
-    res = await db.execute(
+    query_result = await db.execute(
         select(Reviews).where(Reviews.booking_id == booking_id, Reviews.user_id == user_id)
     )
-    return res.scalars().all()
+    return query_result.scalars().all()
 
 
 async def fetch_reviews_filtered(
@@ -56,8 +56,8 @@ async def fetch_reviews_filtered(
         stmt = stmt.where(Reviews.booking_id == booking_id)
     if user_id is not None:
         stmt = stmt.where(Reviews.user_id == user_id)
-    res = await db.execute(stmt)
-    return res.scalars().all()
+    query_result = await db.execute(stmt)
+    return query_result.scalars().all()
 
 
 # ==========================================================

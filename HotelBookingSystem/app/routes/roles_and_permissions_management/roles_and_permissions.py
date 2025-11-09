@@ -29,15 +29,15 @@ async def assign_permissions_to_role(payload: RolePermissionAssign, db: AsyncSes
     # Require ADMIN_CREATION:READ permission to access permissions assignment endpoints
     if not user_perms or "ADMIN_CREATION" not in user_perms or "READ" not in user_perms.get("ADMIN_CREATION", set()):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient privileges: ADMIN_CREATION:READ required")
-    res = await svc_assign_permissions_to_role(db, payload.role_id, payload.permission_ids)
+    assignment_result = await svc_assign_permissions_to_role(db, payload.role_id, payload.permission_ids)
     # audit permission assignment
     try:
-        new_val = RolePermissionResponse.model_validate(res).model_dump()
-        entity_id = f"role:{getattr(res, 'role_id', payload.role_id)}"
+        new_val = RolePermissionResponse.model_validate(assignment_result).model_dump()
+        entity_id = f"role:{getattr(assignment_result, 'role_id', payload.role_id)}"
         await log_audit(entity="role_permissions", entity_id=entity_id, action="INSERT", new_value=new_val)
     except Exception:
         pass
-    return RolePermissionResponse.model_validate(res)
+    return RolePermissionResponse.model_validate(assignment_result)
 
 
 # ==============================================================

@@ -20,23 +20,23 @@ from app.crud.room_management.room_types import fetch_room_type_by_id
 # 🔹 CREATE ROOM
 # ==========================================================
 async def create_room(db: AsyncSession, payload) -> Rooms:
-	existing = await fetch_room_by_number(db, payload.room_no)
-	if existing:
+	existing_room = await fetch_room_by_number(db, payload.room_no)
+	if existing_room:
 		raise HTTPException(status_code=409, detail="Room number already exists")
 
 	room_type = await fetch_room_type_by_id(db, payload.room_type_id)
 	if not room_type:
 		raise HTTPException(status_code=404, detail="Room type not found")
 
-	data = payload.model_dump()
-	data["price_per_night"] = room_type.price_per_night
-	data["max_adult_count"] = room_type.max_adult_count
-	data["max_child_count"] = room_type.max_child_count
+	room_data = payload.model_dump()
+	room_data["price_per_night"] = room_type.price_per_night
+	room_data["max_adult_count"] = room_type.max_adult_count
+	room_data["max_child_count"] = room_type.max_child_count
 
-	obj = await insert_room(db, data)
+	room_record = await insert_room(db, room_data)
 	await db.commit()
-	await db.refresh(obj)
-	return obj
+	await db.refresh(room_record)
+	return room_record
 
 
 # ==========================================================
@@ -55,38 +55,38 @@ async def list_rooms(
 # 🔹 GET ROOM
 # ==========================================================
 async def get_room(db: AsyncSession, room_id: int) -> Rooms:
-	obj = await fetch_room_by_id(db, room_id)
-	if not obj:
+	room_record = await fetch_room_by_id(db, room_id)
+	if not room_record:
 		raise HTTPException(status_code=404, detail="Room not found")
-	return obj
+	return room_record
 
 
 # ==========================================================
 # 🔹 UPDATE ROOM
 # ==========================================================
 async def update_room(db: AsyncSession, room_id: int, payload) -> Rooms:
-	existing = await fetch_room_by_number(db, payload.room_no)
-	if existing and existing.room_id != room_id:
+	existing_room = await fetch_room_by_number(db, payload.room_no)
+	if existing_room and existing_room.room_id != room_id:
 		raise HTTPException(status_code=409, detail="Room number already exists")
 
-	obj = await fetch_room_by_id(db, room_id)
-	if not obj:
+	room_record = await fetch_room_by_id(db, room_id)
+	if not room_record:
 		raise HTTPException(status_code=404, detail="Room not found")
 
-	data = payload.model_dump(exclude_unset=True)
-	await update_room_by_id(db, room_id, data)
+	room_data = payload.model_dump(exclude_unset=True)
+	await update_room_by_id(db, room_id, room_data)
 	await db.commit()
 
-	obj = await fetch_room_by_id(db, room_id)
-	return obj
+	room_record = await fetch_room_by_id(db, room_id)
+	return room_record
 
 
 # ==========================================================
 # 🔹 DELETE (SOFT DELETE)
 # ==========================================================
 async def delete_room(db: AsyncSession, room_id: int) -> None:
-	obj = await fetch_room_by_id(db, room_id)
-	if not obj:
+	room_record = await fetch_room_by_id(db, room_id)
+	if not room_record:
 		raise HTTPException(status_code=404, detail="Room not found")
 
 	await soft_delete_room(db, room_id)

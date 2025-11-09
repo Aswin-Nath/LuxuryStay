@@ -9,12 +9,12 @@ from app.models.sqlalchemy_schemas.notifications import Notifications
 # ==========================================================
 
 async def insert_notification_record(db: AsyncSession, payload: dict) -> Notifications:
-    obj = Notifications(**payload)
-    db.add(obj)
+    notification_record = Notifications(**payload)
+    db.add(notification_record)
     await db.flush()
     await db.commit()
-    await db.refresh(obj)
-    return obj
+    await db.refresh(notification_record)
+    return notification_record
 
 
 # ==========================================================
@@ -39,8 +39,8 @@ async def fetch_user_notifications(
         stmt = stmt.limit(limit)
     if offset:
         stmt = stmt.offset(offset)
-    res = await db.execute(stmt)
-    return res.scalars().all()
+    query_result = await db.execute(stmt)
+    return query_result.scalars().all()
 
 
 # ==========================================================
@@ -49,5 +49,5 @@ async def fetch_user_notifications(
 
 async def mark_as_read_record(db: AsyncSession, notification_id: int) -> Notifications:
     stmt = select(Notifications).where(Notifications.notification_id == notification_id)
-    res = await db.execute(stmt)
-    return res.scalars().first()
+    query_result = await db.execute(stmt)
+    return query_result.scalars().first()

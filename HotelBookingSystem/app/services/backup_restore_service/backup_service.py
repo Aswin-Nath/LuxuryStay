@@ -15,30 +15,30 @@ from app.schemas.pydantic_models.backup_data_collections import BackupDataCollec
 async def create_backup(doc: BackupDataCollection) -> Dict[str, Any]:
     """Create a new backup record using CRUD."""
     try:
-        payload = doc.model_dump(by_alias=True, exclude_none=True)
+        backup_payload = doc.model_dump(by_alias=True, exclude_none=True)
     except Exception:
-        payload = doc.dict(by_alias=True, exclude_none=True)
+        backup_payload = doc.dict(by_alias=True, exclude_none=True)
 
     # Basic validation
-    if not payload.get("snapshotName"):
+    if not backup_payload.get("snapshotName"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="snapshotName is required",
         )
-    if not payload.get("databaseType"):
+    if not backup_payload.get("databaseType"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="databaseType is required",
         )
 
-    inserted = await insert_backup_record(payload)
-    if not inserted:
+    created_backup_record = await insert_backup_record(backup_payload)
+    if not created_backup_record:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to insert backup record",
         )
 
-    return inserted
+    return created_backup_record
 
 
 # ==========================================================
@@ -56,7 +56,7 @@ async def list_backups(
     skip: int = 0,
 ) -> List[Dict[str, Any]]:
     """List all backups with optional filters."""
-    results = await fetch_backup_records(
+    backup_records = await fetch_backup_records(
         snapshotName=snapshotName,
         triggerType=triggerType,
         status=status,
@@ -67,10 +67,10 @@ async def list_backups(
         skip=skip,
     )
 
-    if not results:
+    if not backup_records:
         raise HTTPException(
             status_code=404,
             detail="No backup records found",
         )
 
-    return results
+    return backup_records

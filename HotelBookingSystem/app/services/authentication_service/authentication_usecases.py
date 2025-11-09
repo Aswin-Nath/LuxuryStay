@@ -33,11 +33,11 @@ async def signup(db: AsyncSession, payload: UserCreate, created_by: Optional[int
     if payload.role_id is not None and payload.role_id != 1:
         raise BadRequestError("Cannot create admin users via this endpoint")
 
-    existing = await get_user_by_email(db, payload.email)
-    if existing:
+    existing_user = await get_user_by_email(db, payload.email)
+    if existing_user:
         raise ConflictError("Email already registered")
 
-    user_obj = await authentication_core.create_user(
+    user_record = await authentication_core.create_user(
         db=db,
         full_name=payload.full_name,
         email=payload.email,
@@ -47,7 +47,7 @@ async def signup(db: AsyncSession, payload: UserCreate, created_by: Optional[int
         status_id=1,
         created_by=created_by,
     )
-    return user_obj
+    return user_record
 
 
 # ==========================================================
@@ -102,9 +102,9 @@ async def verify_otp_flow(
     except KeyError:
         raise BadRequestError("Invalid verification_type")
 
-    ok, res = await authentication_core.verify_otp(db, user.user_id, otp, vtype)
+    ok, verification_result = await authentication_core.verify_otp(db, user.user_id, otp, vtype)
     if not ok:
-        raise BadRequestError(res)
+        raise BadRequestError(verification_result)
 
     if vtype == VerificationType.PASSWORD_RESET and new_password:
         await authentication_core.update_user_password(db, user, new_password)
@@ -220,11 +220,11 @@ async def register_admin(
     current_user_id: int,
     user_permissions: dict,
 ):
-    existing = await get_user_by_email(db, payload.email)
-    if existing:
+    existing_user = await get_user_by_email(db, payload.email)
+    if existing_user:
         raise ConflictError("Email already registered")
 
-    user_obj = await authentication_core.create_user(
+    user_record = await authentication_core.create_user(
         db=db,
         full_name=payload.full_name,
         email=payload.email,
@@ -234,4 +234,4 @@ async def register_admin(
         status_id=1,
         created_by=current_user_id,
     )
-    return user_obj
+    return user_record

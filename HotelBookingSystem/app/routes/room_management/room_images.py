@@ -56,7 +56,7 @@ async def upload_image_for_room(
     try:
         image_url = await save_uploaded_image(image)
         
-        obj = await create_image(
+        image_record = await create_image(
             db,
             entity_type="room_type",
             entity_id=room_type_id,
@@ -67,12 +67,12 @@ async def upload_image_for_room(
         )
         # audit image create
         try:
-            new_val = ImageResponse.model_validate(obj).model_dump()
-            entity_id = f"room_type:{room_type_id}:image:{getattr(obj, 'image_id', None)}"
+            new_val = ImageResponse.model_validate(image_record).model_dump()
+            entity_id = f"room_type:{room_type_id}:image:{getattr(image_record, 'image_id', None)}"
             await log_audit(entity="room_image", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
         except Exception:
             pass
-        return ImageResponse.model_validate(obj)
+        return ImageResponse.model_validate(image_record)
     except HTTPException:
         raise
     except Exception as e:

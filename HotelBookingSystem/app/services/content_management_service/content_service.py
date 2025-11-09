@@ -53,18 +53,18 @@ async def create_doc_service(
 # ───────────────────────────────
 async def get_all_docs_service(collection: AsyncIOMotorCollection):
     cursor = collection.find({})
-    docs = await cursor.to_list(length=None)
-    for d in docs:
-        d["_id"] = str(d["_id"])
-    return docs
+    documents = await cursor.to_list(length=None)
+    for document in documents:
+        document["_id"] = str(document["_id"])
+    return documents
 
 
 async def get_doc_service(collection: AsyncIOMotorCollection, id: str):
-    doc = await collection.find_one({"_id": ObjectId(id)})
-    if not doc:
+    content_document = await collection.find_one({"_id": ObjectId(id)})
+    if not content_document:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
-    doc["_id"] = str(doc["_id"])
-    return doc
+    content_document["_id"] = str(content_document["_id"])
+    return content_document
 
 
 # ───────────────────────────────
@@ -85,8 +85,8 @@ async def update_doc_service(
 
     if new_images:
         image_urls = []
-        for img in new_images:
-            img_url = await save_uploaded_image(img)
+        for image_file in new_images:
+            img_url = await save_uploaded_image(image_file)
             image_urls.append({"url": img_url})
         update_data["images"] = image_urls
 

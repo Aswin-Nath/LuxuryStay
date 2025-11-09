@@ -8,26 +8,26 @@ from app.models.sqlalchemy_schemas.rooms import Rooms
 # 🔹 CREATE
 # ==========================================================
 async def insert_room(db: AsyncSession, data: dict) -> Rooms:
-	obj = Rooms(**data)
-	db.add(obj)
+	room_record = Rooms(**data)
+	db.add(room_record)
 	await db.flush()
-	return obj
+	return room_record
 
 
 # ==========================================================
 # 🔹 READ
 # ==========================================================
 async def fetch_room_by_id(db: AsyncSession, room_id: int) -> Optional[Rooms]:
-	res = await db.execute(select(Rooms).where(Rooms.room_id == room_id))
-	return res.scalars().first()
+	query_result = await db.execute(select(Rooms).where(Rooms.room_id == room_id))
+	return query_result.scalars().first()
 
 
 async def fetch_room_by_number(db: AsyncSession, room_no: str, include_deleted: bool = False) -> Optional[Rooms]:
 	stmt = select(Rooms).where(Rooms.room_no == room_no)
 	if not include_deleted:
 		stmt = stmt.where(Rooms.is_deleted.is_(False))
-	res = await db.execute(stmt)
-	return res.scalars().first()
+	query_result = await db.execute(stmt)
+	return query_result.scalars().first()
 
 
 async def fetch_rooms_filtered(
@@ -47,8 +47,8 @@ async def fetch_rooms_filtered(
 		else:
 			stmt = stmt.where(Rooms.freeze_reason.is_(None))
 
-	res = await db.execute(stmt)
-	return res.scalars().all()
+	query_result = await db.execute(stmt)
+	return query_result.scalars().all()
 
 
 # ==========================================================

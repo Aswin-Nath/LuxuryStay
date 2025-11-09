@@ -24,17 +24,17 @@ async def add_wishlist(
     """Add item to wishlist - only available for basic/customer users"""
     # enforce ownership
 
-    obj = await svc_add(db, payload, current_user)
+    wishlist_record = await svc_add(db, payload, current_user)
     # audit wishlist create
     try:
-        new_val = WishlistResponse.model_validate(obj).model_dump()
-        entity_id = f"wishlist:{getattr(obj, 'wishlist_id', None)}"
+        new_val = WishlistResponse.model_validate(wishlist_record).model_dump()
+        entity_id = f"wishlist:{getattr(wishlist_record, 'wishlist_id', None)}"
         await log_audit(entity="wishlist", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
     except Exception:
         pass
     # invalidate this user's wishlist cache
     await invalidate_pattern(f"wishlist:user:{current_user.user_id}:*")
-    return WishlistResponse.model_validate(obj).model_dump()
+    return WishlistResponse.model_validate(wishlist_record).model_dump()
 
 
 @router.get("/", response_model=List[WishlistResponse])
@@ -45,9 +45,9 @@ async def list_wishlist(db: AsyncSession = Depends(get_db), current_user: Users 
         return cached
 
     items = await svc_list(db, current_user.user_id)
-    result = [WishlistResponse.model_validate(i).model_dump() for i in items]
-    await set_cached(cache_key, result, ttl=120)
-    return result
+    response_list = [WishlistResponse.model_validate(i).model_dump() for i in items]
+    await set_cached(cache_key, response_list, ttl=120)
+    return response_list
 
 
 

@@ -19,8 +19,8 @@ async def unlock_expired_rooms_once():
                     .where(BookingEdits.edit_status == "AWAITING_CUSTOMER_RESPONSE")
                     .where(BookingEdits.lock_expires_at <= now)
                 )
-                res = await db.execute(stmt)
-                expired_edits = res.scalars().all()
+                query_result = await db.execute(stmt)
+                expired_edits = query_result.scalars().all()
 
                 for edit in expired_edits:
                     print(f"Unlocking expired edit {edit.edit_id}")

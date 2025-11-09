@@ -58,15 +58,15 @@ async def create_amenity(
     ):
         raise ForbiddenError("Insufficient permissions to create amenities")
 
-    obj = await svc_create_amenity(db, payload)
+    amenity_record = await svc_create_amenity(db, payload)
     try:
-        new_val = AmenityResponse.model_validate(obj).model_dump()
-        entity_id = f"amenity:{getattr(obj, 'amenity_id', None)}"
+        new_val = AmenityResponse.model_validate(amenity_record).model_dump()
+        entity_id = f"amenity:{getattr(amenity_record, 'amenity_id', None)}"
         await log_audit(entity="amenity", entity_id=entity_id, action="INSERT", new_value=new_val)
     except Exception:
         pass
 
-    return AmenityResponse.model_validate(obj).model_copy(update={"message": "Amenity created"})
+    return AmenityResponse.model_validate(amenity_record).model_copy(update={"message": "Amenity created"})
 
 
 @router.get("/")
@@ -76,10 +76,10 @@ async def get_amenities(
     _current_user=Depends(get_current_user),
 ):
     if amenity_id is not None:
-        amen = await svc_get_amenity(db, amenity_id)
+        amenity_record = await svc_get_amenity(db, amenity_id)
         rooms = await svc_get_rooms_for_amenity(db, amenity_id)
         return {
-            "amenity": Amenity.model_validate(amen).model_dump(),
+            "amenity": Amenity.model_validate(amenity_record).model_dump(),
             "rooms": [Room.model_validate(r).model_dump() for r in rooms],
         }
 
@@ -122,16 +122,16 @@ async def map_amenity(
     if len(amenity_ids) == 1:
         amenity_id = amenity_ids[0]
         single_payload = RoomAmenityMapCreate(room_id=payload.room_id, amenity_id=amenity_id)
-        obj = await svc_map_amenity(db, single_payload)
+        amenity_mapping_record = await svc_map_amenity(db, single_payload)
         try:
-            entity_id = f"room:{obj.room_id}:amenity:{obj.amenity_id}"
-            await log_audit(entity="room_amenity", entity_id=entity_id, action="INSERT", new_value=obj.__dict__)
+            entity_id = f"room:{amenity_mapping_record.room_id}:amenity:{amenity_mapping_record.amenity_id}"
+            await log_audit(entity="room_amenity", entity_id=entity_id, action="INSERT", new_value=amenity_mapping_record.__dict__)
         except Exception:
             pass
-        return RoomAmenityMapResponse.model_validate(obj).model_copy(update={"message": "Mapped successfully"})
+        return RoomAmenityMapResponse.model_validate(amenity_mapping_record).model_copy(update={"message": "Mapped successfully"})
 
     # Multiple amenities - use bulk mapping
-    result = await svc_map_amenities_bulk(db, payload.room_id, amenity_ids)
+    mapping_response = await svc_map_amenities_bulk(db, payload.room_id, amenity_ids)
     
     try:
         await log_audit(
@@ -142,9 +142,9 @@ async def map_amenity(
                 "room_id": payload.room_id,
                 "amenity_ids": amenity_ids,
                 "result_summary": {
-                    "successfully_mapped": len(result["successfully_mapped"]),
-                    "already_existed": len(result["already_existed"]),
-                    "failed": len(result["failed"]),
+                    "successfully_mapped": len(mapping_response["successfully_mapped"]),
+                    "already_existed": len(mapping_response["already_existed"]),
+                    "failed": len(mapping_response["failed"]),
                 }
             }
         )
@@ -152,11 +152,11 @@ async def map_amenity(
         pass
 
     return {
-        "room_id": result["room_id"],
-        "successfully_mapped": result["successfully_mapped"],
-        "already_existed": result["already_existed"],
-        "failed": result["failed"],
-        "message": f"Mapping completed: {len(result['successfully_mapped'])} mapped, {len(result['already_existed'])} already existed, {len(result['failed'])} failed"
+        "room_id": mapping_response["room_id"],
+        "successfully_mapped": mapping_response["successfully_mapped"],
+        "already_existed": mapping_response["already_existed"],
+        "failed": mapping_response["failed"],
+        "message": f"Mapping completed: {len(mapping_response['successfully_mapped'])} mapped, {len(mapping_response['already_existed'])} already existed, {len(mapping_response['failed'])} failed"
     }
 
 

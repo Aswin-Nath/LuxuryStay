@@ -42,10 +42,10 @@ async def assign_permissions_to_role(db: AsyncSession, role_id: int, permission_
 # 🔹 PERMISSIONS BY ROLE
 # ==========================================================
 async def get_permissions_by_role(db: AsyncSession, role_id: int):
-	perms = await fetch_permissions_by_role_id(db, role_id)
-	if not perms:
+	permissions_list = await fetch_permissions_by_role_id(db, role_id)
+	if not permissions_list:
 		raise HTTPException(status_code=404, detail=f"No permissions found for role_id {role_id}")
-	return perms
+	return permissions_list
 
 
 # ==========================================================
@@ -53,39 +53,39 @@ async def get_permissions_by_role(db: AsyncSession, role_id: int):
 # ==========================================================
 async def get_permissions_by_resources(db: AsyncSession, resources: List[str]):
 	valid_resources = []
-	for r in resources:
+	for resource in resources:
 		try:
-			valid_resources.append(Resources(r.upper()))
+			valid_resources.append(Resources(resource.upper()))
 		except ValueError:
-			raise HTTPException(status_code=400, detail=f"Invalid resource '{r}'")
+			raise HTTPException(status_code=400, detail=f"Invalid resource '{resource}'")
 
-	perms = await fetch_permissions_by_resources(db, valid_resources)
-	return perms
+	permissions_list = await fetch_permissions_by_resources(db, valid_resources)
+	return permissions_list
 
 
 # ==========================================================
 # 🔹 ROLES BY PERMISSION
 # ==========================================================
 async def get_roles_for_permission(db: AsyncSession, permission_id: int):
-	roles = await fetch_roles_by_permission_id(db, permission_id)
-	if not roles:
+	roles_list = await fetch_roles_by_permission_id(db, permission_id)
+	if not roles_list:
 		raise HTTPException(status_code=404, detail=f"No roles found for permission_id {permission_id}")
-	return roles
+	return roles_list
 
 
 # ==========================================================
 # 🔹 CREATE ROLE
 # ==========================================================
 async def create_role(db: AsyncSession, payload) -> Roles:
-	existing = await fetch_role_by_name(db, payload.role_name)
-	if existing:
+	existing_role = await fetch_role_by_name(db, payload.role_name)
+	if existing_role:
 		raise HTTPException(status_code=409, detail=f"Role '{payload.role_name}' already exists.")
 
 	role_data = payload.model_dump() if hasattr(payload, "model_dump") else dict(payload)
-	role_obj = await insert_role_record(db, role_data)
+	role_record = await insert_role_record(db, role_data)
 	await db.commit()
-	await db.refresh(role_obj)
-	return role_obj
+	await db.refresh(role_record)
+	return role_record
 
 
 # ==========================================================

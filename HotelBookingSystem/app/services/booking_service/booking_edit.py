@@ -82,10 +82,10 @@ async def review_booking_edit_service(edit_id: int, payload: ReviewPayload, db: 
     room_maps = await get_booking_room_maps(db, edit.booking_id)
     for key_str, room_ids in suggested.items():
         key = int(key_str)
-        for br in room_maps:
-            if getattr(br, "room_id") == key:
-                br.edit_suggested_rooms = room_ids
-                db.add(br)
+        for room_booking_map in room_maps:
+            if getattr(room_booking_map, "room_id") == key:
+                room_booking_map.edit_suggested_rooms = room_ids
+                db.add(room_booking_map)
 
     await update_booking_edit_status(
         db,
@@ -123,20 +123,20 @@ async def decision_on_booking_edit_service(edit_id: int, payload: DecisionPayloa
     is_pre_edit = edit.edit_type == "PRE"
     is_post_edit = edit.edit_type == "POST"
 
-    for br in room_maps:
-        if br.room_id not in affected_room_map_ids:
+    for room_booking_map in room_maps:
+        if room_booking_map.room_id not in affected_room_map_ids:
             continue
 
-        decision, decision_room_id = room_decisions[br.room_id]
+        decision, decision_room_id = room_decisions[room_booking_map.room_id]
 
         # --- ACCEPT CASE ---
         if decision == "ACCEPT":
-            accepted_rooms.append((br.room_id, decision_room_id))
-            await delete_booking_room_map(db, booking.booking_id, br.room_id)
+            accepted_rooms.append((room_booking_map.room_id, decision_room_id))
+            await delete_booking_room_map(db, booking.booking_id, room_booking_map.room_id)
 
             # Fetch new room details
-            room_obj = await get_room_by_id(db, decision_room_id)
-            room_type_id = getattr(room_obj, "room_type_id", getattr(br, "room_type_id", None))
+            room_record = await get_room_by_id(db, decision_room_id)
+            room_type_id = getattr(room_record, "room_type_id", getattr(room_booking_map, "room_type_id", None))
 
             new_map = BookingRoomMap(
                 booking_id=booking.booking_id,
@@ -149,12 +149,12 @@ async def decision_on_booking_edit_service(edit_id: int, payload: DecisionPayloa
 
         # --- KEEP CASE ---
         elif decision == "KEEP":
-            kept_rooms.append(br.room_id)
+            kept_rooms.append(room_booking_map.room_id)
             continue
 
         # --- REFUND CASE ---
         elif decision == "REFUND":
-            refund_rooms.append(br.room_id)
+            refund_rooms.append(room_booking_map.room_id)
             total_rooms = max(len(room_maps), 1)
             try:
                 per_room_amount = (Decimal(str(booking.total_price)) / Decimal(total_rooms)).quantize(Decimal("0.01"))
@@ -171,11 +171,11 @@ async def decision_on_booking_edit_service(edit_id: int, payload: DecisionPayloa
             refund_room_map = RefundRoomMap(
                 refund_id=refund.refund_id,
                 booking_id=booking.booking_id,
-                room_id=br.room_id,
+                room_id=room_booking_map.room_id,
                 refund_amount=per_room_amount,
             )
             await create_refund_room_map(db, refund_room_map)
-            await delete_booking_room_map(db, booking.booking_id, br.room_id)
+            await delete_booking_room_map(db, booking.booking_id, room_booking_map.room_id)
 
     # Determine edit status
     if accepted_rooms or refund_rooms:

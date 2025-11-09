@@ -33,26 +33,26 @@ async def create_offer(payload: OfferCreate, db: AsyncSession = Depends(get_db),
         raise ForbiddenError("Insufficient permissions to create offers")
 
     # Use current authenticated user as the creator — ignore any client-provided created_by value
-    obj = await svc_create_offer(db, payload, created_by=current_user.user_id)
+    offer_record = await svc_create_offer(db, payload, created_by=current_user.user_id)
     # invalidate offer list caches
     await invalidate_pattern("offers:*")
     # audit offer create
     try:
-        new_val = OfferResponse.model_validate(obj).model_dump(exclude={"created_at"})
-        entity_id = f"offer:{getattr(obj, 'offer_id', None)}"
+        new_val = OfferResponse.model_validate(offer_record).model_dump(exclude={"created_at"})
+        entity_id = f"offer:{getattr(offer_record, 'offer_id', None)}"
         await log_audit(entity="offer", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
     except Exception:
         pass
     # Use pydantic model_validate (from_attributes=True) to convert SQLAlchemy object
     # Exclude created_at from any API responses (handled internally by backend)
-    return OfferResponse.model_validate(obj).model_dump(exclude={"created_at"})
+    return OfferResponse.model_validate(offer_record).model_dump(exclude={"created_at"})
 
 
 @router.get("/{offer_id}", response_model=OfferResponse)
 async def get_offer(offer_id: int, db: AsyncSession = Depends(get_db)):
-    obj = await svc_get_offer(db, offer_id)
+    offer_record = await svc_get_offer(db, offer_id)
     # Exclude created_at from response
-    return OfferResponse.model_validate(obj).model_dump(exclude={"created_at"})
+    return OfferResponse.model_validate(offer_record).model_dump(exclude={"created_at"})
 
 
 @router.get("/", response_model=List[OfferResponse])
@@ -77,17 +77,17 @@ async def edit_offer(offer_id: int, payload: OfferCreate, db: AsyncSession = Dep
     ):
         raise ForbiddenError("Insufficient permissions to edit offers")
 
-    obj = await svc_update_offer(db, offer_id, payload, updated_by=current_user.user_id)
+    offer_record = await svc_update_offer(db, offer_id, payload, updated_by=current_user.user_id)
     # invalidate offers cache on update
     await invalidate_pattern("offers:*")
     # audit offer update
     try:
-        new_val = OfferResponse.model_validate(obj).model_dump(exclude={"created_at"})
-        entity_id = f"offer:{getattr(obj, 'offer_id', None)}"
+        new_val = OfferResponse.model_validate(offer_record).model_dump(exclude={"created_at"})
+        entity_id = f"offer:{getattr(offer_record, 'offer_id', None)}"
         await log_audit(entity="offer", entity_id=entity_id, action="UPDATE", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
     except Exception:
         pass
-    return OfferResponse.model_validate(obj).model_dump(exclude={"created_at"})
+    return OfferResponse.model_validate(offer_record).model_dump(exclude={"created_at"})
 
 
 @router.delete("/{offer_id}", status_code=status.HTTP_204_NO_CONTENT)

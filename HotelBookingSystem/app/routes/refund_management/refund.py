@@ -17,19 +17,19 @@ router = APIRouter(prefix="/refunds", tags=["REFUNDS"])
 @router.put("/{refund_id}", response_model=RefundResponse)
 async def complete_refund(refund_id: int, payload: RefundTransactionUpdate, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user), _ok: bool = Depends(ensure_not_basic_user)):
     # Admin-only endpoint to update refund transaction details and status (restricted fields only)
-    obj = await svc_update_refund(db, refund_id, payload, current_user)
+    refund_record = await svc_update_refund(db, refund_id, payload, current_user)
     # invalidate refund caches
     from app.core.cache import invalidate_pattern
     await invalidate_pattern("refunds:*")
     await invalidate_pattern(f"refund:{refund_id}")
     # audit refund transaction update
     try:
-        new_val = RefundResponse.model_validate(obj).model_dump()
+        new_val = RefundResponse.model_validate(refund_record).model_dump()
         entity_id = f"refund:{refund_id}"
         await log_audit(entity="refund", entity_id=entity_id, action="UPDATE", new_value=new_val, changed_by_user_id=getattr(current_user, 'user_id', None), user_id=getattr(current_user, 'user_id', None))
     except Exception:
         pass
-    return RefundResponse.model_validate(obj)
+    return RefundResponse.model_validate(refund_record)
 
 
 @router.get("/", response_model=list[RefundResponse])
@@ -58,11 +58,11 @@ async def get_refunds(
 
     # If a specific refund id requested, fetch and enforce ownership for basic users
     if refund_id is not None:
-        obj = await svc_get_refund(db, refund_id)
-        if is_basic_user and getattr(obj, "user_id", None) != current_user.user_id:
+        refund_record = await svc_get_refund(db, refund_id)
+        if is_basic_user and getattr(refund_record, "user_id", None) != current_user.user_id:
             from fastapi import HTTPException, status
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient privileges to view this refund")
-        return [RefundResponse.model_validate(obj)]
+        return [RefundResponse.model_validate(refund_record)]
 
     # Enforce that basic users can only query their own refunds
     if is_basic_user:

@@ -29,15 +29,15 @@ async def create_booking_edit(
     """
     Create a booking edit request (customer initiated).
     """
-    obj = await create_booking_edit_service(payload, db, current_user)
+    booking_edit_record = await create_booking_edit_service(payload, db, current_user)
     # audit booking edit create
     try:
-        new_val = BookingEditResponse.model_validate(obj).model_dump()
-        entity_id = f"booking_edit:{getattr(obj, 'edit_id', None)}"
+        new_val = BookingEditResponse.model_validate(booking_edit_record).model_dump()
+        entity_id = f"booking_edit:{getattr(booking_edit_record, 'edit_id', None)}"
         await log_audit(entity="booking_edit", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=getattr(current_user, 'user_id', None), user_id=getattr(current_user, 'user_id', None))
     except Exception:
         pass
-    return obj
+    return booking_edit_record
 
 
 @router.get("/{booking_id}", response_model=BookingEditResponse | list[BookingEditResponse])
@@ -62,8 +62,8 @@ async def get_booking_edits(
     if is_basic_user:
         # verify ownership by loading booking
 
-        res = await db.execute(select(Bookings).where(Bookings.booking_id == booking_id))
-        booking = res.scalars().first()
+        query_result = await db.execute(select(Bookings).where(Bookings.booking_id == booking_id))
+        booking = query_result.scalars().first()
         if not booking or booking.user_id != current_user.user_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient privileges to access this booking's edits")
     else:
@@ -127,15 +127,15 @@ async def review_booking_edit(
     ):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin permission required")
 
-    obj = await review_booking_edit_service(edit_id, payload, db, current_user)
+    booking_edit_record = await review_booking_edit_service(edit_id, payload, db, current_user)
     # audit admin review action
     try:
-        new_val = BookingEditResponse.model_validate(obj).model_dump()
-        entity_id = f"booking_edit:{getattr(obj, 'edit_id', None)}"
+        new_val = BookingEditResponse.model_validate(booking_edit_record).model_dump()
+        entity_id = f"booking_edit:{getattr(booking_edit_record, 'edit_id', None)}"
         await log_audit(entity="booking_edit", entity_id=entity_id, action="UPDATE", new_value=new_val, changed_by_user_id=getattr(current_user, 'user_id', None), user_id=getattr(current_user, 'user_id', None))
     except Exception:
         pass
-    return obj
+    return booking_edit_record
 
 
 # ✅ Customer Decision (Accept or Reject)
@@ -149,12 +149,12 @@ async def decision_booking_edit(
     """
     Customer accepts or rejects the admin-proposed edit.
     """
-    obj = await decision_on_booking_edit_service(edit_id, payload, db, current_user)
+    booking_edit_record = await decision_on_booking_edit_service(edit_id, payload, db, current_user)
     # audit customer decision
     try:
-        new_val = BookingEditResponse.model_validate(obj).model_dump()
-        entity_id = f"booking_edit:{getattr(obj, 'edit_id', None)}"
+        new_val = BookingEditResponse.model_validate(booking_edit_record).model_dump()
+        entity_id = f"booking_edit:{getattr(booking_edit_record, 'edit_id', None)}"
         await log_audit(entity="booking_edit", entity_id=entity_id, action="UPDATE", new_value=new_val, changed_by_user_id=getattr(current_user, 'user_id', None), user_id=getattr(current_user, 'user_id', None))
     except Exception:
         pass
-    return obj
+    return booking_edit_record

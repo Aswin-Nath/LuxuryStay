@@ -40,20 +40,20 @@ async def create_review(
         "rating": rating,
         "comment": comment,
     }
-    obj = await svc_create_review(db, payload, current_user)
+    review_record = await svc_create_review(db, payload, current_user)
     # invalidate reviews caches
     await invalidate_pattern("reviews:*")
     # audit review create
     try:
-        new_val = ReviewResponse.model_validate(obj).model_dump()
-        entity_id = f"review:{getattr(obj, 'review_id', None)}"
+        new_val = ReviewResponse.model_validate(review_record).model_dump()
+        entity_id = f"review:{getattr(review_record, 'review_id', None)}"
         await log_audit(entity="review", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
     except Exception:
         pass
     # Images should be uploaded via the dedicated review images endpoints:
     # POST /api/reviews/{review_id}/images  -> for uploading
     # DELETE /api/reviews/{review_id}/images -> for removing images
-    return ReviewResponse.model_validate(obj)
+    return ReviewResponse.model_validate(review_record)
 
 
 @router.get("/", response_model=Union[ReviewResponse, List[ReviewResponse]])
@@ -63,10 +63,10 @@ async def list_or_get_reviews(review_id: Optional[int] = None, booking_id: Optio
     Each returned review will include attached images in the `images` field.
     """
     if review_id is not None:
-        obj = await svc_get_review(db, review_id)
+        review_record = await svc_get_review(db, review_id)
         imgs = await get_images_for_review(db, review_id)
         img_resps = [ImageResponse.model_validate(i) for i in imgs]
-        return ReviewResponse.model_validate(obj).model_copy(update={"images": img_resps})
+        return ReviewResponse.model_validate(review_record).model_copy(update={"images": img_resps})
 
     cache_key = f"reviews:booking:{booking_id}:room:{room_id}:user:{user_id}"
     cached = await get_cached(cache_key)
@@ -86,31 +86,31 @@ async def list_or_get_reviews(review_id: Optional[int] = None, booking_id: Optio
 @router.put("/{review_id}/respond", response_model=ReviewResponse)
 async def respond_review(review_id: int, payload: AdminResponseCreate, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user), _ok: bool = Depends(ensure_not_basic_user)):
     # payload validated by Pydantic: {"admin_response": "..."}
-    obj = await svc_admin_respond(db, review_id, current_user, payload.admin_response)
+    review_record = await svc_admin_respond(db, review_id, current_user, payload.admin_response)
     await invalidate_pattern("reviews:*")
     # audit admin response
     try:
-        new_val = ReviewResponse.model_validate(obj).model_dump()
-        entity_id = f"review:{getattr(obj, 'review_id', None)}"
+        new_val = ReviewResponse.model_validate(review_record).model_dump()
+        entity_id = f"review:{getattr(review_record, 'review_id', None)}"
         await log_audit(entity="review", entity_id=entity_id, action="UPDATE", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
     except Exception:
         pass
-    return ReviewResponse.model_validate(obj)
+    return ReviewResponse.model_validate(review_record)
 
 
 @router.put("/{review_id}", response_model=ReviewResponse)
 async def update_review(review_id: int, payload: ReviewUpdate, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)):
     """Allow the authenticated reviewer to update their review's rating/comment."""
-    obj = await svc_update_review(db, review_id, payload, current_user)
+    review_record = await svc_update_review(db, review_id, payload, current_user)
     await invalidate_pattern("reviews:*")
     # audit user update
     try:
-        new_val = ReviewResponse.model_validate(obj).model_dump()
-        entity_id = f"review:{getattr(obj, 'review_id', None)}"
+        new_val = ReviewResponse.model_validate(review_record).model_dump()
+        entity_id = f"review:{getattr(review_record, 'review_id', None)}"
         await log_audit(entity="review", entity_id=entity_id, action="UPDATE", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
     except Exception:
         pass
-    return ReviewResponse.model_validate(obj)
+    return ReviewResponse.model_validate(review_record)
 
 
 @router.post("/{review_id}/images", response_model=List[ImageResponse], status_code=status.HTTP_201_CREATED)
@@ -133,12 +133,12 @@ async def add_review_image(
         caption = None
         if captions and idx < len(captions):
             caption = captions[idx]
-        obj = await create_image(db, entity_type="review", entity_id=review_id, image_url=url, caption=caption, uploaded_by=current_user.user_id)
-        images.append(obj)
+        image_record = await create_image(db, entity_type="review", entity_id=review_id, image_url=url, caption=caption, uploaded_by=current_user.user_id)
+        images.append(image_record)
         # audit each image created
         try:
-            new_val = ImageResponse.model_validate(obj).model_dump()
-            entity_id = f"review:{review_id}:image:{getattr(obj, 'image_id', None)}"
+            new_val = ImageResponse.model_validate(image_record).model_dump()
+            entity_id = f"review:{review_id}:image:{getattr(image_record, 'image_id', None)}"
             await log_audit(entity="review_image", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
         except Exception:
             pass

@@ -52,16 +52,16 @@ async def create_issue(
     payload = issue.model_dump()
     payload["user_id"] = user_id
 
-    obj = await svc_create_issue(db, payload)
+    issue_record = await svc_create_issue(db, payload)
 
     # audit issue create
     try:
-        new_val = IssueResponse.model_validate(obj, from_attributes=True).model_dump()
-        entity_id = f"issue:{getattr(obj, 'issue_id', None)}"
+        new_val = IssueResponse.model_validate(issue_record, from_attributes=True).model_dump()
+        entity_id = f"issue:{getattr(issue_record, 'issue_id', None)}"
         await log_audit(entity="issue", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
     except Exception:
         pass
-    return IssueResponse.model_validate(obj, from_attributes=True).model_dump()
+    return IssueResponse.model_validate(issue_record, from_attributes=True).model_dump()
 
 
 @router.post("/{issue_id}/images", response_model=List[ImageResponse], status_code=status.HTTP_201_CREATED)
@@ -72,19 +72,19 @@ async def add_issue_images(
     current_user: Users = Depends(get_current_user),
 ):
     """Upload one or more images for an issue. Only the issue owner may upload images."""
-    obj = await svc_get_issue(db, issue_id)
-    if obj.user_id != current_user.user_id:
+    issue_record = await svc_get_issue(db, issue_id)
+    if issue_record.user_id != current_user.user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to upload images for this issue")
 
     images = []
     for file in files:
         url = await save_uploaded_image(file)
-        img_obj = await create_image(db, entity_type="issue", entity_id=issue_id, image_url=url, caption=None, uploaded_by=current_user.user_id)
-        images.append(img_obj)
+        image_record = await create_image(db, entity_type="issue", entity_id=issue_id, image_url=url, caption=None, uploaded_by=current_user.user_id)
+        images.append(image_record)
         # audit each image created
         try:
-            new_val = ImageResponse.model_validate(img_obj).model_dump()
-            entity_id = f"issue:{issue_id}:image:{getattr(img_obj, 'image_id', None)}"
+            new_val = ImageResponse.model_validate(image_record).model_dump()
+            entity_id = f"issue:{issue_id}:image:{getattr(image_record, 'image_id', None)}"
             await log_audit(entity="issue_image", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
         except Exception:
             pass
@@ -116,10 +116,10 @@ async def issues(
     is_admin = _require_issue_write(user_permissions)
 
     if issue_id is not None:
-        obj = await svc_get_issue(db, issue_id)
-        if not is_admin and obj.user_id != current_user.user_id:
+        issue_record = await svc_get_issue(db, issue_id)
+        if not is_admin and issue_record.user_id != current_user.user_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to view this issue")
-        return IssueResponse.model_validate(obj).model_dump()
+        return IssueResponse.model_validate(issue_record).model_dump()
 
     # list
     if is_admin:
@@ -141,12 +141,12 @@ async def get_chats(
 
     Allowed for admins (issue-write) or the owning user.
     """
-    obj = await svc_get_issue(db, issue_id)
+    issue_record = await svc_get_issue(db, issue_id)
 
     is_admin = _require_issue_write(user_permissions)
 
 
-    if not is_admin and obj.user_id != current_user.user_id:
+    if not is_admin and issue_record.user_id != current_user.user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to view chats for this issue")
 
     items = await svc_list_chats(db, issue_id)
@@ -177,11 +177,11 @@ async def update_issue(
     - If `status` is provided, requester must have ISSUE_RESOLUTION WRITE permission.
     - Only the issue owner may update title/description.
     """
-    obj = await svc_get_issue(db, issue_id)
+    issue_record = await svc_get_issue(db, issue_id)
 
     is_admin = _require_issue_write(user_permissions)
 
-    is_owner = obj.user_id == current_user.user_id
+    is_owner = issue_record.user_id == current_user.user_id
 
     if not is_admin and not is_owner:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to edit this issue")
@@ -226,11 +226,11 @@ async def post_chat(
     current_user: Users = Depends(get_current_user),
     user_permissions: dict = Depends(get_user_permissions),
 ):
-    obj = await svc_get_issue(db, issue_id)
+    issue_record = await svc_get_issue(db, issue_id)
 
     is_admin = _require_issue_write(user_permissions)
 
-    if not is_admin and obj.user_id != current_user.user_id:
+    if not is_admin and issue_record.user_id != current_user.user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to post chat to this issue")
 
     chat = await svc_add_chat(db, issue_id, current_user.user_id, message)

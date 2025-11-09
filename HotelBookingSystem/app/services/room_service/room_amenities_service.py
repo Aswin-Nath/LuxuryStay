@@ -19,21 +19,21 @@ from app.crud.room_management.room_amenities import (
 # 🔹 MAP AMENITY TO ROOM
 # ==========================================================
 async def map_amenity(db: AsyncSession, payload) -> None:
-	room = await fetch_room_by_id(db, payload.room_id)
-	if not room:
+	room_record = await fetch_room_by_id(db, payload.room_id)
+	if not room_record:
 		raise HTTPException(status_code=404, detail="Room not found")
 
-	amen = await fetch_amenity_by_id(db, payload.amenity_id)
-	if not amen:
+	amenity_record = await fetch_amenity_by_id(db, payload.amenity_id)
+	if not amenity_record:
 		raise HTTPException(status_code=404, detail="Amenity not found")
 
-	existing = await fetch_mapping_exists(db, payload.room_id, payload.amenity_id)
-	if existing:
+	existing_mapping = await fetch_mapping_exists(db, payload.room_id, payload.amenity_id)
+	if existing_mapping:
 		raise HTTPException(status_code=409, detail="Mapping already exists")
 
-	obj = await insert_room_amenity_map(db, payload.model_dump())
+	amenity_mapping = await insert_room_amenity_map(db, payload.model_dump())
 	await db.commit()
-	return obj
+	return amenity_mapping
 
 
 # ==========================================================
@@ -54,11 +54,11 @@ async def get_rooms_for_amenity(db: AsyncSession, amenity_id: int) -> List[Rooms
 # 🔹 UNMAP AMENITY FROM ROOM
 # ==========================================================
 async def unmap_amenity(db: AsyncSession, room_id: int, amenity_id: int) -> None:
-	obj = await fetch_mapping_by_ids(db, room_id, amenity_id)
-	if not obj:
+	amenity_mapping = await fetch_mapping_by_ids(db, room_id, amenity_id)
+	if not amenity_mapping:
 		raise HTTPException(status_code=404, detail="Mapping not found")
 
-	await delete_room_amenity_map(db, obj)
+	await delete_room_amenity_map(db, amenity_mapping)
 	await db.commit()
 
 
@@ -70,8 +70,8 @@ async def map_amenities_bulk(db: AsyncSession, room_id: int, amenity_ids: List[i
 	Map multiple amenities to a room.
 	Returns a summary of successfully mapped, already existing, and failed mappings.
 	"""
-	room = await fetch_room_by_id(db, room_id)
-	if not room:
+	room_record = await fetch_room_by_id(db, room_id)
+	if not room_record:
 		raise HTTPException(status_code=404, detail="Room not found")
 
 	result = {
@@ -84,8 +84,8 @@ async def map_amenities_bulk(db: AsyncSession, room_id: int, amenity_ids: List[i
 	for amenity_id in amenity_ids:
 		try:
 			# Check if amenity exists
-			amen = await fetch_amenity_by_id(db, amenity_id)
-			if not amen:
+			amenity_record = await fetch_amenity_by_id(db, amenity_id)
+			if not amenity_record:
 				result["failed"].append({
 					"amenity_id": amenity_id,
 					"reason": "Amenity not found"
@@ -93,8 +93,8 @@ async def map_amenities_bulk(db: AsyncSession, room_id: int, amenity_ids: List[i
 				continue
 
 			# Check if mapping already exists
-			existing = await fetch_mapping_exists(db, room_id, amenity_id)
-			if existing:
+			existing_mapping = await fetch_mapping_exists(db, room_id, amenity_id)
+			if existing_mapping:
 				result["already_existed"].append(amenity_id)
 				continue
 
@@ -120,8 +120,8 @@ async def unmap_amenities_bulk(db: AsyncSession, room_id: int, amenity_ids: List
 	Unmap multiple amenities from a room.
 	Returns a summary of successfully unmapped, not found, and failed unmappings.
 	"""
-	room = await fetch_room_by_id(db, room_id)
-	if not room:
+	room_record = await fetch_room_by_id(db, room_id)
+	if not room_record:
 		raise HTTPException(status_code=404, detail="Room not found")
 
 	result = {
@@ -133,12 +133,12 @@ async def unmap_amenities_bulk(db: AsyncSession, room_id: int, amenity_ids: List
 
 	for amenity_id in amenity_ids:
 		try:
-			obj = await fetch_mapping_by_ids(db, room_id, amenity_id)
-			if not obj:
+			amenity_mapping = await fetch_mapping_by_ids(db, room_id, amenity_id)
+			if not amenity_mapping:
 				result["not_found"].append(amenity_id)
 				continue
 
-			await delete_room_amenity_map(db, obj)
+			await delete_room_amenity_map(db, amenity_mapping)
 			result["successfully_unmapped"].append(amenity_id)
 
 		except Exception as e:

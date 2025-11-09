@@ -15,17 +15,17 @@ from app.models.sqlalchemy_schemas.notifications import Notifications
 # ==========================================================
 
 async def add_notification(db: AsyncSession, payload, commit: bool = True) -> Notifications:
-    data = payload.model_dump() if hasattr(payload, "model_dump") else dict(payload)
+    notification_data = payload.model_dump() if hasattr(payload, "model_dump") else dict(payload)
 
-    recipient_user_id = data.get("recipient_user_id") or data.get("resc_user_id")
+    recipient_user_id = notification_data.get("recipient_user_id") or notification_data.get("resc_user_id")
     if recipient_user_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="recipient_user_id is required",
         )
 
-    title = data.get("title")
-    message = data.get("message")
+    title = notification_data.get("title")
+    message = notification_data.get("message")
     if not title or not message:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -34,22 +34,22 @@ async def add_notification(db: AsyncSession, payload, commit: bool = True) -> No
 
     notification_payload = {
         "recipient_user_id": recipient_user_id,
-        "notification_type": data.get("notification_type"),
-        "entity_type": data.get("entity_type"),
-        "entity_id": data.get("entity_id"),
+        "notification_type": notification_data.get("notification_type"),
+        "entity_type": notification_data.get("entity_type"),
+        "entity_id": notification_data.get("entity_id"),
         "title": title,
         "message": message,
     }
 
     try:
-        obj = await insert_notification_record(db, notification_payload)
+        notification_record = await insert_notification_record(db, notification_payload)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create notification: {str(e)}",
         )
 
-    return obj
+    return notification_record
 
 
 # ==========================================================

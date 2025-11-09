@@ -26,8 +26,8 @@ async def get_booking_by_id(db: AsyncSession, booking_id: int) -> Bookings:
         .options(joinedload(Bookings.rooms), joinedload(Bookings.taxes))
         .where(Bookings.booking_id == booking_id)
     )
-    res = await db.execute(stmt)
-    booking = res.scalars().first()
+    query_result = await db.execute(stmt)
+    booking = query_result.scalars().first()
     if not booking:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
     return booking
@@ -41,8 +41,8 @@ async def list_all_bookings(db: AsyncSession, limit: int = 20, offset: int = 0) 
         .limit(limit)
         .offset(offset)
     )
-    res = await db.execute(stmt)
-    return res.unique().scalars().all()
+    query_result = await db.execute(stmt)
+    return query_result.unique().scalars().all()
 
 
 async def update_booking_status(db: AsyncSession, booking_id: int, status: str) -> None:
@@ -78,8 +78,8 @@ async def create_booking_room_map(db: AsyncSession, brm_obj: BookingRoomMap) -> 
 async def get_rooms_for_booking(db: AsyncSession, booking_id: int) -> List[BookingRoomMap]:
     """Retrieve room mappings for a booking."""
     stmt = select(BookingRoomMap).where(BookingRoomMap.booking_id == booking_id)
-    res = await db.execute(stmt)
-    return res.scalars().all()
+    query_result = await db.execute(stmt)
+    return query_result.scalars().all()
 
 
 async def delete_booking_room_maps(db: AsyncSession, booking_id: int) -> None:
@@ -103,8 +103,8 @@ async def create_booking_tax_map(db: AsyncSession, tax_map_obj: BookingTaxMap) -
 async def get_tax_for_booking(db: AsyncSession, booking_id: int) -> Optional[BookingTaxMap]:
     """Retrieve tax mapping for a booking."""
     stmt = select(BookingTaxMap).where(BookingTaxMap.booking_id == booking_id)
-    res = await db.execute(stmt)
-    return res.scalars().first()
+    query_result = await db.execute(stmt)
+    return query_result.scalars().first()
 
 
 async def delete_booking_tax_map(db: AsyncSession, booking_id: int) -> None:
@@ -128,8 +128,8 @@ async def create_payment(db: AsyncSession, payment_obj: PaymentsModel) -> Paymen
 async def get_payment_by_booking(db: AsyncSession, booking_id: int) -> Optional[PaymentsModel]:
     """Retrieve payment record linked to a booking."""
     stmt = select(PaymentsModel).where(PaymentsModel.booking_id == booking_id)
-    res = await db.execute(stmt)
-    return res.scalars().first()
+    query_result = await db.execute(stmt)
+    return query_result.scalars().first()
 
 
 async def delete_payment(db: AsyncSession, payment_id: int) -> None:

@@ -20,10 +20,10 @@ from app.crud.wishlist_management.wishlist import (
 
 async def add_to_wishlist(db: AsyncSession, payload, current_user) -> Wishlist:
     """Create a wishlist entry. Enforce uniqueness per user+item (room_type or offer)."""
-    data = payload.model_dump()
+    wishlist_data = payload.model_dump()
     user_id = current_user.user_id
-    room_type_id = data.get("room_type_id")
-    offer_id = data.get("offer_id")
+    room_type_id = wishlist_data.get("room_type_id")
+    offer_id = wishlist_data.get("offer_id")
 
     # Normalize optional FKs (0 → None)
     room_type_id = None if room_type_id == 0 else room_type_id
@@ -36,17 +36,17 @@ async def add_to_wishlist(db: AsyncSession, payload, current_user) -> Wishlist:
         )
 
     # Check uniqueness
-    existing = await get_wishlist_by_user_and_item(db, user_id, room_type_id, offer_id)
-    if existing:
+    existing_item = await get_wishlist_by_user_and_item(db, user_id, room_type_id, offer_id)
+    if existing_item:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Item already in wishlist",
         )
 
     # Create entry
-    obj = await create_wishlist_entry(db, user_id, room_type_id, offer_id)
+    wishlist_entry = await create_wishlist_entry(db, user_id, room_type_id, offer_id)
     await db.commit()
-    return obj
+    return wishlist_entry
 
 
 # ==========================================================
@@ -66,18 +66,18 @@ async def list_user_wishlist(
 
 async def remove_wishlist(db: AsyncSession, wishlist_id: int, user_id: int):
     """Soft-delete a wishlist item for a user."""
-    obj = await get_wishlist_by_id(db, wishlist_id)
-    if not obj:
+    wishlist_entry = await get_wishlist_by_id(db, wishlist_id)
+    if not wishlist_entry:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Wishlist item not found",
         )
-    if obj.user_id != user_id:
+    if wishlist_entry.user_id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not allowed to remove this wishlist item",
         )
 
-    await soft_delete_wishlist_entry(db, obj)
+    await soft_delete_wishlist_entry(db, wishlist_entry)
     await db.commit()
     return {"message": "Wishlist item removed"}

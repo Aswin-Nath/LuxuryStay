@@ -43,12 +43,12 @@ async def update_my_profile(
 ):
     """Update allowed profile fields."""
     content_type = request.headers.get("content-type", "")
-    data = {}
+    profile_update_data = {}
     if content_type.startswith("application/json"):
-        data = await request.json()
+        profile_update_data = await request.json()
     elif payload:
-        data = payload.model_dump(exclude_unset=True)
-    return await update_my_profile_service(db, current_user, data)
+        profile_update_data = payload.model_dump(exclude_unset=True)
+    return await update_my_profile_service(db, current_user, profile_update_data)
 
 
 # ==========================================================

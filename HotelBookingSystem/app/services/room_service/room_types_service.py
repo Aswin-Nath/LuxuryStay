@@ -17,14 +17,14 @@ from app.crud.room_management.room_types import (
 # 🔹 CREATE ROOM TYPE
 # ==========================================================
 async def create_room_type(db: AsyncSession, payload) -> RoomTypes:
-	existing = await fetch_room_type_by_name(db, payload.type_name)
-	if existing:
+	existing_type = await fetch_room_type_by_name(db, payload.type_name)
+	if existing_type:
 		raise HTTPException(status_code=409, detail="Room type already exists")
 
-	obj = await insert_room_type(db, payload.model_dump())
+	room_type_record = await insert_room_type(db, payload.model_dump())
 	await db.commit()
-	await db.refresh(obj)
-	return obj
+	await db.refresh(room_type_record)
+	return room_type_record
 
 
 # ==========================================================
@@ -38,34 +38,34 @@ async def list_room_types(db: AsyncSession, include_deleted: Optional[bool] = Fa
 # 🔹 GET ROOM TYPE
 # ==========================================================
 async def get_room_type(db: AsyncSession, room_type_id: int) -> RoomTypes:
-	obj = await fetch_room_type_by_id(db, room_type_id)
-	if not obj:
+	room_type_record = await fetch_room_type_by_id(db, room_type_id)
+	if not room_type_record:
 		raise HTTPException(status_code=404, detail="Room type not found")
-	return obj
+	return room_type_record
 
 
 # ==========================================================
 # 🔹 UPDATE ROOM TYPE
 # ==========================================================
 async def update_room_type(db: AsyncSession, room_type_id: int, payload) -> RoomTypes:
-	obj = await fetch_room_type_by_id(db, room_type_id)
-	if not obj:
+	room_type_record = await fetch_room_type_by_id(db, room_type_id)
+	if not room_type_record:
 		raise HTTPException(status_code=404, detail="Room type not found")
 
-	data = payload.model_dump(exclude_unset=True)
-	await update_room_type_by_id(db, room_type_id, data)
+	room_type_data = payload.model_dump(exclude_unset=True)
+	await update_room_type_by_id(db, room_type_id, room_type_data)
 	await db.commit()
 
-	obj = await fetch_room_type_by_id(db, room_type_id)
-	return obj
+	room_type_record = await fetch_room_type_by_id(db, room_type_id)
+	return room_type_record
 
 
 # ==========================================================
 # 🔹 SOFT DELETE ROOM TYPE
 # ==========================================================
 async def soft_delete_room_type(db: AsyncSession, room_type_id: int) -> None:
-	obj = await fetch_room_type_by_id(db, room_type_id)
-	if not obj:
+	room_type_record = await fetch_room_type_by_id(db, room_type_id)
+	if not room_type_record:
 		raise HTTPException(status_code=404, detail="Room type not found")
 
 	await mark_room_type_deleted(db, room_type_id)

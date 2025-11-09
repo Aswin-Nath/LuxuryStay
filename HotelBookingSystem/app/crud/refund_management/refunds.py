@@ -14,17 +14,17 @@ from app.models.sqlalchemy_schemas.rooms import Rooms
 # ==========================================================
 
 async def insert_refund_record(db: AsyncSession, data: dict) -> Refunds:
-    obj = Refunds(**data)
-    db.add(obj)
+    refund_record = Refunds(**data)
+    db.add(refund_record)
     await db.flush()
-    return obj
+    return refund_record
 
 
 async def insert_refund_room_map(db: AsyncSession, data: dict) -> RefundRoomMap:
-    obj = RefundRoomMap(**data)
-    db.add(obj)
+    refund_room_map_record = RefundRoomMap(**data)
+    db.add(refund_room_map_record)
     await db.flush()
-    return obj
+    return refund_room_map_record
 
 
 # ==========================================================
@@ -32,23 +32,23 @@ async def insert_refund_room_map(db: AsyncSession, data: dict) -> RefundRoomMap:
 # ==========================================================
 
 async def fetch_refund_by_id(db: AsyncSession, refund_id: int) -> Optional[Refunds]:
-    res = await db.execute(select(Refunds).where(Refunds.refund_id == refund_id))
-    return res.scalars().first()
+    query_result = await db.execute(select(Refunds).where(Refunds.refund_id == refund_id))
+    return query_result.scalars().first()
 
 
 async def fetch_booking_by_id(db: AsyncSession, booking_id: int) -> Optional[Bookings]:
-    res = await db.execute(select(Bookings).where(Bookings.booking_id == booking_id))
-    return res.scalars().first()
+    query_result = await db.execute(select(Bookings).where(Bookings.booking_id == booking_id))
+    return query_result.scalars().first()
 
 
 async def fetch_room_by_id(db: AsyncSession, room_id: int) -> Optional[Rooms]:
-    res = await db.execute(select(Rooms).where(Rooms.room_id == room_id))
-    return res.scalars().first()
+    query_result = await db.execute(select(Rooms).where(Rooms.room_id == room_id))
+    return query_result.scalars().first()
 
 
 async def fetch_booking_room_maps(db: AsyncSession, booking_id: int) -> List[BookingRoomMap]:
-    res = await db.execute(select(BookingRoomMap).where(BookingRoomMap.booking_id == booking_id))
-    return res.scalars().all()
+    query_result = await db.execute(select(BookingRoomMap).where(BookingRoomMap.booking_id == booking_id))
+    return query_result.scalars().all()
 
 
 async def fetch_refunds_filtered(
@@ -76,5 +76,5 @@ async def fetch_refunds_filtered(
         stmt = stmt.where(Refunds.initiated_at >= from_date)
     if to_date is not None:
         stmt = stmt.where(Refunds.initiated_at <= to_date)
-    res = await db.execute(stmt)
-    return res.scalars().all()
+    query_result = await db.execute(stmt)
+    return query_result.scalars().all()

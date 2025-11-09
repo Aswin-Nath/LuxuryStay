@@ -17,14 +17,14 @@ from app.crud.room_management.amenities import (
 # 🔹 CREATE AMENITY
 # ==========================================================
 async def create_amenity(db: AsyncSession, payload) -> RoomAmenities:
-	existing = await fetch_amenity_by_name(db, payload.amenity_name)
-	if existing:
+	existing_amenity = await fetch_amenity_by_name(db, payload.amenity_name)
+	if existing_amenity:
 		raise HTTPException(status_code=409, detail="Amenity already exists")
 
-	obj = await insert_amenity(db, payload.model_dump())
+	amenity_record = await insert_amenity(db, payload.model_dump())
 	await db.commit()
-	await db.refresh(obj)
-	return obj
+	await db.refresh(amenity_record)
+	return amenity_record
 
 
 # ==========================================================
@@ -38,27 +38,27 @@ async def list_amenities(db: AsyncSession) -> List[RoomAmenities]:
 # 🔹 GET AMENITY
 # ==========================================================
 async def get_amenity(db: AsyncSession, amenity_id: int) -> RoomAmenities:
-	obj = await fetch_amenity_by_id(db, amenity_id)
-	if not obj:
+	amenity_record = await fetch_amenity_by_id(db, amenity_id)
+	if not amenity_record:
 		raise HTTPException(status_code=404, detail="Amenity not found")
-	return obj
+	return amenity_record
 
 
 # ==========================================================
 # 🔹 DELETE AMENITY
 # ==========================================================
 async def delete_amenity(db: AsyncSession, amenity_id: int) -> None:
-	obj = await fetch_amenity_by_id(db, amenity_id)
-	if not obj:
+	amenity_record = await fetch_amenity_by_id(db, amenity_id)
+	if not amenity_record:
 		raise HTTPException(status_code=404, detail="Amenity not found")
 
 	# check if amenity is mapped to any rooms using a COUNT query
-	count_result = await db.execute(
+	mapped_count = await db.execute(
 		select(func.count()).select_from(RoomAmenityMap).where(RoomAmenityMap.amenity_id == amenity_id)
 	)
-	count = count_result.scalar()
-	if count > 0:
+	count_result = mapped_count.scalar()
+	if count_result > 0:
 		raise HTTPException(status_code=400, detail="Amenity is mapped to rooms; unmap first")
 
-	await remove_amenity(db, obj)
+	await remove_amenity(db, amenity_record)
 	await db.commit()

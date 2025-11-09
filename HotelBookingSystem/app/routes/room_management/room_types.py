@@ -29,18 +29,18 @@ async def create_room_type(payload: RoomTypeCreate, db: AsyncSession = Depends(g
     ):
         raise ForbiddenError("Insufficient permissions to create room types")
 
-    obj = await svc_create_room_type(db, payload)
+    room_type_record = await svc_create_room_type(db, payload)
     # audit create
     try:
-        new_val = RoomTypeResponse.model_validate(obj).model_dump()
-        entity_id = f"room_type:{getattr(obj, 'room_type_id', None)}"
+        new_val = RoomTypeResponse.model_validate(room_type_record).model_dump()
+        entity_id = f"room_type:{getattr(room_type_record, 'room_type_id', None)}"
         changed_by = getattr(locals().get('current_user'), 'user_id', None) or getattr(payload, 'user_id', None)
         await log_audit(entity="room_type", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=changed_by, user_id=changed_by)
     except Exception:
         pass
     # invalidate room-types cache
     await invalidate_pattern("room_types:*")
-    return RoomTypeResponse.model_validate(obj).model_copy(update={"message": "Room type created"})
+    return RoomTypeResponse.model_validate(room_type_record).model_copy(update={"message": "Room type created"})
 
 
 @router.get("/")
@@ -58,8 +58,8 @@ async def get_room_types(
     Authentication required; basic users are allowed.
     """
     if room_type_id is not None:
-        obj = await svc_get_room_type(db, room_type_id)
-        return RoomTypeResponse.model_validate(obj)
+        room_type_record = await svc_get_room_type(db, room_type_id)
+        return RoomTypeResponse.model_validate(room_type_record)
 
     cache_key = f"room_types:include_deleted:{include_deleted}"
     cached = await get_cached(cache_key)
@@ -67,9 +67,9 @@ async def get_room_types(
         return cached
 
     items = await svc_list_room_types(db, include_deleted=include_deleted)
-    result = [RoomTypeResponse.model_validate(r).model_copy(update={"message": "Fetched successfully"}) for r in items]
-    await set_cached(cache_key, result, ttl=300)
-    return result
+    response_list = [RoomTypeResponse.model_validate(r).model_copy(update={"message": "Fetched successfully"}) for r in items]
+    await set_cached(cache_key, response_list, ttl=300)
+    return response_list
 
 
 @router.put("/{room_type_id}", response_model=RoomTypeResponse)
@@ -80,17 +80,17 @@ async def update_room_type(room_type_id: int, payload: RoomTypeUpdate, db: Async
     ):
         raise ForbiddenError("Insufficient permissions to update room types")
 
-    obj = await svc_update_room_type(db, room_type_id, payload)
+    room_type_record = await svc_update_room_type(db, room_type_id, payload)
     # audit update
     try:
-        new_val = RoomTypeResponse.model_validate(obj).model_dump()
-        entity_id = f"room_type:{getattr(obj, 'room_type_id', None)}"
+        new_val = RoomTypeResponse.model_validate(room_type_record).model_dump()
+        entity_id = f"room_type:{getattr(room_type_record, 'room_type_id', None)}"
         changed_by = getattr(locals().get('current_user'), 'user_id', None)
         await log_audit(entity="room_type", entity_id=entity_id, action="UPDATE", new_value=new_val, changed_by_user_id=changed_by, user_id=changed_by)
     except Exception:
         pass
     await invalidate_pattern("room_types:*")
-    return RoomTypeResponse.model_validate(obj).model_copy(update={"message": "Updated successfully"})
+    return RoomTypeResponse.model_validate(room_type_record).model_copy(update={"message": "Updated successfully"})
 
 
 @router.delete("/{room_type_id}")

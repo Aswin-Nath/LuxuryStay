@@ -13,11 +13,11 @@ async def create_wishlist_entry(
     db: AsyncSession, user_id: int, room_type_id: Optional[int], offer_id: Optional[int]
 ) -> Wishlist:
     """Insert a new wishlist record."""
-    obj = Wishlist(user_id=user_id, room_type_id=room_type_id, offer_id=offer_id)
-    db.add(obj)
+    wishlist_record = Wishlist(user_id=user_id, room_type_id=room_type_id, offer_id=offer_id)
+    db.add(wishlist_record)
     await db.flush()
-    await db.refresh(obj)
-    return obj
+    await db.refresh(wishlist_record)
+    return wishlist_record
 
 
 # ==========================================================
@@ -37,8 +37,8 @@ async def get_wishlist_by_user_and_item(
     if offer_id:
         stmt = stmt.where(Wishlist.offer_id == offer_id)
 
-    res = await db.execute(stmt)
-    return res.scalars().first()
+    query_result = await db.execute(stmt)
+    return query_result.scalars().first()
 
 
 async def get_user_wishlist(
@@ -48,15 +48,15 @@ async def get_user_wishlist(
     stmt = select(Wishlist).where(Wishlist.user_id == user_id)
     if not include_deleted:
         stmt = stmt.where(Wishlist.is_deleted == False)
-    res = await db.execute(stmt)
-    return res.scalars().all()
+    query_result = await db.execute(stmt)
+    return query_result.scalars().all()
 
 
 async def get_wishlist_by_id(db: AsyncSession, wishlist_id: int) -> Optional[Wishlist]:
     """Fetch a wishlist entry by its ID."""
     stmt = select(Wishlist).where(Wishlist.wishlist_id == wishlist_id)
-    res = await db.execute(stmt)
-    return res.scalars().first()
+    query_result = await db.execute(stmt)
+    return query_result.scalars().first()
 
 
 # ==========================================================

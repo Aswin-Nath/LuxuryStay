@@ -25,9 +25,9 @@ async def cancel_booking_and_create_refund(db: AsyncSession, booking_id: int, pa
     if booking.user_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="Cannot cancel a booking you do not own")
 
-    data = payload.model_dump() if hasattr(payload, "model_dump") else dict(payload)
-    refund_rooms = data.get("refund_rooms") or []
-    full_cancel = bool(data.get("full_cancellation", False)) or (len(refund_rooms) == 0)
+    refund_payload = payload.model_dump() if hasattr(payload, "model_dump") else dict(payload)
+    refund_rooms = refund_payload.get("refund_rooms") or []
+    full_cancel = bool(refund_payload.get("full_cancellation", False)) or (len(refund_rooms) == 0)
 
     nights = max((booking.check_out - booking.check_in).days, 1)
     brm_items = await fetch_booking_room_maps(db, booking.booking_id)
@@ -60,9 +60,9 @@ async def cancel_booking_and_create_refund(db: AsyncSession, booking_id: int, pa
         type="CANCELLATION" if full_cancel else "PARTIAL_CANCEL",
         status="INITIATED",
         refund_amount=refund_amount,
-        remarks=data.get("remarks"),
-        transaction_method_id=data.get("transaction_method_id"),
-        transaction_number=data.get("transaction_number"),
+        remarks=refund_payload.get("remarks"),
+        transaction_method_id=refund_payload.get("transaction_method_id"),
+        transaction_number=refund_payload.get("transaction_number"),
     )
 
     rf = await insert_refund_record(db, rf_data)
@@ -90,39 +90,39 @@ async def cancel_booking_and_create_refund(db: AsyncSession, booking_id: int, pa
 
 
 async def update_refund_transaction(db: AsyncSession, refund_id: int, payload, admin_user):
-    rf = await fetch_refund_by_id(db, refund_id)
-    if not rf:
+    refund_record = await fetch_refund_by_id(db, refund_id)
+    if not refund_record:
         raise HTTPException(status_code=404, detail="Refund not found")
 
-    data = payload.model_dump() if hasattr(payload, "model_dump") else dict(payload)
-    status_val = data.get("status")
-    method_id = data.get("transaction_method_id")
-    trans_num = data.get("transaction_number")
+    refund_update_data = payload.model_dump() if hasattr(payload, "model_dump") else dict(payload)
+    status_val = refund_update_data.get("status")
+    method_id = refund_update_data.get("transaction_method_id")
+    trans_num = refund_update_data.get("transaction_number")
 
     if method_id is not None:
-        q = await db.execute(
+        payment_method_query = await db.execute(
             select(PaymentMethodUtility).where(PaymentMethodUtility.method_id == method_id)
         )
-        pm = q.scalars().first()
-        if not pm:
+        payment_method = payment_method_query.scalars().first()
+        if not payment_method:
             raise HTTPException(status_code=400, detail="Invalid transaction_method_id")
-        rf.transaction_method_id = method_id
+        refund_record.transaction_method_id = method_id
 
     if trans_num is not None:
-        rf.transaction_number = trans_num
+        refund_record.transaction_number = trans_num
 
     if status_val is not None:
-        rf.status = status_val
+        refund_record.status = status_val
         now = datetime.utcnow()
         if status_val.upper() == "PROCESSED":
-            rf.processed_at = now
+            refund_record.processed_at = now
         if status_val.upper() == "COMPLETED":
-            rf.processed_at = now
-            rf.completed_at = now
+            refund_record.processed_at = now
+            refund_record.completed_at = now
 
-    db.add(rf)
+    db.add(refund_record)
     await db.commit()
-    return rf
+    return refund_record
 
 
 async def get_refund(db: AsyncSession, refund_id: int):

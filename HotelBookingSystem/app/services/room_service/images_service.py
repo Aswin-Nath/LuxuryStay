@@ -25,19 +25,19 @@ async def create_image(
 
     # Validate entity existence depending on entity_type
     if effective_entity_type == "room_type":
-        res = await db.execute(select(RoomTypes).where(RoomTypes.room_type_id == entity_id))
-        room_type = res.scalars().first()
+        query_result = await db.execute(select(RoomTypes).where(RoomTypes.room_type_id == entity_id))
+        room_type = query_result.scalars().first()
         if not room_type:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room type not found")
     elif effective_entity_type == "review":
         # ensure review exists
-        res = await db.execute(select(Reviews).where(Reviews.review_id == entity_id))
-        review = res.scalars().first()
+        query_result = await db.execute(select(Reviews).where(Reviews.review_id == entity_id))
+        review = query_result.scalars().first()
         if not review:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review not found")
     elif effective_entity_type=="issue":
-        res=await db.execute(select(Issues).where(Issues.issue_id==entity_id))
-        issue=res.scalars().first()
+        query_result=await db.execute(select(Issues).where(Issues.issue_id==entity_id))
+        issue=query_result.scalars().first()
         if not issue:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found")
 
@@ -60,11 +60,11 @@ async def create_image(
         "uploaded_by": uploaded_by,
     }
 
-    obj = Images(**data)
-    db.add(obj)
+    image_record = Images(**data)
+    db.add(image_record)
     await db.commit()
-    await db.refresh(obj)
-    return obj
+    await db.refresh(image_record)
+    return image_record
 
 
 async def get_images_for_room(db: AsyncSession, room_type_id: int) -> List[Images]:
@@ -78,8 +78,8 @@ async def get_images_for_room(db: AsyncSession, room_type_id: int) -> List[Image
         .where(Images.entity_id == room_type_id)
         .where(Images.is_deleted == False)
     )
-    res = await db.execute(stmt)
-    items = res.scalars().all()
+    query_result = await db.execute(stmt)
+    items = query_result.scalars().all()
     return items
 
 
@@ -91,8 +91,8 @@ async def get_images_for_review(db: AsyncSession, review_id: int) -> List[Images
         .where(Images.entity_id == review_id)
         .where(Images.is_deleted == False)
     )
-    res = await db.execute(stmt)
-    items = res.scalars().all()
+    query_result = await db.execute(stmt)
+    items = query_result.scalars().all()
     return items
 
 
@@ -104,8 +104,8 @@ async def get_images_for_entity(db: AsyncSession, entity_type: str, entity_id: i
         .where(Images.entity_id == entity_id)
         .where(Images.is_deleted == False)
     )
-    res = await db.execute(stmt)
-    items = res.scalars().all()
+    query_result = await db.execute(stmt)
+    items = query_result.scalars().all()
     return items
 
 
@@ -115,14 +115,14 @@ async def hard_delete_image(db: AsyncSession, image_id: int, requester_id: int |
     This removes the DB row; it does NOT attempt to delete remote file contents (external upload providers may
     require separate deletion APIs).
     """
-    q = await db.execute(select(Images).where(Images.image_id == image_id))
-    obj = q.scalars().first()
-    if not obj:
+    query = await db.execute(select(Images).where(Images.image_id == image_id))
+    image_record = query.scalars().first()
+    if not image_record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
 
     # If it's a room/room_type image, requester must either be uploader or have room_service.WRITE
     allowed = False
-    if requester_id and obj.uploaded_by and requester_id == obj.uploaded_by:
+    if requester_id and image_record.uploaded_by and requester_id == image_record.uploaded_by:
         allowed = True
     if requester_permissions:
         if (
@@ -131,17 +131,17 @@ async def hard_delete_image(db: AsyncSession, image_id: int, requester_id: int |
         ):
             allowed = True
     # Allow review owner to delete images attached to their review
-    if not allowed and obj.entity_type == "review" and requester_id:
-        res = await db.execute(select(Reviews).where(Reviews.review_id == obj.entity_id))
-        review = res.scalars().first()
-        if review and review.user_id == requester_id:
+    if not allowed and image_record.entity_type == "review" and requester_id:
+        query_result = await db.execute(select(Reviews).where(Reviews.review_id == image_record.entity_id))
+        review_record = query_result.scalars().first()
+        if review_record and review_record.user_id == requester_id:
             allowed = True
 
     if not allowed:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to delete image")
 
     # Permanently delete the DB row
-    await db.delete(obj)
+    await db.delete(image_record)
     await db.commit()
 
 
@@ -150,14 +150,14 @@ async def set_image_primary(db: AsyncSession, image_id: int, requester_id: int |
 
     Only uploader or users with ROOM_MANAGEMENT.WRITE may perform this.
     """
-    q = await db.execute(select(Images).where(Images.image_id == image_id))
-    obj = q.scalars().first()
-    if not obj:
+    query = await db.execute(select(Images).where(Images.image_id == image_id))
+    image_record = query.scalars().first()
+    if not image_record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
 
     # Permission check: uploader or ROOM_MANAGEMENT.WRITE
     allowed = False
-    if requester_id and obj.uploaded_by and requester_id == obj.uploaded_by:
+    if requester_id and image_record.uploaded_by and requester_id == image_record.uploaded_by:
         allowed = True
     if requester_permissions:
         if (
@@ -172,14 +172,14 @@ async def set_image_primary(db: AsyncSession, image_id: int, requester_id: int |
     # Unset other primary images for same entity
     await db.execute(
         update(Images)
-        .where(Images.entity_type == obj.entity_type)
-        .where(Images.entity_id == obj.entity_id)
+        .where(Images.entity_type == image_record.entity_type)
+        .where(Images.entity_id == image_record.entity_id)
         .values(is_primary=False)
     )
 
     # Set this image primary
-    obj.is_primary = True
-    db.add(obj)
+    image_record.is_primary = True
+    db.add(image_record)
     await db.commit()
-    await db.refresh(obj)
+    await db.refresh(image_record)
     return {"message":"setted as primary"}
