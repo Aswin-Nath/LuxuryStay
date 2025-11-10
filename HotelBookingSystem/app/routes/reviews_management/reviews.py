@@ -36,7 +36,33 @@ async def create_review(
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
 ):
-    # Build payload dict and create review
+    """
+    Submit a new review for a completed booking.
+    
+    Creates a review for a room after checkout. Users can rate (1-5 stars) and provide
+    comments. Reviews are attached to bookings and can include images via separate endpoint.
+    One review per booking allowed. Draft reviews can be updated before finalization.
+    
+    Args:
+        booking_id (int): The completed booking to review (user must own booking).
+        room_type_id (Optional[int]): Room type being reviewed (optional).
+        rating (int): Star rating (1-5).
+        comment (Optional[str]): User's review text/feedback.
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user creating review.
+    
+    Returns:
+        ReviewResponse: Created review with review_id, rating, comment, timestamps.
+    
+    Raises:
+        HTTPException (404): If booking_id not found or not owned by user.
+        HTTPException (409): If review already exists for this booking.
+    
+    Side Effects:
+        - Invalidates reviews cache pattern ("reviews:*").
+        - Creates audit log entry.
+        - Images uploaded separately via /reviews/{review_id}/images.
+    """
     payload = {
         "booking_id": booking_id,
         "room_type_id": room_type_id,
@@ -64,9 +90,27 @@ async def create_review(
 # ============================================================================
 @router.get("/", response_model=Union[ReviewResponse, List[ReviewResponse]])
 async def list_or_get_reviews(review_id: Optional[int] = None, booking_id: Optional[int] = None, room_id: Optional[int] = None, user_id: Optional[int] = None, db: AsyncSession = Depends(get_db)):
-    """If review_id is provided return that single review (with images), otherwise return list (optionally filtered by booking_id).
-
-    Each returned review will include attached images in the `images` field.
+    """
+    Retrieve reviews (single or list with optional filters).
+    
+    Flexible GET endpoint supporting two modes:
+    - **By review_id:** Returns single review with all attached images.
+    - **By filters:** Returns list of reviews optionally filtered by booking_id, room_id, or user_id.
+    
+    Results are cached for 120 seconds to reduce database load. Images are included in responses.
+    
+    Args:
+        review_id (Optional[int]): Query parameter - if provided, return specific review.
+        booking_id (Optional[int]): Query parameter - filter reviews by booking.
+        room_id (Optional[int]): Query parameter - filter reviews by room.
+        user_id (Optional[int]): Query parameter - filter reviews by reviewer.
+        db (AsyncSession): Database session dependency.
+    
+    Returns:
+        ReviewResponse | List[ReviewResponse]: Single review or list with attached images.
+    
+    Raises:
+        HTTPException (404): If review_id not found.
     """
     if review_id is not None:
         review_record = await svc_get_review(db, review_id)
@@ -94,7 +138,33 @@ async def list_or_get_reviews(review_id: Optional[int] = None, booking_id: Optio
 # ============================================================================
 @router.put("/{review_id}/respond", response_model=ReviewResponse)
 async def respond_review(review_id: int, payload: AdminResponseCreate, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user), _ok: bool = Depends(ensure_not_basic_user)):
-    # payload validated by Pydantic: {"admin_response": "..."}
+    """
+    Add admin response to a customer review.
+    
+    Allows admin/manager to respond to customer reviews publicly. Response is visible to
+    all users viewing the review. One response per review allowed. Useful for addressing
+    concerns or thanking guests for feedback.
+    
+    **Authorization:** Requires non-basic user (admin/manager role).
+    
+    Args:
+        review_id (int): The review ID to respond to.
+        payload (AdminResponseCreate): Admin's response message.
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated admin user.
+        _ok (bool): Non-basic user check.
+    
+    Returns:
+        ReviewResponse: Updated review with admin_response field populated.
+    
+    Raises:
+        HTTPException (403): If user is basic user.
+        HTTPException (404): If review_id not found.
+    
+    Side Effects:
+        - Invalidates reviews cache pattern ("reviews:*").
+        - Creates audit log entry.
+    """
     review_record = await svc_admin_respond(db, review_id, current_user, payload.admin_response)
     await invalidate_pattern("reviews:*")
     # audit admin response
@@ -112,7 +182,31 @@ async def respond_review(review_id: int, payload: AdminResponseCreate, db: Async
 # ============================================================================
 @router.put("/{review_id}", response_model=ReviewResponse)
 async def update_review(review_id: int, payload: ReviewUpdate, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)):
-    """Allow the authenticated reviewer to update their review's rating/comment."""
+    """
+    Update user's own review (rating and/or comment).
+    
+    Allows the reviewer to modify their rating or comment after submission. Only the review
+    owner can edit. Admin response (if any) remains unchanged. Changes are timestamped for
+    auditing. Useful for correcting typos or adjusting ratings after reflection.
+    
+    Args:
+        review_id (int): The review ID to update (must own).
+        payload (ReviewUpdate): Updated rating and/or comment.
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user (review owner).
+    
+    Returns:
+        ReviewResponse: Updated review with new rating/comment and updated_at timestamp.
+    
+    Raises:
+        HTTPException (403): If user doesn't own the review.
+        HTTPException (404): If review_id not found.
+    
+    Side Effects:
+        - Invalidates reviews cache pattern ("reviews:*").
+        - Creates audit log entry.
+        - Updates updated_at timestamp.
+    """
     review_record = await svc_update_review(db, review_id, payload, current_user)
     await invalidate_pattern("reviews:*")
     # audit user update
@@ -136,10 +230,32 @@ async def add_review_image(
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
 ):
-    """Upload one or more images for a review.
-
-    captions may be provided as repeated form fields (`-F "captions=one" -F "captions=two"`) and
-    will be applied to files by index. If there are fewer captions than files, remaining captions are None.
+    """
+    Upload one or more images for a review.
+    
+    Attaches photos/screenshots to a review for visual context. Supports batch uploads with
+    optional captions for each image. Images are stored via external provider and linked to
+    the review. Maximum file size and format restrictions enforced by upload service.
+    
+    Args:
+        review_id (int): The review to attach images to.
+        files (List[UploadFile]): Image files to upload (must be images).
+        captions (Optional[List[str]]): Optional captions for each image (matched by index).
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user (review owner).
+    
+    Returns:
+        List[ImageResponse]: Created image records with URLs and captions.
+    
+    Raises:
+        HTTPException (400): If file format invalid or too large.
+        HTTPException (404): If review_id not found.
+    
+    Side Effects:
+        - Uploads files to external storage.
+        - Creates image records in database.
+        - Invalidates review cache.
+        - Creates audit log entry per image.
     """
     images = []
     for idx, file in enumerate(files):
@@ -168,6 +284,22 @@ async def add_review_image(
 # ============================================================================
 @router.get("/{review_id}/images", response_model=List[ImageResponse])
 async def list_review_images(review_id: int, db: AsyncSession = Depends(get_db)):
+    """
+    Retrieve all images attached to a review.
+    
+    Fetches the complete list of images/photos associated with a specific review. Includes
+    URLs, captions, and uploader information. Useful for gallery views and detailed review pages.
+    
+    Args:
+        review_id (int): The review to fetch images for.
+        db (AsyncSession): Database session dependency.
+    
+    Returns:
+        List[ImageResponse]: List of image records with URLs and metadata.
+    
+    Raises:
+        HTTPException (404): If review_id not found (returns empty list by default).
+    """
     items = await get_images_for_review(db, review_id)
     return [ImageResponse.model_validate(i) for i in items]
 
@@ -177,9 +309,32 @@ async def list_review_images(review_id: int, db: AsyncSession = Depends(get_db))
 # ============================================================================
 @router.delete("/{review_id}/images")
 async def delete_review_images(review_id: int, image_ids: List[int], db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user), user_permissions: dict = Depends(get_user_permissions)):
-    """Delete specified image ids attached to a review. Only the uploader/review-owner or ROOM_MANAGEMENT.WRITE may delete.
-
-    Caller must provide a list of image_ids (JSON body).
+    """
+    Delete images from a review.
+    
+    Removes specified images from a review. Only the image uploader or users with
+    ROOM_MANAGEMENT:WRITE permission can delete images. Images are permanently removed
+    from storage and database.
+    
+    Args:
+        review_id (int): The review containing images.
+        image_ids (List[int]): JSON body with list of image_ids to delete.
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user.
+        user_permissions (dict): Current user's permissions.
+    
+    Returns:
+        dict: Confirmation with list of deleted image_ids and success message.
+    
+    Raises:
+        HTTPException (400): If image_ids list is empty.
+        HTTPException (403): If user not image uploader and lacks ROOM_MANAGEMENT:WRITE.
+        HTTPException (404): If image_id not found.
+    
+    Side Effects:
+        - Removes images from external storage.
+        - Invalidates review cache.
+        - Creates audit log entry per deletion.
     """
     if not image_ids:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="image_ids is required")

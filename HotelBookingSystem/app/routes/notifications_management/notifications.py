@@ -25,6 +25,28 @@ async def list_notifications(
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
 ):
+    """
+    Retrieve authenticated user's notifications (paginated and filterable).
+    
+    Fetches user's notifications with optional filtering by read status and soft-delete status.
+    Supports pagination with limit and offset. Useful for notification inbox and alert management.
+    Returns most recent notifications first.
+    
+    Args:
+        include_read (bool): Include already-read notifications (default True).
+        include_deleted (bool): Include soft-deleted notifications (default False).
+        limit (int): Maximum notifications to return (default 50).
+        offset (int): Number of notifications to skip for pagination (default 0).
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user (notification owner).
+    
+    Returns:
+        List[NotificationResponse]: List of notifications matching filters with read status and timestamps.
+    
+    Note:
+        - Only returns current user's notifications.
+        - Deleted notifications can be optionally included.
+    """
     items = await svc_list(db, current_user.user_id, include_read=include_read, include_deleted=include_deleted, limit=limit, offset=offset)
     return [NotificationResponse.model_validate(i).model_dump() for i in items]
 
@@ -34,7 +56,28 @@ async def list_notifications(
 # ============================================================================
 @router.put("/{notification_id}/read", status_code=status.HTTP_200_OK)
 async def mark_read(notification_id: int, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)):
-    """Mark the authenticated user's notification as read."""
+    """
+    Mark a notification as read.
+    
+    Updates notification read status. Only the notification recipient can mark their own notifications
+    as read. Marking as read changes UI display and affects notification counts.
+    
+    Args:
+        notification_id (int): The notification ID to mark as read (must own).
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user (notification owner).
+    
+    Returns:
+        dict: Confirmation with notification_id and success message.
+    
+    Raises:
+        HTTPException (403): If user doesn't own the notification.
+        HTTPException (404): If notification_id not found.
+    
+    Side Effects:
+        - Updates notification read_at timestamp.
+        - Creates audit log entry.
+    """
     await svc_mark_read(db, notification_id, current_user.user_id)
     # audit mark read
     try:

@@ -24,8 +24,32 @@ async def add_wishlist(
     current_user: Users = Depends(get_current_user),
     _basic_user_check: bool = Depends(ensure_only_basic_user),
 ):
-    """Add item to wishlist - only available for basic/customer users"""
-    # enforce ownership
+    """
+    Add a room to user's wishlist.
+    
+    Allows basic users (customers) to save rooms for later consideration. Each user can wishlist
+    multiple rooms. Duplicate wishlists for same room are prevented (upsert behavior). Useful for
+    price tracking and future booking reminders.
+    
+    **Authorization:** Only basic users (customers) allowed.
+    
+    Args:
+        payload (WishlistCreate): Request with room_id to add.
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user (must be basic user/customer).
+        _basic_user_check (bool): Ensure only basic users can add to wishlist.
+    
+    Returns:
+        WishlistResponse: Created wishlist entry with wishlist_id and timestamps.
+    
+    Raises:
+        HTTPException (403): If user is not a basic user (admin/manager).
+        HTTPException (404): If room_id not found.
+    
+    Side Effects:
+        - Invalidates user's wishlist cache.
+        - Creates audit log entry.
+    """
 
     wishlist_record = await svc_add(db, payload, current_user)
     # audit wishlist create
@@ -45,6 +69,22 @@ async def add_wishlist(
 # ============================================================================
 @router.get("/", response_model=List[WishlistResponse])
 async def list_wishlist(db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)):
+    """
+    Retrieve authenticated user's complete wishlist.
+    
+    Fetches all rooms saved to the user's wishlist. Results are cached for 120 seconds.
+    Returns room details, prices, and wishlist timestamps. Empty list if no wishlisted rooms.
+    
+    Args:
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user (wishlist owner).
+    
+    Returns:
+        List[WishlistResponse]: List of wishlisted room items with details.
+    
+    Side Effects:
+        - Uses Redis cache with TTL of 120 seconds (key: "wishlist:user:{user_id}").
+    """
     cache_key = f"wishlist:user:{current_user.user_id}"
     cached = await get_cached(cache_key)
     if cached is not None:
@@ -63,7 +103,28 @@ async def list_wishlist(db: AsyncSession = Depends(get_db), current_user: Users 
 # ============================================================================
 @router.delete("/{wishlist_id}", status_code=status.HTTP_201_CREATED)
 async def delete_wishlist(wishlist_id: int, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)):
-    await svc_remove(db, wishlist_id, current_user.user_id)
+    """
+    Remove a room from user's wishlist.
+    
+    Removes a specific wishlisted item. Only the wishlist owner can remove their own items.
+    Attempting to remove another user's wishlist item returns 403.
+    
+    Args:
+        wishlist_id (int): The wishlist entry ID to remove.
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user (must own wishlist entry).
+    
+    Returns:
+        dict: Confirmation message for successful deletion.
+    
+    Raises:
+        HTTPException (403): If user doesn't own the wishlist entry.
+        HTTPException (404): If wishlist_id not found.
+    
+    Side Effects:
+        - Deletes wishlist entry from database.
+        - Invalidates user's wishlist cache pattern.
+    """
     # invalidate this user's wishlist cache
     await invalidate_pattern(f"wishlist:user:{current_user.user_id}:*")
     return {"message":"wishlist deleted successfully"}

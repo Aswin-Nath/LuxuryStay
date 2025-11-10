@@ -19,6 +19,36 @@ router = APIRouter(prefix="/refunds", tags=["REFUNDS"])
 # ============================================================================
 @router.put("/{refund_id}", response_model=RefundResponse)
 async def complete_refund(refund_id: int, payload: RefundTransactionUpdate, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user), _ok: bool = Depends(ensure_not_basic_user)):
+    """
+    Update refund transaction and process refund status.
+    
+    Admin-only endpoint to update refund transaction details including payment method,
+    transaction number, and refund status. Automatically sets processed_at and completed_at
+    timestamps based on status transitions. Invalidates refund caches and logs audit entry.
+    
+    Args:
+        refund_id (int): Path parameter - The ID of the refund to update.
+        payload (RefundTransactionUpdate): Request body containing status, transaction_method_id, transaction_number.
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Current authenticated admin user (required, must not be basic user).
+        _ok (bool): Authorization check dependency (ensure_not_basic_user).
+    
+    Returns:
+        RefundResponse: Updated refund record with new status and transaction details.
+    
+    Raises:
+        HTTPException (403): If user is a basic user (role_id == 1).
+        HTTPException (404): If refund ID not found.
+        HTTPException (400): If transaction_method_id is invalid.
+    
+    Example:
+        PUT /refunds/123
+        {
+            "status": "COMPLETED",
+            "transaction_method_id": 1,
+            "transaction_number": "TXN123456"
+        }
+    """
     # Admin-only endpoint to update refund transaction details and status (restricted fields only)
     refund_record = await svc_update_refund(db, refund_id, payload, current_user)
     # invalidate refund caches
@@ -52,6 +82,46 @@ async def get_refunds(
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
 ):
+    """
+    Retrieve refunds with role-based access control and filtering.
+    
+    Unified endpoint supporting single refund retrieval and paginated list queries.
+    Basic users (role_id == 1) can only access their own refunds; non-basic users
+    (admin/manager) can query across all refunds. Results are cached for 60 seconds.
+    
+    Args:
+        refund_id (Optional[int]): Query parameter - Specific refund ID to fetch.
+        booking_id (Optional[int]): Query parameter - Filter by booking ID.
+        user_id (Optional[int]): Query parameter - Filter by refund owner user ID.
+        status (Optional[str]): Query parameter - Filter by refund status.
+        type (Optional[str]): Query parameter - Filter by refund type.
+        from_date (Optional[datetime]): Query parameter - Filter refunds from date onwards.
+        to_date (Optional[datetime]): Query parameter - Filter refunds up to date.
+        limit (int): Query parameter - Maximum records to return (default 20).
+        offset (int): Query parameter - Number of records to skip (default 0).
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Current authenticated user (required).
+    
+    Returns:
+        list[RefundResponse]: List of refund records matching filters and pagination.
+    
+    Raises:
+        HTTPException (403): If basic user tries to access other users' refunds or
+                             if basic user requests refund_id of another user.
+    
+    Access Rules:
+        - Basic users: Can only view their own refunds (user_id auto-set to current user).
+        - Non-basic users: Can query all refunds with any combination of filters.
+        - Single refund fetch: If refund_id provided, returns that one refund (after auth check).
+        - List fetch: Returns paginated results with limit and offset.
+    
+    Caching:
+        - Results cached in Redis with 60-second TTL using cache key:
+          `refunds:query:refund_id:{refund_id}:booking_id:{booking_id}:...`
+    
+    Example:
+        GET /refunds/?user_id=5&status=COMPLETED&limit=10&offset=0
+    """
     """Unified GET for refunds.
 
     Rules:

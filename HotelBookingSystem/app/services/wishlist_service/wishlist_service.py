@@ -19,7 +19,25 @@ from app.crud.wishlist_management.wishlist import (
 # ==========================================================
 
 async def add_to_wishlist(db: AsyncSession, payload, current_user) -> Wishlist:
-    """Create a wishlist entry. Enforce uniqueness per user+item (room_type or offer)."""
+    """
+    Add an item (room type or offer) to user's wishlist.
+    
+    Creates a wishlist entry for either a room_type_id or offer_id. Enforces uniqueness
+    per user and item - duplicate additions are rejected with 409 CONFLICT. Validates that
+    at least one of room_type_id or offer_id is provided.
+    
+    Args:
+        db (AsyncSession): Database session for executing queries.
+        payload: Pydantic model containing room_type_id and/or offer_id (0 treated as None).
+        current_user: The authenticated user (user_id extracted for ownership).
+    
+    Returns:
+        Wishlist: The newly created wishlist entry record.
+    
+    Raises:
+        HTTPException (400): If neither room_type_id nor offer_id is provided.
+        HTTPException (409): If item already exists in user's wishlist.
+    """
     wishlist_data = payload.model_dump()
     user_id = current_user.user_id
     room_type_id = wishlist_data.get("room_type_id")
@@ -56,7 +74,20 @@ async def add_to_wishlist(db: AsyncSession, payload, current_user) -> Wishlist:
 async def list_user_wishlist(
     db: AsyncSession, user_id: int, include_deleted: bool = False
 ) -> List[Wishlist]:
-    """Return all wishlist items for the user."""
+    """
+    Retrieve all wishlist items for a user.
+    
+    Fetches the wishlist entries for a specific user, optionally including soft-deleted items.
+    Returns all entries regardless of whether they reference room types or offers.
+    
+    Args:
+        db (AsyncSession): Database session for executing the query.
+        user_id (int): The ID of the user.
+        include_deleted (bool): If True, includes soft-deleted wishlist items (default False).
+    
+    Returns:
+        List[Wishlist]: All active (or all) wishlist entries for the user.
+    """
     return await get_user_wishlist(db, user_id, include_deleted)
 
 
@@ -65,7 +96,24 @@ async def list_user_wishlist(
 # ==========================================================
 
 async def remove_wishlist(db: AsyncSession, wishlist_id: int, user_id: int):
-    """Soft-delete a wishlist item for a user."""
+    """
+    Remove a wishlist item by soft-deleting it.
+    
+    Soft-deletes a wishlist entry for a user. Validates that the user owns the wishlist item
+    before deletion. The entry remains in the database marked as deleted for audit purposes.
+    
+    Args:
+        db (AsyncSession): Database session for executing queries.
+        wishlist_id (int): The ID of the wishlist item to remove.
+        user_id (int): The ID of the current user (must own the item).
+    
+    Returns:
+        dict: Confirmation message {"message": "Wishlist item removed"}.
+    
+    Raises:
+        HTTPException (404): If wishlist item not found.
+        HTTPException (403): If user does not own the wishlist item.
+    """
     wishlist_entry = await get_wishlist_by_id(db, wishlist_id)
     if not wishlist_entry:
         raise HTTPException(

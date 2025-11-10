@@ -15,6 +15,26 @@ from app.models.sqlalchemy_schemas.notifications import Notifications
 # ==========================================================
 
 async def add_notification(db: AsyncSession, payload, commit: bool = True) -> Notifications:
+    """
+    Create a new notification for a recipient user.
+    
+    Validates required fields (recipient_user_id, title, message) and creates a notification
+    record with optional entity references (e.g., booking_id, room_id). Notification types
+    can be BOOKING, REFUND, OFFER, REVIEW, etc.
+    
+    Args:
+        db (AsyncSession): Database session for executing the query.
+        payload: Pydantic model containing recipient_user_id, title, message, notification_type,
+                 entity_type, entity_id.
+        commit (bool): Whether to commit changes (default True).
+    
+    Returns:
+        Notifications: The newly created notification record.
+    
+    Raises:
+        HTTPException (400): If recipient_user_id, title, or message is missing.
+        HTTPException (500): If database insert fails.
+    """
     notification_data = payload.model_dump() if hasattr(payload, "model_dump") else dict(payload)
 
     recipient_user_id = notification_data.get("recipient_user_id") or notification_data.get("resc_user_id")
@@ -64,6 +84,23 @@ async def list_user_notifications(
     limit: Optional[int] = 50,
     offset: Optional[int] = 0,
 ) -> List[Notifications]:
+    """
+    Retrieve notifications for a specific user with optional filtering.
+    
+    Fetches user notifications with support for including/excluding read and soft-deleted
+    notifications. Results are sorted by most recent and paginated.
+    
+    Args:
+        db (AsyncSession): Database session for executing the query.
+        user_id (int): The ID of the recipient user.
+        include_read (bool): Whether to include already-read notifications (default True).
+        include_deleted (bool): Whether to include soft-deleted notifications (default False).
+        limit (Optional[int]): Maximum number of records to return (default 50).
+        offset (Optional[int]): Number of records to skip for pagination (default 0).
+    
+    Returns:
+        List[Notifications]: List of notification records for the user, sorted newest first.
+    """
     notifications = await fetch_user_notifications(
         db,
         user_id=user_id,
@@ -80,6 +117,24 @@ async def list_user_notifications(
 # ==========================================================
 
 async def mark_notification_as_read(db: AsyncSession, notification_id: int, user_id: int):
+    """
+    Mark a notification as read by the recipient user.
+    
+    Sets the is_read flag on a notification record. Validates that the current user
+    is the notification recipient (ownership check).
+    
+    Args:
+        db (AsyncSession): Database session for executing the query.
+        notification_id (int): The ID of the notification to mark as read.
+        user_id (int): The ID of the current user (must be notification recipient).
+    
+    Returns:
+        dict: Message confirmation {"message": "marked as read"}.
+    
+    Raises:
+        HTTPException (404): If notification not found.
+        HTTPException (403): If user is not the notification recipient.
+    """
     notification = await mark_as_read_record(db, notification_id)
     if not notification:
         raise HTTPException(

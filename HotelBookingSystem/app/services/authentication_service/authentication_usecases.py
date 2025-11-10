@@ -34,12 +34,28 @@ from app.utils.auth_utils import is_valid_email, is_strong_password, is_valid_in
 
 async def signup(db: AsyncSession, payload: UserCreate, created_by: Optional[int] = None) -> Users:
     """
-    User signup with email, password, and phone validation.
+    User signup with comprehensive validation.
     
-    Validations:
-    - Email: standard email format
-    - Password: strong password requirements (uppercase, lowercase, digit, special char)
-    - Phone: Indian format (10 digits starting with 6-9)
+    Creates a new user account with email, password, and phone validation.
+    Only basic users (role_id=1) can be created through this endpoint.
+    
+    Validations performed:
+    - Email: Standard email format validation
+    - Password: Strong password requirements (uppercase, lowercase, digit, special char, min 8 chars)
+    - Phone: Indian phone format (10 digits starting with 6-9)
+    - Email uniqueness: No duplicate emails allowed
+    
+    Args:
+        db (AsyncSession): Database session for executing queries.
+        payload (UserCreate): Pydantic model with full_name, email, password, phone_number.
+        created_by (Optional[int]): User ID of admin creating this user (if applicable).
+    
+    Returns:
+        Users: The newly created user record with user_id assigned.
+    
+    Raises:
+        BadRequestError: If email format invalid, password weak, phone invalid, or admin creation attempted.
+        ConflictError: If email already registered.
     """
     
     if payload.role_id is not None and payload.role_id != 1:
@@ -89,6 +105,25 @@ async def request_otp(
     verification_type: Optional[str],
     client_host: Optional[str] = None,
 ):
+    """
+    Generate and send OTP for email verification or password reset.
+    
+    Creates an OTP verification record and sends it via email (if configured).
+    If email sending fails, OTP is returned in response for testing purposes.
+    
+    Args:
+        db (AsyncSession): Database session for executing queries.
+        email (str): User's email address.
+        verification_type (Optional[str]): Type of verification (PASSWORD_RESET, EMAIL_VERIFICATION, etc).
+        client_host (Optional[str]): Client IP address for logging purposes.
+    
+    Returns:
+        dict: Message indicating OTP created; may include otp_code if email send failed.
+    
+    Raises:
+        NotFoundError: If user with given email not found.
+        BadRequestError: If verification_type is invalid.
+    """
     user = await get_user_by_email(db, email)
     if not user:
         raise NotFoundError("User not found")
@@ -121,6 +156,27 @@ async def verify_otp_flow(
     verification_type: Optional[str] = None,
     new_password: Optional[str] = None,
 ):
+    """
+    Verify OTP and optionally reset password.
+    
+    Validates OTP against stored verification record. If verification type is PASSWORD_RESET
+    and new_password is provided, updates user's password.
+    
+    Args:
+        db (AsyncSession): Database session for executing queries.
+        email (str): User's email address.
+        otp (str): The OTP code to verify.
+        verification_type (Optional[str]): Type of verification (PASSWORD_RESET, EMAIL_VERIFICATION, etc).
+        new_password (Optional[str]): New password (required for PASSWORD_RESET type).
+    
+    Returns:
+        dict: Success message with "message" key.
+    
+    Raises:
+        NotFoundError: If user with email not found.
+        BadRequestError: If OTP invalid, expired, or verification_type invalid.
+        UnauthorizedError: If OTP verification fails.
+    """
     user = await get_user_by_email(db, email)
     if not user:
         raise NotFoundError("User not found")
@@ -152,6 +208,25 @@ async def change_password(
     current_password: str,
     new_password: str,
 ):
+    """
+    Change password for authenticated user.
+    
+    Validates current password before allowing change to new password.
+    New password must meet strong password requirements.
+    
+    Args:
+        db (AsyncSession): Database session for executing queries.
+        current_user (Users): The authenticated user object.
+        current_password (str): User's current password for verification.
+        new_password (str): The new password to set.
+    
+    Returns:
+        dict: Success message with "message" key.
+    
+    Raises:
+        UnauthorizedError: If current password is incorrect.
+        BadRequestError: If new password doesn't meet requirements.
+    """
     auth_user = await authentication_core.authenticate_user(
         db, email=current_user.email, password=current_password
     )
@@ -173,6 +248,25 @@ async def login_flow(
     device_info: Optional[str] = None,
     client_host: Optional[str] = None,
 ) -> TokenResponse:
+    """
+    Authenticate user and create login session.
+    
+    Validates email and password credentials, creates a session record,
+    and returns access and refresh tokens.
+    
+    Args:
+        db (AsyncSession): Database session for executing queries.
+        email (str): User's email address.
+        password (str): User's password (plain text, validated against hash).
+        device_info (Optional[str]): Device information for session tracking.
+        client_host (Optional[str]): Client IP address for session logging.
+    
+    Returns:
+        TokenResponse: Object with access_token, refresh_token, expires_in, token_type, role_id.
+    
+    Raises:
+        UnauthorizedError: If email/password combination is invalid.
+    """
     user = await authentication_core.authenticate_user(db, email=email, password=password)
     if not user:
         raise UnauthorizedError("Invalid credentials")
@@ -201,6 +295,23 @@ async def login_flow(
 # ==========================================================
 
 async def refresh_tokens(db: AsyncSession, access_token: str) -> TokenResponse:
+    """
+    Refresh access token using current access token.
+    
+    Validates existing access token and generates a new one with extended expiration.
+    Useful for extending user sessions without re-authentication.
+    
+    Args:
+        db (AsyncSession): Database session for executing queries.
+        access_token (str): The current/existing access token.
+    
+    Returns:
+        TokenResponse: Object with new access_token, refresh_token, expires_in, token_type, role_id.
+    
+    Raises:
+        UnauthorizedError: If access_token is invalid or expired.
+        NotFoundError: If user associated with token not found.
+    """
     try:
         session = await authentication_core.refresh_access_token(db, access_token)
     except Exception as e:

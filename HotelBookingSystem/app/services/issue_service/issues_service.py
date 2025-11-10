@@ -30,6 +30,31 @@ async def create_issue(
     payload: dict,
     images: Optional[List[UploadFile]] = None,
 ) -> dict:
+    """
+    Create a new issue/bug report with optional images.
+    
+    Creates an issue record for a booking with title, description, and optional attached images.
+    Automatically generates and sends a system notification to the issue creator. Images are
+    uploaded asynchronously and linked to the issue via image records.
+    
+    Args:
+        db (AsyncSession): Database session for executing queries.
+        payload (dict): Issue data including booking_id, user_id, title, description, room_id (optional).
+        images (Optional[List[UploadFile]]): List of image files to attach (default None).
+    
+    Returns:
+        dict: The newly created issue record with issue_id and timestamps.
+    
+    Raises:
+        HTTPException (502): If image upload fails.
+        HTTPException (500): If image handling or database operations fail.
+    
+    Side Effects:
+        - Creates issue record
+        - Uploads and saves images if provided
+        - Creates image entity records linking to issue
+        - Sends notification to issue creator
+    """
     issue = await insert_issue(
         db,
         {
@@ -86,6 +111,22 @@ async def create_issue(
 # ==========================================================
 
 async def get_issue(db: AsyncSession, issue_id: int):
+    """
+    Retrieve a single issue with its attached images.
+    
+    Fetches an issue record by ID and eagerly loads all associated images. Returns
+    complete issue details for displaying to users or admin.
+    
+    Args:
+        db (AsyncSession): Database session for executing queries.
+        issue_id (int): The ID of the issue to retrieve.
+    
+    Returns:
+        dict: Issue record with images list in __dict__["images"].
+    
+    Raises:
+        HTTPException (404): If issue not found.
+    """
     issue = await get_issue_by_id(db, issue_id)
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
@@ -100,6 +141,21 @@ async def get_issue(db: AsyncSession, issue_id: int):
 # ==========================================================
 
 async def list_issues(db: AsyncSession, user_id: Optional[int] = None, limit: int = 50, offset: int = 0):
+    """
+    Retrieve list of issues with pagination and optional user filtering.
+    
+    Fetches issues with attached images for each one. Supports filtering by issue creator
+    (user_id) and paginated results. Each issue includes all associated image URLs.
+    
+    Args:
+        db (AsyncSession): Database session for executing queries.
+        user_id (Optional[int]): Filter issues by creator user ID (default None = all).
+        limit (int): Maximum number of issues to return (default 50).
+        offset (int): Number of issues to skip for pagination (default 0).
+    
+    Returns:
+        list: List of issue records, each with images list populated in __dict__["images"].
+    """
     items = await list_issues_records(db, user_id, limit, offset)
     for issue in items:
         imgs = await get_issue_images(db, issue.issue_id)
@@ -117,6 +173,26 @@ async def update_issue(
     payload: dict,
     images: Optional[List[UploadFile]] = None,
 ):
+    """
+    Update issue details and optionally add new images.
+    
+    Updates existing issue record with new title, description, or status. Can also attach
+    additional images which are uploaded and linked to the issue. Does not delete existing images.
+    
+    Args:
+        db (AsyncSession): Database session for executing queries.
+        issue_id (int): The ID of the issue to update.
+        payload (dict): Updated issue fields (title, description, status, etc.).
+        images (Optional[List[UploadFile]]): Additional images to attach (default None).
+    
+    Returns:
+        dict: Updated issue record with new data and timestamps.
+    
+    Raises:
+        HTTPException (404): If issue not found.
+        HTTPException (502): If image upload fails.
+        HTTPException (500): If image handling or database operations fail.
+    """
     issue = await get_issue_by_id(db, issue_id)
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
@@ -149,9 +225,27 @@ async def update_issue(
 # ==========================================================
 
 async def add_chat(db: AsyncSession, issue_id: int, sender_id: int, message: str):
+    """
+    Add a message to an issue's discussion thread.
+    
+    Creates a chat message associated with an issue for collaborative communication. Automatically
+    notifies the issue owner if the sender is not the original issue creator.
+    
+    Args:
+        db (AsyncSession): Database session for executing queries.
+        issue_id (int): The ID of the issue to comment on.
+        sender_id (int): The user ID of the message sender.
+        message (str): The chat message content.
+    
+    Returns:
+        dict: The newly created chat message record with timestamps and sender info.
+    
+    Side Effects:
+        - Sends notification to issue owner if sender is not the creator
+    """
     chat = await insert_chat_message(db, issue_id, sender_id, message)
 
-    # Notify issue owner if sender isn’t them
+    # Notify issue owner if sender isn't them
     issue = await get_issue_by_id(db, issue_id)
     if issue and issue.user_id and issue.user_id != sender_id:
         notif = NotificationCreate(
@@ -171,4 +265,17 @@ async def add_chat(db: AsyncSession, issue_id: int, sender_id: int, message: str
 # ==========================================================
 
 async def list_chats(db: AsyncSession, issue_id: int):
+    """
+    Retrieve all chat messages for an issue.
+    
+    Fetches the complete discussion thread for an issue, ordered chronologically.
+    Includes all messages exchanged between users and support staff regarding the issue.
+    
+    Args:
+        db (AsyncSession): Database session for executing queries.
+        issue_id (int): The ID of the issue.
+    
+    Returns:
+        list: All chat message records for the issue, ordered by timestamp.
+    """
     return await list_chat_messages(db, issue_id)

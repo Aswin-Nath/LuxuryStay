@@ -22,7 +22,6 @@ router = APIRouter(prefix="/booking-edits", tags=["BOOKING-EDITS"])
 # ============================================================================
 # 🔹 CREATE - Submit a booking edit request
 # ============================================================================
-# ✅ 1️⃣ Create Booking Edit
 @router.post("/", response_model=BookingEditResponse, status_code=status.HTTP_201_CREATED)
 async def create_booking_edit(
     payload: BookingEditCreate,
@@ -30,7 +29,27 @@ async def create_booking_edit(
     current_user=Depends(get_current_user),
 ):
     """
-    Create a booking edit request (customer initiated).
+    Create a booking edit request (customer-initiated).
+    
+    Allows customers to request changes to their existing bookings (room change, date change, etc).
+    Creates an edit request in PENDING status awaiting admin review. Only one active edit per booking
+    allowed at a time. Prevents duplicate requests within a short time window.
+    
+    Args:
+        payload (BookingEditCreate): Edit request with booking_id, new room/dates, reason, etc.
+        db (AsyncSession): Database session dependency.
+        current_user: Authenticated user creating the edit request.
+    
+    Returns:
+        BookingEditResponse: Created edit request with edit_id, status PENDING, timestamps.
+    
+    Raises:
+        HTTPException (404): If booking_id not found or not owned by user.
+        HTTPException (409): If active edit already exists for the booking.
+    
+    Side Effects:
+        - Creates booking edit record in PENDING status.
+        - Creates audit log entry.
     """
     booking_edit_record = await create_booking_edit_service(payload, db, current_user)
     # audit booking edit create
@@ -54,14 +73,24 @@ async def get_booking_edits(
     user_permissions: dict = Depends(get_user_permissions),
 ):
     """
-    Unified endpoint to fetch booking edits.
-
-    - If `active=True` -> returns the active edit (or None).
-    - Otherwise -> returns list of all edits for the booking.
-
-    Authorization rules (enforced here):
-    - Basic users (role_id == 1) may only access edits for bookings they own.
-    - Non-basic users must have BOOKING.WRITE permission to access edits for other users.
+    Retrieve all booking edit requests for a specific booking.
+    
+    Fetches all edit requests (history) for a booking. Authorization varies by user role:
+    - **Basic users:** Can only access edit requests for bookings they own.
+    - **Non-basic users:** Must have REFUND_APPROVAL:WRITE permission to access other users' edits.
+    
+    Args:
+        booking_id (int): The booking ID to fetch edits for.
+        db (AsyncSession): Database session dependency.
+        current_user: Authenticated user.
+        user_permissions (dict): Current user's permissions.
+    
+    Returns:
+        BookingEditResponse | list[BookingEditResponse]: Single edit or list of all edit requests.
+    
+    Raises:
+        HTTPException (403): If user lacks permission to access this booking's edits.
+        HTTPException (404): If booking_id not found.
     """
     # Authorization
     is_basic_user = getattr(current_user, "role_id", None) == 1
@@ -92,10 +121,27 @@ async def change_room_status_route(
     current_user=Depends(get_current_user),
     user_permissions: dict = Depends(get_user_permissions),
 ):
-    """Lock or unlock a room. Requires ROOM_MANAGEMENT.WRITE permission for non-basic users.
-
-    - lock=True -> lock the room
-    - lock=False -> unlock the room
+    """
+    Lock or unlock a room status.
+    
+    Admin-only endpoint to lock or unlock room availability. Locked rooms cannot be booked or
+    edited during the lock period. Used during maintenance, overbooking disputes, or edit review.
+    
+    **Authorization:** Requires ROOM_MANAGEMENT:WRITE permission.
+    
+    Args:
+        room_id (int): The room ID to lock/unlock.
+        lock (bool): True to lock, False to unlock the room.
+        db (AsyncSession): Database session dependency.
+        current_user: Authenticated user (admin).
+        user_permissions (dict): Current user's permissions.
+    
+    Returns:
+        dict: Confirmation with room_id, room_status, and freeze_reason.
+    
+    Raises:
+        HTTPException (403): If user lacks ROOM_MANAGEMENT:WRITE permission.
+        HTTPException (404): If room_id not found.
     """
     # Permission check: only admins/managers with ROOM_MANAGEMENT.WRITE can perform this
     if not user_permissions or (
@@ -120,7 +166,6 @@ async def change_room_status_route(
 # ============================================================================
 # 🔹 UPDATE - Admin review and suggest new rooms for booking edit
 # ============================================================================
-# ✅ Admin Review (Suggest rooms & lock edit)
 @router.post("/{edit_id}/review")
 async def review_booking_edit(
     edit_id: int,
@@ -130,7 +175,32 @@ async def review_booking_edit(
     user_permissions: dict = Depends(get_user_permissions),
 ):
     """
-    Admin suggests room changes and locks them for 30 minutes.
+    Admin review and suggest room changes for a booking edit request.
+    
+    Admin examines a pending edit request and suggests alternative rooms for the customer.
+    Locks the suggested rooms for 30 minutes to prevent overbooking. Admin can provide multiple
+    room options or reject the request. Rooms remain locked pending customer decision.
+    
+    **Authorization:** Requires ROOM_MANAGEMENT:WRITE permission.
+    
+    Args:
+        edit_id (int): The booking edit request ID to review.
+        payload (ReviewPayload): Admin's decision with suggested rooms and notes.
+        db (AsyncSession): Database session dependency.
+        current_user: Authenticated admin user.
+        user_permissions (dict): Admin's permissions.
+    
+    Returns:
+        BookingEditResponse: Updated edit request with status UNDER_REVIEW and suggested rooms.
+    
+    Raises:
+        HTTPException (403): If user lacks ROOM_MANAGEMENT:WRITE permission.
+        HTTPException (404): If edit_id not found.
+    
+    Side Effects:
+        - Locks suggested rooms for 30 minutes.
+        - Changes edit status to UNDER_REVIEW.
+        - Creates audit log entry.
     """
     # Check admin access against canonical permission enums
     if not user_permissions or (
@@ -153,7 +223,6 @@ async def review_booking_edit(
 # ============================================================================
 # 🔹 UPDATE - Customer accept/reject proposed booking edit
 # ============================================================================
-# ✅ Customer Decision (Accept or Reject)
 @router.post("/{edit_id}/decision")
 async def decision_booking_edit(
     edit_id: int,
@@ -162,7 +231,31 @@ async def decision_booking_edit(
     current_user=Depends(get_current_user),
 ):
     """
-    Customer accepts or rejects the admin-proposed edit.
+    Customer accept or reject admin-proposed booking edit.
+    
+    Customer reviews admin's suggested rooms/changes and accepts or rejects. Accepting
+    finalizes the booking change and applies new dates/room. Rejecting returns edit to
+    PENDING status and unlocks suggested rooms. 30-minute lock expires if customer
+    doesn't respond in time.
+    
+    Args:
+        edit_id (int): The booking edit request ID to decide on.
+        payload (DecisionPayload): Customer's decision (ACCEPTED or REJECTED).
+        db (AsyncSession): Database session dependency.
+        current_user: Authenticated user (booking owner).
+    
+    Returns:
+        BookingEditResponse: Updated edit request with final status and decision timestamp.
+    
+    Raises:
+        HTTPException (404): If edit_id not found or not owned by user.
+        HTTPException (400): If edit not in UNDER_REVIEW status or lock expired.
+    
+    Side Effects:
+        - Finalizes or rejects booking changes.
+        - Unlocks rooms from admin's lock.
+        - Updates booking if accepted.
+        - Creates audit log entry.
     """
     booking_edit_record = await decision_on_booking_edit_service(edit_id, payload, db, current_user)
     # audit customer decision

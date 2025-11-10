@@ -30,7 +30,35 @@ async def create_booking(
 	current_user: Users = Depends(get_current_user),
 	_basic_user_check: bool = Depends(ensure_only_basic_user),
 ):
-	# Permission check: require BOOKING.WRITE
+	"""
+	Create a new booking.
+	
+	Creates a new room booking for the authenticated user. Validates availability for the specified
+	check-in and check-out dates and room. Automatically calculates total price based on room rate
+	and duration. Only basic users can create bookings for themselves.
+	
+	**Authorization:** Requires BOOKING:WRITE permission.
+	
+	Args:
+		payload (BookingCreate): Booking request with room_id, check_in, check_out, guest count, etc.
+		db (AsyncSession): Database session dependency.
+		user_permissions (dict): Current user's permissions.
+		current_user (Users): Authenticated user making the booking.
+		_basic_user_check (bool): Ensure only basic users can create bookings.
+	
+	Returns:
+		BookingResponse: Newly created booking with booking_id, dates, room info, and status.
+	
+	Raises:
+		HTTPException (403): If user lacks BOOKING:WRITE permission.
+		HTTPException (400): If room unavailable for specified dates.
+		HTTPException (404): If room_id not found.
+	
+	Side Effects:
+		- Invalidates bookings cache pattern ("bookings:*").
+		- Creates audit log entry.
+		- Reserves room capacity for specified dates.
+	"""
 	if not (
 		Resources.BOOKING.value in user_permissions
 		and PermissionTypes.WRITE.value in user_permissions[Resources.BOOKING.value]
@@ -57,8 +85,33 @@ async def create_booking(
 # ============================================================================
 @router.post("/{booking_id}/cancel", response_model=RefundResponse, status_code=status.HTTP_201_CREATED)
 async def cancel_booking(booking_id: int, payload: RefundCreate, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)):
+	"""
+	Cancel a booking and create a refund.
+	
+	Cancels an existing booking and initiates a refund process. Calculates refund amount based on
+	cancellation policy and timing (full refund if within grace period, partial otherwise). Booking
+	status changes to CANCELLED and room availability is restored. Refund is created in PENDING status.
+	
+	Args:
+		booking_id (int): The ID of the booking to cancel.
+		payload (RefundCreate): Refund request with reason and other details.
+		db (AsyncSession): Database session dependency.
+		current_user (Users): Authenticated user initiating cancellation.
+	
+	Returns:
+		RefundResponse: Created refund record with refund_id, amount, and status.
+	
+	Raises:
+		HTTPException (404): If booking_id not found or not owned by user.
+		HTTPException (400): If booking cannot be cancelled (already cancelled, check-in passed, etc.).
+	
+	Side Effects:
+		- Changes booking status to CANCELLED.
+		- Creates refund record in PENDING status.
+		- Restores room availability.
+		- Creates audit log entry for booking cancellation.
+	"""
 	refund_record = await svc_cancel_booking(db, booking_id, payload, current_user)
-	# audit booking cancellation (status change)
 	try:
 		new_val = RefundResponse.model_validate(refund_record).model_dump()
 		entity_id = f"booking:{booking_id}"
@@ -83,15 +136,30 @@ async def get_bookings(
     current_user: Users = Depends(get_current_user),
 ):
     """
-    Unified GET for bookings (simplified).
-
-    - Basic user (role_id == 1):
-        • If booking_id → return that booking (must own it)
-        • Else → return all their own bookings (filter by status if given)
-    - Privileged user (has booking WRITE permission):
-        • If booking_id → return that booking
-        • Else → return all bookings (filter by status if given, else paginated)
-    - Others → 403
+    Retrieve bookings (single, list, or filtered).
+    
+    Flexible GET endpoint supporting multiple query modes:
+    - **Basic users (role_id=1):** Can only view their own bookings (optionally filter by status).
+    - **Privileged users (BOOKING:WRITE):** Can view all bookings system-wide (with optional status filter).
+    
+    Respects pagination with limit and offset. Supports optional status filtering for both roles.
+    Basic users cannot access bookings they don't own; attempting so returns 403.
+    
+    Args:
+        booking_id (Optional[int]): Query parameter - if provided, return single booking.
+        status (Optional[str]): Query parameter - filter by booking status (CONFIRMED, CANCELLED, etc).
+        limit (int): Pagination limit (default 20, max 200).
+        offset (int): Pagination offset (default 0).
+        db (AsyncSession): Database session dependency.
+        user_permissions (dict): Current user's permissions.
+        current_user (Users): Authenticated user.
+    
+    Returns:
+        List[BookingResponse]: List of bookings matching criteria (basic users get only their own).
+    
+    Raises:
+        HTTPException (403): If user lacks BOOKING:WRITE and tries to access other user's booking.
+        HTTPException (404): If booking_id not found.
     """
 
     is_basic_user = getattr(current_user, "role_id", None) == 1

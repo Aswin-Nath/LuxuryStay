@@ -25,7 +25,33 @@ from app.schemas.pydantic_models.payments import BookingPaymentCreate
 
 
 async def create_booking(db: AsyncSession, payload, user_id: int) -> Bookings:
-    """Create booking, allocate rooms, map tax, create notification, attach payment."""
+    """
+    Create a new booking and allocate rooms.
+    
+    Creates a complete booking transaction including:
+    1. Validates requested room types and availability
+    2. Allocates available rooms based on request
+    3. Creates booking record in database
+    4. Maps rooms to booking
+    5. Maps applicable taxes
+    6. Creates payment record
+    7. Creates notification for the booking
+    
+    Room allocation is automatically performed based on room availability and type matching.
+    All rooms are marked as BOOKED after successful allocation.
+    
+    Args:
+        db (AsyncSession): The database session for executing queries.
+        payload: Pydantic model containing booking details (check_in, check_out, rooms list, total_price, etc).
+        user_id (int): The ID of the authenticated user creating the booking.
+    
+    Returns:
+        Bookings: The newly created booking record with booking_id assigned.
+    
+    Raises:
+        HTTPException (400): If no rooms requested, room count mismatch, or no available rooms for requested types.
+        HTTPException (400): If any allocated room becomes unavailable during processing.
+    """
     data = payload.model_dump()
     data["user_id"] = user_id  # Enforce user_id from authenticated user
     requested_room_type_ids = data.pop("rooms", []) or []
@@ -160,14 +186,55 @@ async def create_booking(db: AsyncSession, payload, user_id: int) -> Bookings:
 
 
 async def get_booking(db: AsyncSession, booking_id: int) -> Bookings:
+    """
+    Retrieve a booking by its ID.
+    
+    Fetches a complete booking record with all associated data.
+    
+    Args:
+        db (AsyncSession): The database session for executing queries.
+        booking_id (int): The unique identifier of the booking.
+    
+    Returns:
+        Bookings: The booking record with the specified ID.
+    
+    Raises:
+        HTTPException (404): If booking not found.
+    """
     return await get_booking_by_id(db, booking_id)
 
 
 async def list_bookings(db: AsyncSession, limit: int = 20, offset: int = 0) -> List[Bookings]:
+    """
+    Retrieve a list of all bookings with pagination.
+    
+    Fetches multiple booking records from the database, limited by the offset and limit parameters.
+    
+    Args:
+        db (AsyncSession): The database session for executing queries.
+        limit (int): Maximum number of bookings to return (default: 20).
+        offset (int): Number of bookings to skip from the beginning (default: 0).
+    
+    Returns:
+        List[Bookings]: A list of booking records.
+    """
     return await list_all_bookings(db, limit=limit, offset=offset)
 
 
 async def query_bookings(db: AsyncSession, user_id: Optional[int] = None, status: Optional[str] = None):
+    """
+    Query bookings with optional filters.
+    
+    Retrieves bookings filtered by user ID and/or booking status. Eagerly loads related rooms and taxes.
+    
+    Args:
+        db (AsyncSession): The database session for executing queries.
+        user_id (Optional[int]): Filter by user ID. If None, no user filtering applied.
+        status (Optional[str]): Filter by booking status (e.g., 'CONFIRMED', 'CANCELLED', 'COMPLETED'). If None, no status filtering applied.
+    
+    Returns:
+        List[Bookings]: A list of booking records matching the filter criteria, with rooms and taxes loaded.
+    """
     stmt = select(Bookings).options(joinedload(Bookings.rooms), joinedload(Bookings.taxes))
     if user_id:
         stmt = stmt.where(Bookings.user_id == user_id)

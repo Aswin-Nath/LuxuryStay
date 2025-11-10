@@ -47,8 +47,28 @@ async def create_issue(
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
 ):
-    """Create an issue. Image uploads are handled by a separate endpoint:
-    POST /api/issues/{issue_id}/images (accepts multiple files).
+    """
+    Submit a new customer issue or complaint.
+    
+    Creates an issue for reporting problems, complaints, or support requests. Issues are assigned
+    unique IDs and tracked through resolution workflow. New issues start in OPEN status. Images
+    can be attached via separate endpoint. Each issue belongs to the creating user.
+    
+    Args:
+        issue (IssueCreate): Form data containing title, description, and issue type.
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user creating the issue.
+    
+    Returns:
+        IssueResponse: Created issue with issue_id, status OPEN, timestamps, and creator info.
+    
+    Raises:
+        HTTPException (400): If required fields missing or invalid.
+    
+    Side Effects:
+        - Creates issue record with OPEN status.
+        - Creates audit log entry.
+        - Images uploaded separately via POST /issues/{issue_id}/images.
     """
     user_id = current_user.user_id
 
@@ -77,7 +97,31 @@ async def add_issue_images(
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
 ):
-    """Upload one or more images for an issue. Only the issue owner may upload images."""
+    """
+    Upload images to an issue/complaint.
+    
+    Allows issue creators to attach supporting images/screenshots. Multiple files supported.
+    Images are stored via external provider. Only issue owner can upload images to their issues.
+    
+    Args:
+        issue_id (int): The issue to attach images to (must own).
+        files (List[UploadFile]): Image files to upload.
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user (issue owner).
+    
+    Returns:
+        List[ImageResponse]: Created image records with URLs.
+    
+    Raises:
+        HTTPException (403): If user doesn't own the issue.
+        HTTPException (404): If issue_id not found.
+    
+    Side Effects:
+        - Uploads files to external storage.
+        - Creates image records linked to issue.
+        - Invalidates issue cache.
+        - Creates audit log entry per image.
+    """
     issue_record = await svc_get_issue(db, issue_id)
     if issue_record.user_id != current_user.user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to upload images for this issue")
@@ -116,11 +160,34 @@ async def issues(
     current_user: Users = Depends(get_current_user),
     user_permissions: dict = Depends(get_user_permissions),
 ):
-    """Unified issues endpoint.
-
-    - If `issue_id` is provided: returns that issue. Admins (issue-write) may fetch any issue;
-      non-admins can fetch only their own.
-    - If `issue_id` is not provided: admins get all issues; non-admins get only their own issues (paged).
+    """
+    Unified endpoint to fetch single issue or paginated list with role-based filtering.
+    
+    Supports two modes:
+    - Single issue: Pass issue_id query param to retrieve a specific issue. Admin users (ISSUE_RESOLUTION:WRITE)
+      can fetch any issue; non-admin users can only fetch issues they created.
+    - List issues: When issue_id is None, returns paginated list. Admins see all issues; non-admins see only
+      issues they created. Supports offset-limit pagination.
+    
+    Args:
+        issue_id (Optional[int]): If provided, returns single issue record. Ownership/permission checked.
+        limit (int): Page size for list mode (default 50).
+        offset (int): Pagination offset for list mode (default 0).
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user (scope determines which issues are visible).
+        user_permissions (dict): User permission dict from dependency (checks ISSUE_RESOLUTION:WRITE for admin).
+    
+    Returns:
+        Union[IssueResponse, List[IssueResponse]]: Single issue object or list of issue objects.
+    
+    Raises:
+        HTTPException (403): If non-admin tries to access issue not owned by them.
+        HTTPException (404): If issue_id provided but not found in database.
+    
+    Side Effects:
+        - Queries database with role-based filtering.
+        - Single issue fetch verifies user ownership if non-admin.
+        - List queries filtered by user_id for non-admin users.
     """
     is_admin = _require_issue_write(user_permissions)
 
@@ -149,9 +216,29 @@ async def get_chats(
     current_user: Users = Depends(get_current_user),
     user_permissions: dict = Depends(get_user_permissions),
 ):
-    """Return chats for an issue.
-
-    Allowed for admins (issue-write) or the owning user.
+    """
+    Fetch all chat messages posted on an issue thread.
+    
+    Retrieves the full conversation history for an issue. Only the issue creator and admin users
+    (ISSUE_RESOLUTION:WRITE) can access chat for an issue. Useful for following issue resolution
+    discussion/updates over time.
+    
+    Args:
+        issue_id (int): The issue to fetch chats for.
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user (must be issue owner or admin).
+        user_permissions (dict): User permission dict (checked for ISSUE_RESOLUTION:WRITE).
+    
+    Returns:
+        List[dict]: List of chat message dicts with keys: chat_id, issue_id, sender_id, message, sent_at.
+    
+    Raises:
+        HTTPException (403): If non-admin and current_user is not the issue owner.
+        HTTPException (404): If issue_id not found in database.
+    
+    Side Effects:
+        - Queries issue record and all associated chat messages.
+        - Access control enforced (ownership or admin permission).
     """
     issue_record = await svc_get_issue(db, issue_id)
 
@@ -187,10 +274,37 @@ async def update_issue(
     current_user: Users = Depends(get_current_user),
     user_permissions: dict = Depends(get_user_permissions),
 ):
-    """Unified update: admins can update status; owners can update title/description.
-
-    - If `status` is provided, requester must have ISSUE_RESOLUTION WRITE permission.
-    - Only the issue owner may update title/description.
+    """
+    Update issue details with granular permission control.
+    
+    Supports two types of updates with different permission requirements:
+    - Status updates (OPEN → IN_PROGRESS → RESOLVED → CLOSED): Admin only (ISSUE_RESOLUTION:WRITE).
+      Auto-sets resolved_by to current_user when status set to RESOLVED.
+    - Title/Description updates: Issue owner only. Used to clarify/add details to complaint.
+    
+    Enforces role-based authorization: non-owners cannot change title/description;
+    non-admins cannot change status.
+    
+    Args:
+        issue_id (int): The issue to update.
+        status (Optional[str]): New issue status (e.g., "RESOLVED"). Admin-only.
+        title (Optional[str]): New issue title. Owner-only.
+        description (Optional[str]): New issue description. Owner-only.
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user (must be owner or admin depending on field).
+        user_permissions (dict): User permission dict (checked for ISSUE_RESOLUTION:WRITE for admin).
+    
+    Returns:
+        IssueResponse: Updated issue record.
+    
+    Raises:
+        HTTPException (403): If non-admin tries to update status, or non-owner tries to update title/description.
+        HTTPException (404): If issue_id not found.
+    
+    Side Effects:
+        - Updates issue record in database.
+        - Audit log entry created for UPDATE action with user_id and changed_by_user_id.
+        - When status → RESOLVED, sets resolved_by to current_user.user_id.
     """
     issue_record = await svc_get_issue(db, issue_id)
 
@@ -244,6 +358,32 @@ async def post_chat(
     current_user: Users = Depends(get_current_user),
     user_permissions: dict = Depends(get_user_permissions),
 ):
+    """
+    Post a chat message to an issue resolution thread.
+    
+    Adds message to issue conversation. Both issue creator and admins (ISSUE_RESOLUTION:WRITE)
+    can post messages. Used for issue resolution discussion, updates, and back-and-forth
+    between customer and support team.
+    
+    Args:
+        issue_id (int): The issue to post message to.
+        message (str): The chat message text (required, non-empty).
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user (must be issue owner or admin).
+        user_permissions (dict): User permission dict (checked for ISSUE_RESOLUTION:WRITE).
+    
+    Returns:
+        dict: Created chat message with keys: chat_id, issue_id, sender_id, message, sent_at.
+    
+    Raises:
+        HTTPException (403): If non-admin and current_user is not the issue owner.
+        HTTPException (404): If issue_id not found.
+    
+    Side Effects:
+        - Inserts new chat_message record linked to issue.
+        - Audit log entry created with action=INSERT, message content logged.
+        - Chat message includes sent_at timestamp.
+    """
     issue_record = await svc_get_issue(db, issue_id)
 
     is_admin = _require_issue_write(user_permissions)

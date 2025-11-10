@@ -18,6 +18,27 @@ from app.models.sqlalchemy_schemas.payment_method import PaymentMethodUtility
 
 
 async def cancel_booking_and_create_refund(db: AsyncSession, booking_id: int, payload, current_user):
+    """
+    Cancel booking and create refund record with optional partial cancellation.
+    
+    Creates a refund for a booking and releases allocated rooms back to AVAILABLE status.
+    Supports full cancellation (all rooms) or partial cancellation (specific rooms).
+    Calculates refund amount based on number of nights and per-room pricing.
+    
+    Args:
+        db (AsyncSession): Database session for executing queries.
+        booking_id (int): The ID of the booking to cancel.
+        payload: Pydantic model containing refund_rooms (list), full_cancellation (bool), remarks, transaction details.
+        current_user: The authenticated user (must be booking owner for authorization).
+    
+    Returns:
+        dict: Refund details including refund_id, booking_id, amount, status, rooms affected.
+    
+    Raises:
+        HTTPException (404): If booking not found.
+        HTTPException (403): If user doesn't own the booking.
+        HTTPException (400): If partial cancellation attempted without specifying rooms.
+    """
     booking = await fetch_booking_by_id(db, booking_id)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
@@ -90,6 +111,25 @@ async def cancel_booking_and_create_refund(db: AsyncSession, booking_id: int, pa
 
 
 async def update_refund_transaction(db: AsyncSession, refund_id: int, payload, admin_user):
+    """
+    Update refund transaction details and status.
+    
+    Updates payment method, transaction number, and refund status. When status is set to PROCESSED
+    or COMPLETED, sets corresponding timestamps automatically. Validates payment method exists.
+    
+    Args:
+        db (AsyncSession): Database session for executing queries.
+        refund_id (int): The ID of the refund to update.
+        payload: Pydantic model containing status, transaction_method_id, transaction_number fields.
+        admin_user: The authenticated admin user performing the update.
+    
+    Returns:
+        Refund: Updated refund record with new transaction details and status.
+    
+    Raises:
+        HTTPException (404): If refund not found.
+        HTTPException (400): If transaction_method_id is invalid or doesn't exist in PaymentMethodUtility.
+    """
     refund_record = await fetch_refund_by_id(db, refund_id)
     if not refund_record:
         raise HTTPException(status_code=404, detail="Refund not found")
@@ -126,6 +166,22 @@ async def update_refund_transaction(db: AsyncSession, refund_id: int, payload, a
 
 
 async def get_refund(db: AsyncSession, refund_id: int):
+    """
+    Retrieve refund record by ID.
+    
+    Fetches a single refund record with all related transaction details and room-level
+    refund mappings.
+    
+    Args:
+        db (AsyncSession): Database session for executing queries.
+        refund_id (int): The ID of the refund to retrieve.
+    
+    Returns:
+        Refund: The refund record with all details including transaction info and room mappings.
+    
+    Raises:
+        HTTPException (404): If refund with the given ID not found.
+    """
     refund = await fetch_refund_by_id(db, refund_id)
     if not refund:
         raise HTTPException(status_code=404, detail="Refund not found")
@@ -133,4 +189,22 @@ async def get_refund(db: AsyncSession, refund_id: int):
 
 
 async def list_refunds(db: AsyncSession, **filters):
+    """
+    List refunds with optional filtering.
+    
+    Retrieves multiple refund records with support for filtering by status, user, booking,
+    date range, and other criteria. Results include all transaction and room-level details.
+    
+    Args:
+        db (AsyncSession): Database session for executing queries.
+        **filters: Optional filter parameters including:
+            - status (str): Filter by refund status (e.g., INITIATED, PROCESSED, COMPLETED).
+            - user_id (int): Filter by refund owner user ID.
+            - booking_id (int): Filter by associated booking ID.
+            - skip (int): Number of records to skip for pagination.
+            - limit (int): Maximum number of records to return.
+    
+    Returns:
+        list[Refund]: List of refund records matching the filter criteria with all details.
+    """
     return await fetch_refunds_filtered(db, **filters)

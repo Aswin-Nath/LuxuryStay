@@ -21,6 +21,26 @@ from app.models.sqlalchemy_schemas.offers import Offer
 # ==========================================================
 
 async def create_offer(db: AsyncSession, payload, created_by: Optional[int] = None) -> Offer:
+    """
+    Create a new promotional offer.
+    
+    Creates an offer that can be applied to bookings for room type discounts.
+    Validates offer name uniqueness and automatically calculates discounted prices based on discount percent.
+    Links the offer to specified room types.
+    
+    Args:
+        db (AsyncSession): The database session for executing queries.
+        payload: Pydantic model containing offer details (offer_name, discount_percent, room_types, etc).
+        created_by (Optional[int]): User ID of the admin creating the offer.
+    
+    Returns:
+        Offer: The newly created offer record with linked room types and pricing.
+    
+    Raises:
+        HTTPException (409): If an offer with the same name already exists.
+        HTTPException (400): If no room_types provided or invalid room_type_ids.
+        HTTPException (400): If pricing is missing for any room type.
+    """
     offer_data = payload.model_dump()
     room_types = offer_data.pop("room_types", [])  # Extract room_types list of IDs
     if created_by:
@@ -73,6 +93,22 @@ async def create_offer(db: AsyncSession, payload, created_by: Optional[int] = No
 # ==========================================================
 
 async def get_offer(db: AsyncSession, offer_id: int, include_deleted: bool = False) -> Offer:
+    """
+    Retrieve a single offer by ID.
+    
+    Fetches an offer with all its linked room types and pricing information.
+    
+    Args:
+        db (AsyncSession): The database session for executing queries.
+        offer_id (int): The unique identifier of the offer.
+        include_deleted (bool): If True, includes soft-deleted offers; if False (default), excludes them.
+    
+    Returns:
+        Offer: The offer record with room type mappings and pricing.
+    
+    Raises:
+        HTTPException (404): If offer not found.
+    """
     offer = await fetch_offer_by_id(db, offer_id, include_deleted)
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found")

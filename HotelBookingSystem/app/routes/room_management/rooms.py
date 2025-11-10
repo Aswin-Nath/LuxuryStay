@@ -24,11 +24,23 @@ router = APIRouter(prefix="/rooms", tags=["ROOMS"])
 
 
 def _require_permissions(user_permissions: dict, required_resources: list, perm: PermissionTypes, require_all: bool = True):
-    """Simple helper to validate permissions.
-
-    - required_resources: list of Resources to check
-    - perm: PermissionTypes (READ/WRITE)
-    - require_all: if True, user must have the permission on all required resources; if False, any one suffices
+    """
+    Validate user permissions for accessing resources.
+    
+    Checks if the user has the required permission on the specified resources.
+    Can enforce that user must have permission on ALL resources (require_all=True) or at least ONE (require_all=False).
+    
+    Args:
+        user_permissions (dict): Dictionary mapping resource names to lists of allowed permissions.
+        required_resources (list): List of Resources enum values to check.
+        perm (PermissionTypes): The permission type to validate (READ, WRITE, DELETE, etc).
+        require_all (bool): If True, user must have permission on all required resources; if False, on any one.
+    
+    Returns:
+        None: Returns if permission check passes.
+    
+    Raises:
+        ForbiddenError: If user lacks the required permissions.
     """
     # Normalize required resources and permission to strings (enum.value)
     req_keys = [r.value if hasattr(r, 'value') else str(r).upper() for r in required_resources]
@@ -49,6 +61,35 @@ def _require_permissions(user_permissions: dict, required_resources: list, perm:
 # ============================================================================
 @router.post("/", response_model=RoomResponse, status_code=status.HTTP_201_CREATED)
 async def create_room(payload: RoomCreate, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
+    """
+    Create a new room in the system.
+    
+    Creates a new room with the provided details. The room number must be unique.
+    Requires WRITE permission on both BOOKING and ROOM_MANAGEMENT resources.
+    
+    **Request Body:**
+    - `room_no` (str): Unique room number (e.g., "101", "102")
+    - `room_type_id` (int): ID of the room type (must exist)
+    
+    **Response:**
+    - Returns the newly created room with all details including room_id, status, price, etc.
+    - Includes an audit log entry for the creation.
+    
+    **Access Control:** Requires WRITE permission on BOOKING and ROOM_MANAGEMENT resources.
+    
+    Args:
+        payload (RoomCreate): Pydantic model containing room creation data.
+        db (AsyncSession): Database session dependency.
+        user_permissions (dict): User's permission dictionary from authentication.
+    
+    Returns:
+        RoomResponse: The newly created room object with success message.
+    
+    Raises:
+        ForbiddenError: If user lacks required permissions.
+        HTTPException (409): If room number already exists.
+        HTTPException (404): If room type not found.
+    """
     # Require WRITE on both Booking and Room_Management
     _require_permissions(user_permissions, [Resources.BOOKING, Resources.ROOM_MANAGEMENT], PermissionTypes.WRITE, require_all=True)
     room_record = await svc_create_room(db, payload)
@@ -80,13 +121,38 @@ async def get_rooms(
     _current_user = Depends(get_current_user),
     _ok: bool = Depends(ensure_not_basic_user),
 ):
-    """Single GET endpoint for rooms.
-
-    Behavior:
-    - If `room_id` is provided: return the single room as `RoomResponse`.
-    - Otherwise: return a list of `Room` matching optional filters.
-
-    Access control: only non-basic users (admins/managers) may access this endpoint.
+    """
+    Fetch room(s) with optional filters and caching.
+    
+    **Dual Behavior:**
+    - If `room_id` query param is provided: Returns a single room as RoomResponse.
+    - Otherwise: Returns a list of rooms matching optional filters (room_type_id, status_filter, is_freezed).
+    
+    **Query Parameters:**
+    - `room_id` (int, optional): Return single room by ID.
+    - `room_type_id` (int, optional): Filter by room type.
+    - `status_filter` (str, optional): Filter by status (AVAILABLE, BOOKED, MAINTENANCE, FROZEN).
+    - `is_freezed` (bool, optional): True for frozen rooms, False for non-frozen.
+    
+    **Caching:** List results are cached for 120 seconds to improve performance.
+    
+    **Access Control:** Only non-basic users (admins/managers) may access this endpoint.
+    
+    Args:
+        room_id (Optional[int]): Single room ID if fetching one room.
+        room_type_id (Optional[int]): Filter by room type.
+        status_filter (Optional[str]): Filter by room status.
+        is_freezed (Optional[bool]): Filter by freeze status.
+        db (AsyncSession): Database session dependency.
+        _current_user: Authenticated user (dependency).
+        _ok (bool): Authorization check (dependency).
+    
+    Returns:
+        Union[RoomResponse, List[Room]]: Single room or list of rooms depending on room_id parameter.
+    
+    Raises:
+        HTTPException (404): If room_id is provided but room not found.
+        ForbiddenError: If user is a basic user.
     """
     if room_id is not None:
         room_record = await svc_get_room(db, room_id)
@@ -108,6 +174,38 @@ async def get_rooms(
 # ============================================================================
 @router.put("/{room_id}", response_model=RoomResponse)
 async def update_room(room_id: int, payload: RoomUpdate, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
+    """
+    Update an existing room's information.
+    
+    Updates specified fields of a room. Only provided fields are updated (partial updates supported).
+    Requires WRITE permission on both BOOKING and ROOM_MANAGEMENT resources.
+    
+    **Path Parameters:**
+    - `room_id` (int): The ID of the room to update.
+    
+    **Request Body:**
+    - Pydantic model with fields to update (all optional).
+    
+    **Response:**
+    - Returns the updated room object with all current details.
+    - Includes an audit log entry for the update.
+    
+    **Access Control:** Requires WRITE permission on BOOKING and ROOM_MANAGEMENT resources.
+    
+    Args:
+        room_id (int): The room ID to update.
+        payload (RoomUpdate): Pydantic model with fields to update.
+        db (AsyncSession): Database session dependency.
+        user_permissions (dict): User's permission dictionary.
+    
+    Returns:
+        RoomResponse: The updated room object with success message.
+    
+    Raises:
+        ForbiddenError: If user lacks required permissions.
+        HTTPException (404): If room not found.
+        HTTPException (409): If new room number conflicts with another room.
+    """
     # Require WRITE on both Booking and Room_Management
     _require_permissions(user_permissions, [Resources.BOOKING, Resources.ROOM_MANAGEMENT], PermissionTypes.WRITE, require_all=True)
     room_record = await svc_update_room(db, room_id, payload)
@@ -129,6 +227,33 @@ async def update_room(room_id: int, payload: RoomUpdate, db: AsyncSession = Depe
 # ============================================================================
 @router.delete("/{room_id}")
 async def delete_room(room_id: int, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
+    """
+    Soft-delete a room from the system.
+    
+    Marks the room as deleted (soft delete). The room record remains in the database for historical purposes
+    but is excluded from normal queries. Requires WRITE permission on both BOOKING and ROOM_MANAGEMENT resources.
+    
+    **Path Parameters:**
+    - `room_id` (int): The ID of the room to delete.
+    
+    **Response:**
+    - Returns a success message.
+    - Clears all room-related cache entries.
+    
+    **Access Control:** Requires WRITE permission on BOOKING and ROOM_MANAGEMENT resources.
+    
+    Args:
+        room_id (int): The room ID to delete.
+        db (AsyncSession): Database session dependency.
+        user_permissions (dict): User's permission dictionary.
+    
+    Returns:
+        dict: Dictionary with "message" key confirming deletion.
+    
+    Raises:
+        ForbiddenError: If user lacks required permissions.
+        HTTPException (404): If room not found.
+    """
     # Require WRITE on both Booking and Room_Management
     _require_permissions(user_permissions, [Resources.BOOKING, Resources.ROOM_MANAGEMENT], PermissionTypes.WRITE, require_all=True)
     await svc_delete_room(db, room_id)
