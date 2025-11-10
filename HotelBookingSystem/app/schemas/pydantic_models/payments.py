@@ -5,11 +5,8 @@ from datetime import datetime
 
 class PaymentCreate(BaseModel):
     booking_id: int
-    user_id: int
     amount: float = Field(..., ge=0)
-    payment_date: Optional[datetime] = None
     method_id: int
-    # status is not expected from client; payments are one-time and created as SUCCESS
     transaction_reference: Optional[str] = None
     remarks: Optional[str] = None
 

@@ -74,10 +74,88 @@ async def complete_refund(
 
 
 # ============================================================================
-# 🔹 READ - Fetch refund details (single or list with filters)
+# 🔹 READ - Customer endpoint to fetch own refunds
 # ============================================================================
-@router.get("/", response_model=list[RefundResponse])
-async def get_refunds(
+@router.get("/customer", response_model=list[RefundResponse])
+async def get_customer_refunds(
+    refund_id: int | None = None,
+    booking_id: int | None = None,
+    status: str | None = None,
+    type: str | None = None,
+    from_date: datetime | None = None,
+    to_date: datetime | None = None,
+    limit: int = 20,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+):
+    """
+    Retrieve current user's own refunds only.
+    
+    **Authorization:** No special scope required. Users can only see their own refunds.
+    
+    Args:
+        refund_id (Optional[int]): Fetch specific refund (must belong to current user).
+        booking_id (Optional[int]): Filter by booking ID (must belong to current user).
+        status (Optional[str]): Filter by refund status.
+        type (Optional[str]): Filter by refund type.
+        from_date (Optional[datetime]): Filter refunds from date onwards.
+        to_date (Optional[datetime]): Filter refunds up to date.
+        limit (int): Maximum records to return (default 20).
+        offset (int): Number of records to skip (default 0).
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user.
+    
+    Returns:
+        list[RefundResponse]: List of current user's refunds matching filters.
+    
+    Raises:
+        HTTPException (404): If refund_id not found or doesn't belong to user.
+    """
+    from app.core.cache import get_cached, set_cached
+    from fastapi import HTTPException, status as http_status
+    
+    # If specific refund requested, verify ownership
+    if refund_id is not None:
+        refund_record = await svc_get_refund(db, refund_id)
+        if getattr(refund_record, "user_id", None) != current_user.user_id:
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to access this refund"
+            )
+        return [RefundResponse.model_validate(refund_record)]
+    
+    # Build cache key for list query
+    cache_key = f"refunds:customer:{current_user.user_id}:booking_id:{booking_id}:status:{status}:type:{type}:from:{from_date}:to:{to_date}:limit:{limit}:offset:{offset}"
+    cached = await get_cached(cache_key)
+    if cached is not None:
+        return cached
+    
+    # Fetch only current user's refunds
+    items = await svc_list_refunds(
+        db,
+        refund_id=refund_id,
+        booking_id=booking_id,
+        user_id=current_user.user_id,  # ALWAYS filter by current user
+        status=status,
+        type=type,
+        from_date=from_date,
+        to_date=to_date
+    )
+    
+    # Apply pagination
+    paginated = items[offset : offset + limit] if offset or limit else items
+    
+    result = [RefundResponse.model_validate(i) for i in paginated]
+    await set_cached(cache_key, result, ttl=60)
+    return result
+
+
+# ============================================================================
+# 🔹 READ - Admin endpoint to fetch all refunds with advanced filtering
+# ============================================================================
+@router.get("/admin", response_model=list[RefundResponse])
+async def get_admin_refunds(
     refund_id: int | None = None,
     booking_id: int | None = None,
     user_id: int | None = None,
@@ -89,84 +167,59 @@ async def get_refunds(
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
+    _permissions: dict = Security(check_permission, scopes=["REFUND_APPROVAL:READ"]),
 ):
     """
-    Retrieve refunds with role-based access control and filtering.
+    Retrieve all refunds with advanced filtering. Admin-only endpoint.
     
-    Unified endpoint supporting single refund retrieval and paginated list queries.
-    Basic users (role_id == 1) can only access their own refunds; non-basic users
-    (admin/manager) can query across all refunds. Results are cached for 60 seconds.
+    **Authorization:** Requires REFUND_APPROVAL:READ permission (admin only).
+    
+    Admin users can query all refunds with any combination of filters including user_id.
+    Results are cached for performance.
     
     Args:
-        refund_id (Optional[int]): Query parameter - Specific refund ID to fetch.
-        booking_id (Optional[int]): Query parameter - Filter by booking ID.
-        user_id (Optional[int]): Query parameter - Filter by refund owner user ID.
-        status (Optional[str]): Query parameter - Filter by refund status.
-        type (Optional[str]): Query parameter - Filter by refund type.
-        from_date (Optional[datetime]): Query parameter - Filter refunds from date onwards.
-        to_date (Optional[datetime]): Query parameter - Filter refunds up to date.
-        limit (int): Query parameter - Maximum records to return (default 20).
-        offset (int): Query parameter - Number of records to skip (default 0).
+        refund_id (Optional[int]): Filter by specific refund ID.
+        booking_id (Optional[int]): Filter by booking ID.
+        user_id (Optional[int]): Filter by refund owner user ID (admin only).
+        status (Optional[str]): Filter by refund status.
+        type (Optional[str]): Filter by refund type.
+        from_date (Optional[datetime]): Filter refunds from date onwards.
+        to_date (Optional[datetime]): Filter refunds up to date.
+        limit (int): Maximum records to return (default 20).
+        offset (int): Number of records to skip (default 0).
         db (AsyncSession): Database session dependency.
-        current_user (Users): Current authenticated user (required).
+        current_user (Users): Authenticated admin user.
+        _permissions (dict): Security token with REFUND_APPROVAL:READ permission.
     
     Returns:
-        list[RefundResponse]: List of refund records matching filters and pagination.
+        list[RefundResponse]: List of all refunds matching criteria.
     
     Raises:
-        HTTPException (403): If basic user tries to access other users' refunds or
-                             if basic user requests refund_id of another user.
-    
-    Access Rules:
-        - Basic users: Can only view their own refunds (user_id auto-set to current user).
-        - Non-basic users: Can query all refunds with any combination of filters.
-        - Single refund fetch: If refund_id provided, returns that one refund (after auth check).
-        - List fetch: Returns paginated results with limit and offset.
-    
-    Caching:
-        - Results cached in Redis with 60-second TTL using cache key:
-          `refunds:query:refund_id:{refund_id}:booking_id:{booking_id}:...`
-    
-    Example:
-        GET /refunds/?user_id=5&status=COMPLETED&limit=10&offset=0
+        HTTPException (403): If insufficient permissions.
     """
-    """Unified GET for refunds.
-
-    Rules:
-    - If `refund_id` provided -> return that refund (basic users can only access their own).
-    - Basic users (role_id == 1) can only query their refunds (user_id derived from token).
-    - Non-basic users can query across all refunds. If no filters provided, return paginated list.
-    """
-
-    is_basic_user = getattr(current_user, "role_id", None) == 1
-
-    # If a specific refund id requested, fetch and enforce ownership for basic users
-    if refund_id is not None:
-        refund_record = await svc_get_refund(db, refund_id)
-        if is_basic_user and getattr(refund_record, "user_id", None) != current_user.user_id:
-            from fastapi import HTTPException, status
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient privileges to view this refund")
-        return [RefundResponse.model_validate(refund_record)]
-
-    # Enforce that basic users can only query their own refunds
-    if is_basic_user:
-        if user_id is not None and user_id != current_user.user_id:
-            from fastapi import HTTPException, status
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient privileges to query other users' refunds")
-        user_id = current_user.user_id
-
-    # Build cache key and fetch
     from app.core.cache import get_cached, set_cached
-    cache_key = f"refunds:query:refund_id:{refund_id}:booking_id:{booking_id}:user_id:{user_id}:status:{status}:type:{type}:from:{from_date}:to:{to_date}:limit:{limit}:offset:{offset}"
+    
+    # Build cache key for admin list query
+    cache_key = f"refunds:admin:refund_id:{refund_id}:booking_id:{booking_id}:user_id:{user_id}:status:{status}:type:{type}:from:{from_date}:to:{to_date}:limit:{limit}:offset:{offset}"
     cached = await get_cached(cache_key)
     if cached is not None:
         return cached
-
-    items = await svc_list_refunds(db, refund_id=refund_id, booking_id=booking_id, user_id=user_id, status=status, type=type, from_date=from_date, to_date=to_date)
-
-    # Simple pagination
-    paginated = items[offset: offset + limit] if offset or limit else items
-
+    
+    # Fetch refunds with all filters (admin has no restrictions)
+    items = await svc_list_refunds(
+        db,
+        refund_id=refund_id,
+        booking_id=booking_id,
+        user_id=user_id,  # Admin can filter by any user
+        status=status,
+        type=type,
+        from_date=from_date,
+        to_date=to_date
+    )
+    
+    # Apply pagination
+    paginated = items[offset : offset + limit] if offset or limit else items
+    
     result = [RefundResponse.model_validate(i) for i in paginated]
     await set_cached(cache_key, result, ttl=60)
     return result

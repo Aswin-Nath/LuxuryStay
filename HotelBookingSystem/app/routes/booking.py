@@ -76,7 +76,7 @@ async def create_booking(
 # 🔹 UPDATE - Cancel a booking and initiate refund
 # ============================================================================
 @router.post("/{booking_id}/cancel", response_model=RefundResponse, status_code=status.HTTP_201_CREATED)
-async def cancel_booking(booking_id: int, payload: RefundCreate, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)):
+async def cancel_booking(booking_id: int, payload: RefundCreate, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user),	token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE"]),):
 	"""
 	Cancel a booking and create a refund.
 	
@@ -103,6 +103,9 @@ async def cancel_booking(booking_id: int, payload: RefundCreate, db: AsyncSessio
 		- Restores room availability.
 		- Creates audit log entry for booking cancellation.
 	"""
+    
+
+
 	refund_record = await svc_cancel_booking(db, booking_id, payload, current_user)
 	try:
 		new_val = RefundResponse.model_validate(refund_record).model_dump()
@@ -111,76 +114,152 @@ async def cancel_booking(booking_id: int, payload: RefundCreate, db: AsyncSessio
 		await log_audit(entity="booking", entity_id=entity_id, action="UPDATE", new_value=new_val, changed_by_user_id=changed_by, user_id=changed_by)
 	except Exception:
 		pass
+	# invalidate bookings and refunds cache after cancellation
+	await invalidate_pattern("bookings:*")
+	await invalidate_pattern("refunds:*")
 	return RefundResponse.model_validate(refund_record)
 
 
 # ============================================================================
-# 🔹 READ - Fetch booking details (single or list with filters)
+# 🔹 READ - Customer endpoint to fetch specific own booking by ID
 # ============================================================================
-@router.get("/", response_model=List[BookingResponse])
-async def get_bookings(
-    booking_id: Optional[int] = None,
+@router.get("/customer/{booking_id}", response_model=BookingResponse)
+async def get_customer_booking_by_id(
+    booking_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+):
+    """
+    Retrieve a specific booking belonging to current user only.
+    
+    **Authorization:** No special scope required. Users can only see their own bookings.
+    
+    Args:
+        booking_id (int): ID of the booking to retrieve.
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user.
+    
+    Returns:
+        BookingResponse: The requested booking if owned by current user.
+    
+    Raises:
+        HTTPException (404): If booking not found.
+        HTTPException (403): If booking belongs to different user.
+    """
+    booking_record = await svc_get_booking(db, booking_id)
+    if booking_record.user_id != current_user.user_id:
+        raise ForbiddenException("You don't have permission to access this booking")
+    return BookingResponse.model_validate(booking_record).model_dump(exclude={"created_at"})
+
+
+# ============================================================================
+# 🔹 READ - Admin endpoint to fetch any booking by ID
+# ============================================================================
+@router.get("/admin/{booking_id}", response_model=BookingResponse)
+async def get_admin_booking_by_id(
+    booking_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:READ"]),
+):
+    """
+    Retrieve a specific booking by its ID. Admin-only endpoint.
+    
+    **Authorization:** Requires BOOKING:READ permission (admin only).
+    
+    Admin users can access any booking and view detailed information.
+    
+    Args:
+        booking_id (int): ID of the booking to retrieve.
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated admin user.
+        token_payload (dict): Security token with BOOKING:READ permission.
+    
+    Returns:
+        BookingResponse: The requested booking record.
+    
+    Raises:
+        HTTPException (404): If booking not found.
+    """
+    booking_record = await svc_get_booking(db, booking_id)
+    return BookingResponse.model_validate(booking_record).model_dump(exclude={"created_at"})
+
+
+# ============================================================================
+# 🔹 READ - Customer endpoint to fetch own bookings (list)
+# ============================================================================
+@router.get("/customer", response_model=List[BookingResponse])
+async def get_customer_bookings(
     status: Optional[str] = Query(None),
     limit: int = Query(20, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
-    token_payload: dict = Security(check_permission, scopes=["BOOKING:READ"]),
     current_user: Users = Depends(get_current_user),
 ):
     """
-    Retrieve bookings (single, list, or filtered).
+    Retrieve current user's own bookings only (list).
     
-    Flexible GET endpoint supporting multiple query modes:
-    - **Basic users (role_id=1):** Can only view their own bookings (optionally filter by status).
-    - **Privileged users (BOOKING:READ):** Can view all bookings system-wide (with optional status filter).
+    **Authorization:** No special scope required. Users can only see their own bookings.
     
-    Respects pagination with limit and offset. Supports optional status filtering for both roles.
-    Basic users cannot access bookings they don't own; attempting so returns 403.
+    Use GET /customer/{booking_id} to fetch a specific booking.
     
     Args:
-        booking_id (Optional[int]): Query parameter - if provided, return single booking.
-        status (Optional[str]): Query parameter - filter by booking status (CONFIRMED, CANCELLED, etc).
+        status (Optional[str]): Filter by booking status (CONFIRMED, CANCELLED, etc).
         limit (int): Pagination limit (default 20, max 200).
         offset (int): Pagination offset (default 0).
         db (AsyncSession): Database session dependency.
-        token_payload (dict): Security token payload validating BOOKING:READ permission.
         current_user (Users): Authenticated user.
     
     Returns:
-        List[BookingResponse]: List of bookings matching criteria (basic users get only their own).
+        List[BookingResponse]: List of current user's bookings matching criteria.
     
     Raises:
-        HTTPException (403): If user lacks BOOKING:READ and tries to access other user's booking.
-        HTTPException (404): If booking_id not found.
+        None - Always returns user's own bookings or empty list.
     """
+    # Get all own bookings (optionally filtered by status)
+    items = await svc_query_bookings(db, user_id=current_user.user_id, status=status)
+    return [BookingResponse.model_validate(i).model_dump(exclude={"created_at"}) for i in items]
 
-    is_basic_user = getattr(current_user, "role_id", None) == 1
-    has_booking_read = True  # User has BOOKING:READ via Security
 
-    # BASIC USER LOGIC
-    if is_basic_user:
-        if booking_id:
-            booking_record = await svc_get_booking(db, booking_id)
-            if booking_record.user_id != current_user.user_id:
-                raise ForbiddenException("Insufficient privileges to access this booking")
-            return [BookingResponse.model_validate(booking_record).model_dump(exclude={"created_at"})]
-
-        # All their own bookings (optional status filter)
-        items = await svc_query_bookings(db, user_id=current_user.user_id, status=status)
-        return [BookingResponse.model_validate(i).model_dump(exclude={"created_at"}) for i in items]
-
-    # PRIVILEGED USER LOGIC
-    if not has_booking_read:
-        raise ForbiddenException("Insufficient permissions to access bookings")
-
-    if booking_id:
-        booking_record = await svc_get_booking(db, booking_id)
-        return [BookingResponse.model_validate(booking_record).model_dump(exclude={"created_at"})]
-
-    # List all bookings (filtered or paginated)
+# ============================================================================
+# 🔹 READ - Admin endpoint to fetch all bookings with advanced filtering (list)
+# ============================================================================
+@router.get("/admin", response_model=List[BookingResponse])
+async def get_admin_bookings(
+    status: Optional[str] = Query(None),
+    limit: int = Query(20, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    token_payload: dict = Security(check_permission, scopes=["ROOM_MANAGEMENT:READ"]),
+):
+    """
+    Retrieve all bookings with advanced filtering (list). Admin-only endpoint.
+    
+    **Authorization:** Requires BOOKING:READ permission (admin only).
+    
+    Use GET /admin/{booking_id} to fetch a specific booking.
+    
+    Admin users can query all bookings system-wide with optional status filtering.
+    
+    Args:
+        status (Optional[str]): Filter by booking status (CONFIRMED, CANCELLED, etc).
+        limit (int): Pagination limit (default 20, max 200).
+        offset (int): Pagination offset (default 0).
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated admin user.
+        token_payload (dict): Security token with BOOKING:READ permission.
+    
+    Returns:
+        List[BookingResponse]: List of all bookings matching criteria.
+    
+    Raises:
+        HTTPException (403): If insufficient permissions.
+    """
+    # List all bookings (filtered by status or paginated)
     if status:
         items = await svc_query_bookings(db, user_id=None, status=status)
     else:
         items = await svc_list_bookings(db, limit=limit, offset=offset)
-
+    
     return [BookingResponse.model_validate(i).model_dump(exclude={"created_at"}) for i in items]

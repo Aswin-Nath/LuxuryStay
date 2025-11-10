@@ -26,7 +26,7 @@ async def create_offer(db: AsyncSession, payload, created_by: Optional[int] = No
     
     Creates an offer that can be applied to bookings for room type discounts.
     Validates offer name uniqueness and automatically calculates discounted prices based on discount percent.
-    Links the offer to specified room types.
+    Links the offer to specified room types. Calculates offer_price dynamically as the average of all discounted prices.
     
     Args:
         db (AsyncSession): The database session for executing queries.
@@ -34,7 +34,7 @@ async def create_offer(db: AsyncSession, payload, created_by: Optional[int] = No
         created_by (Optional[int]): User ID of the admin creating the offer.
     
     Returns:
-        Offer: The newly created offer record with linked room types and pricing.
+        Offer: The newly created offer record with linked room types and pricing, offer_price calculated.
     
     Raises:
         HTTPException (409): If an offer with the same name already exists.
@@ -80,6 +80,14 @@ async def create_offer(db: AsyncSession, payload, created_by: Optional[int] = No
     missing = room_type_ids - {r["room_type_id"] for r in room_pricing_list}
     if missing:
         raise HTTPException(status_code=400, detail=f"Missing pricing for room_type_ids: {list(missing)}")
+
+    # Calculate offer_price as average of all discounted prices
+    if room_pricing_list:
+        total_discounted = sum(Decimal(str(r["discounted_price"])) for r in room_pricing_list)
+        average_offer_price = (total_discounted / len(room_pricing_list)).quantize(Decimal("0.01"))
+        offer_data["offer_price"] = float(average_offer_price)
+    else:
+        offer_data["offer_price"] = 0.0
 
     created_offer = await insert_offer_record(db, offer_data)
     await insert_offer_room_map(db, created_offer.offer_id, room_pricing_list)

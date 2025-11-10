@@ -1,9 +1,11 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, Literal
 from datetime import datetime
 
 
 class NotificationCreate(BaseModel):
+	model_config = ConfigDict(populate_by_name=True)
+	
 	recipient_user_id: int = Field(..., alias="resc_user_id")
 	notification_type: Literal["SYSTEM", "PROMOTIONAL", "REMINDER", "TRANSACTIONAL", "SECURITY", "OTHER"]
 	entity_type: Optional[

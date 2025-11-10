@@ -143,13 +143,14 @@ async def create_booking_edit_service(payload: BookingEditCreate, db: AsyncSessi
         calculated_total_price = float(calculated_total_price.quantize(Decimal("0.01")))
 
     # Only set fields that are provided (not None) - keep existing values for unchanged fields
-    # Note: primary_customer_phno is required in the request and is used as-is (no fallback to booking value)
-    # because BookingEdits.primary_customer_phno is NOT NULL
+    # All optional fields fall back to booking values if not provided in payload
+    # Note: check_in_time and check_out_time are optional - only set if explicitly provided by user
+    # (don't convert from booking's Time objects to datetime, keep them as-is)
     new_edit = BookingEdits(
         booking_id=payload.booking_id,
         user_id=getattr(current_user, "user_id", None),
         primary_customer_name=payload.primary_customer_name or booking.primary_customer_name,
-        primary_customer_phno=payload.primary_customer_phno,
+        primary_customer_phno=payload.primary_customer_phno or booking.primary_customer_phone_number,
         primary_customer_dob=payload.primary_customer_dob or booking.primary_customer_dob,
         check_in_date=booking.check_in,
         check_out_date=booking.check_out,

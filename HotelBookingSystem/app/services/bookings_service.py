@@ -12,7 +12,6 @@ from app.crud.bookings import (
     create_booking_record,
     create_booking_room_map,
     create_booking_tax_map,
-    create_payment,
     get_booking_by_id,
     list_all_bookings,
 )
@@ -21,8 +20,6 @@ from app.models.sqlalchemy_schemas.bookings import Bookings, BookingRoomMap, Boo
 from app.models.sqlalchemy_schemas.rooms import Rooms, RoomStatus, RoomTypes
 from app.models.sqlalchemy_schemas.tax_utility import TaxUtility
 from app.models.sqlalchemy_schemas.notifications import Notifications
-from app.models.sqlalchemy_schemas.payments import Payments as PaymentsModel
-from app.schemas.pydantic_models.payments import BookingPaymentCreate
 
 
 # ============================================================================
@@ -244,6 +241,7 @@ async def create_booking(db: AsyncSession, payload, user_id: int) -> Bookings:
     booking = Bookings(
         user_id=data["user_id"],
         room_count=room_count,  # Use computed room_count from len(rooms)
+        status="PENDING_PAYMENT",
         check_in=data["check_in"],
         check_in_time=data.get("check_in_time"),
         check_out=data["check_out"],
@@ -308,29 +306,6 @@ async def create_booking(db: AsyncSession, payload, user_id: int) -> Bookings:
         db.add(notification)
     except Exception:
         pass
-
-    payment_payload = data.get("payment") if isinstance(data, dict) else None
-    if payment_payload:
-        try:
-            bp = BookingPaymentCreate.model_validate(payment_payload)
-        except Exception as e:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid payment: {str(e)}")
-
-        from app.models.sqlalchemy_schemas.payment_method import PaymentMethodUtility
-        payment_method_query = await db.execute(select(PaymentMethodUtility).where(PaymentMethodUtility.method_id == bp.method_id))
-        pm = payment_method_query.scalars().first()
-        if not pm:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payment method_id")
-
-        pay = PaymentsModel(
-            booking_id=booking.booking_id,
-            amount=booking.total_price,
-            method_id=bp.method_id,
-            transaction_reference=bp.transaction_reference,
-            remarks=bp.remarks,
-            user_id=booking.user_id,
-        )
-        await create_payment(db, pay)
 
     await db.commit()
 

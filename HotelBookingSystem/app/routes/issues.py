@@ -341,48 +341,52 @@ async def update_issue(
 
 
 # ============================================================================
-# 🔹 CREATE - Post a chat message on an issue thread
+# 🔹 CREATE - Customer post a chat message on their issue thread
 # ============================================================================
-@router.post("/{issue_id}/chat", status_code=status.HTTP_201_CREATED)
-async def post_chat(
+@router.post("/customer/{issue_id}/chat", status_code=status.HTTP_201_CREATED)
+async def post_customer_chat(
     issue_id: int,
     message: str = Form(...),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["ISSUE_RESOLUTION:WRITE"]),
 ):
     """
-    Post a chat message to an issue resolution thread.
+    Post a chat message to an issue resolution thread (customer only).
     
-    Adds message to issue conversation. Both issue creator and admins (ISSUE_RESOLUTION:WRITE)
-    can post messages. Used for issue resolution discussion, updates, and back-and-forth
-    between customer and support team.
+    Allows customers to add messages to their own issue conversation. Only the issue creator
+    can use this endpoint. Used for providing updates, answering support questions, and
+    communication with support team.
+    
+    **Authorization:** No special scope required. Users can only chat on their own issues.
     
     Args:
-        issue_id (int): The issue to post message to.
+        issue_id (int): The issue to post message to (must own).
         message (str): The chat message text (required, non-empty).
         db (AsyncSession): Database session dependency.
-        current_user (Users): Authenticated user (must be issue owner or admin).
-        token_payload (dict): Security token payload validating ISSUE_RESOLUTION:WRITE permission.
+        current_user (Users): Authenticated user (must be issue owner).
     
     Returns:
         dict: Created chat message with keys: chat_id, issue_id, sender_id, message, sent_at.
     
     Raises:
-        HTTPException (403): If non-admin and current_user is not the issue owner.
+        HTTPException (403): If current_user is not the issue owner.
         HTTPException (404): If issue_id not found.
     
     Side Effects:
         - Inserts new chat_message record linked to issue.
-        - Audit log entry created with action=INSERT, message content logged.
-        - Chat message includes sent_at timestamp.
+        - Sends notification to support team if applicable.
+        - Audit log entry created with action=INSERT.
     """
+    if not message or not message.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Message cannot be empty")
+    
     issue_record = await svc_get_issue(db, issue_id)
-
-    is_admin = True  # User has ISSUE_RESOLUTION:WRITE via Security
-
-    if not is_admin and issue_record.user_id != current_user.user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to post chat to this issue")
+    if not issue_record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found")
+    
+    # Verify ownership - customer can only chat on their own issues
+    if issue_record.user_id != current_user.user_id:
+        raise ForbiddenException("You can only chat on your own issues")
 
     chat = await svc_add_chat(db, issue_id, current_user.user_id, message)
 
@@ -392,6 +396,71 @@ async def post_chat(
         await log_audit(entity="issue_chat", entity_id=entity_id, action="INSERT", new_value={"message": chat.message}, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
     except Exception:
         pass
+    
+    return {
+        "chat_id": chat.chat_id,
+        "issue_id": chat.issue_id,
+        "sender_id": chat.sender_id,
+        "message": chat.message,
+        "sent_at": chat.sent_at,
+    }
+
+
+# ============================================================================
+# 🔹 CREATE - Admin post a chat message on any issue thread
+# ============================================================================
+@router.post("/admin/{issue_id}/chat", status_code=status.HTTP_201_CREATED)
+async def post_admin_chat(
+    issue_id: int,
+    message: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    token_payload: dict = Security(check_permission, scopes=["ISSUE_RESOLUTION:WRITE"]),
+):
+    """
+    Post a chat message to an issue resolution thread (admin only).
+    
+    Allows admin/support staff to add messages to any issue conversation. Admins can respond
+    to customer issues, provide updates, and coordinate issue resolution. Used for support
+    team communication on issue threads.
+    
+    **Authorization:** Requires ISSUE_RESOLUTION:WRITE permission (admin/support only).
+    
+    Args:
+        issue_id (int): The issue to post message to (any issue allowed).
+        message (str): The chat message text (required, non-empty).
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated admin user.
+        token_payload (dict): Security token payload validating ISSUE_RESOLUTION:WRITE permission.
+    
+    Returns:
+        dict: Created chat message with keys: chat_id, issue_id, sender_id, message, sent_at.
+    
+    Raises:
+        HTTPException (403): If user lacks ISSUE_RESOLUTION:WRITE permission.
+        HTTPException (404): If issue_id not found.
+    
+    Side Effects:
+        - Inserts new chat_message record linked to issue.
+        - Sends notification to issue creator.
+        - Audit log entry created with action=INSERT.
+    """
+    if not message or not message.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Message cannot be empty")
+    
+    issue_record = await svc_get_issue(db, issue_id)
+    if not issue_record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found")
+
+    chat = await svc_add_chat(db, issue_id, current_user.user_id, message)
+
+    # audit chat message create
+    try:
+        entity_id = f"issue:{issue_id}:chat:{getattr(chat, 'chat_id', None)}"
+        await log_audit(entity="issue_chat", entity_id=entity_id, action="INSERT", new_value={"message": chat.message}, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
+    except Exception:
+        pass
+    
     return {
         "chat_id": chat.chat_id,
         "issue_id": chat.issue_id,

@@ -2,7 +2,6 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Literal, Any
 from datetime import date, time, datetime
 import re
-from app.schemas.pydantic_models.payments import BookingPaymentCreate
 
 
 # ─────────────────────────────────────────────
@@ -53,7 +52,6 @@ class BookingCreate(BaseModel):
     primary_customer_name: Optional[str] = None
     primary_customer_phone_number: Optional[str] = None
     primary_customer_dob: Optional[date] = None
-    payment: Optional[BookingPaymentCreate] = None  # Optional payment info
     
     @property
     def room_count(self) -> int:

@@ -36,7 +36,6 @@ class OfferCreate(BaseModel):
     start_date: date
     expiry_date: date
     room_types: List[int] = Field(..., description="Room type IDs under this offer")
-    offer_price:int
 
 # ==============================================================
 # OFFER OUTPUT MODEL

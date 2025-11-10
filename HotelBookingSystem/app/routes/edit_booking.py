@@ -70,7 +70,7 @@ async def get_booking_edits(
     booking_id: int,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["REFUND_APPROVAL:WRITE"]),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE"]),
 ):
     """
     Retrieve all booking edit requests for a specific booking.
