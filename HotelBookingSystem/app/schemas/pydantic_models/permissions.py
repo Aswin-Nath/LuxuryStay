@@ -12,8 +12,7 @@ class PermissionCreate(BaseModel):
 
 class Permission(BaseModel):
     permission_id: int
-    resource: str
-    permission_type: str
+    permission_name: str
     model_config = {"from_attributes": True}
 
 

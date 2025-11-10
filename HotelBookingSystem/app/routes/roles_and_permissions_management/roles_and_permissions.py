@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status, Security
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
@@ -12,7 +12,7 @@ from app.services.roles_and_permissions_service.roles_and_permissions_service im
     get_roles_for_permission as svc_get_roles_for_permission,
     create_role as svc_create_role, list_roles as svc_list_roles
 )
-from app.dependencies.authentication import get_user_permissions, ensure_not_basic_user, invalidate_permissions_cache
+from app.dependencies.authentication import ensure_not_basic_user, invalidate_permissions_cache, check_permission
 from app.core.cache import get_cached, set_cached, invalidate_pattern
 from app.utils.audit_helper import log_audit
 
@@ -25,32 +25,34 @@ roles_and_permissions_router = APIRouter(prefix="/roles", tags=["ROLES"])
 # 🔹 CREATE - Assign permissions to a role
 # ==============================================================
 @roles_and_permissions_router.post("/assign", response_model=RolePermissionResponse)
-async def assign_permissions_to_role(payload: RolePermissionAssign, db: AsyncSession = Depends(get_db), _ok: bool = Depends(ensure_not_basic_user), user_perms: dict = Depends(get_user_permissions)):
+async def assign_permissions_to_role(
+    payload: RolePermissionAssign,
+    db: AsyncSession = Depends(get_db),
+    _ok: bool = Depends(ensure_not_basic_user),
+    token_payload: dict = Security(check_permission, scopes=["ADMIN_CREATION:WRITE"]),
+):
     """
     Assign permissions to a role.
     
     Endpoint to associate one or more permissions with a specific role. Permissions already
     linked to the role are skipped. Used for role configuration and access control setup.
     
-    **Authorization:** Requires ADMIN_CREATION:READ permission.
+    **Authorization:** Requires ADMIN_CREATION:WRITE permission.
     
     Args:
         payload (RolePermissionAssign): Request body containing role_id and list of permission_ids.
         db (AsyncSession): Database session dependency.
         _ok (bool): Authentication check (ensure_not_basic_user).
-        user_perms (dict): User permissions dependency.
+        token_payload (dict): Token validation with ADMIN_CREATION:WRITE scope requirement.
     
     Returns:
         RolePermissionResponse: Confirmation with role_id, assigned permission IDs, and success message.
     
     Raises:
-        HTTPException (403): If user lacks ADMIN_CREATION:READ permission.
+        HTTPException (403): If user lacks ADMIN_CREATION:WRITE permission.
         HTTPException (404): If role_id not found (from service).
         HTTPException (409): If permission assignment conflicts (from service).
     """
-    # Require ADMIN_CREATION:READ permission to access permissions assignment endpoints
-    if not user_perms or "ADMIN_CREATION" not in user_perms or "READ" not in user_perms.get("ADMIN_CREATION", set()):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient privileges: ADMIN_CREATION:READ required")
     assignment_result = await svc_assign_permissions_to_role(db, payload.role_id, payload.permission_ids)
     
     # Invalidate permissions cache for this role (permissions changed)
@@ -76,7 +78,7 @@ async def get_permissions(
     resources: List[str] | None = Query(None, description="List of resources to filter by"),
     db: AsyncSession = Depends(get_db),
     _ok: bool = Depends(ensure_not_basic_user),
-    user_perms: dict = Depends(get_user_permissions),
+    token_payload: dict = Security(check_permission, scopes=["ADMIN_CREATION:READ"]),
 ):
     """
     Retrieve permissions by role, resource, or find roles for a permission.
@@ -94,7 +96,7 @@ async def get_permissions(
         resources (List[str] | None): Query parameter - list of resource names to filter permissions.
         db (AsyncSession): Database session dependency.
         _ok (bool): Authentication check (ensure_not_basic_user).
-        user_perms (dict): User permissions dependency.
+        token_payload (dict): Token validation with ADMIN_CREATION:READ scope requirement.
     
     Returns:
         dict or List: 
@@ -113,10 +115,6 @@ async def get_permissions(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provide one of: permission_id, role_id or resources")
     if provided > 1:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provide only one of: permission_id, role_id or resources at a time")
-
-    # Require ADMIN_CREATION:READ permission to access permissions endpoints
-    if not user_perms or "ADMIN_CREATION" not in user_perms or "READ" not in user_perms.get("ADMIN_CREATION", set()):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient privileges: ADMIN_CREATION:READ required")
 
     if permission_id is not None:
         roles = await svc_get_roles_for_permission(db, permission_id)
@@ -139,9 +137,12 @@ async def get_permissions(
 # 🔹 CREATE - Create a new role
 # ==============================================================
 @roles_and_permissions_router.post("/", response_model=RoleResponse)
-async def create_new_role(payload: RoleCreate, db: AsyncSession = Depends(get_db),
-                          _ok: bool = Depends(ensure_not_basic_user),
-                          user_perms: dict = Depends(get_user_permissions)):
+async def create_new_role(
+    payload: RoleCreate,
+    db: AsyncSession = Depends(get_db),
+    _ok: bool = Depends(ensure_not_basic_user),
+    token_payload: dict = Security(check_permission, scopes=["ADMIN_CREATION:WRITE"]),
+):
     """
     Create a new system role.
     
@@ -149,28 +150,25 @@ async def create_new_role(payload: RoleCreate, db: AsyncSession = Depends(get_db
     roles start without permissions and must be populated using the /assign endpoint.
     Cache is invalidated after successful creation to reflect changes system-wide.
     
-    **Authorization:** Requires ADMIN_CREATION:READ permission.
+    **Authorization:** Requires ADMIN_CREATION:WRITE permission.
     
     Args:
         payload (RoleCreate): Request body containing role_name, description, and role details.
         db (AsyncSession): Database session dependency.
         _ok (bool): Authentication check (ensure_not_basic_user).
-        user_perms (dict): User permissions dependency.
+        token_payload (dict): Token validation with ADMIN_CREATION:WRITE scope requirement.
     
     Returns:
         RoleResponse: The newly created role record with role_id, timestamps, and success message.
     
     Raises:
-        HTTPException (403): If user lacks ADMIN_CREATION:READ permission.
+        HTTPException (403): If user lacks ADMIN_CREATION:WRITE permission.
         HTTPException (409): If role_name already exists (from service).
     
     Side Effects:
         - Invalidates roles cache pattern ("roles:*") to ensure consistency.
         - Creates audit log entry for role creation.
     """
-    # Require ADMIN_CREATION:READ permission to access roles endpoints
-    if not user_perms or "ADMIN_CREATION" not in user_perms or "READ" not in user_perms.get("ADMIN_CREATION", set()):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient privileges: ADMIN_CREATION:READ required")
     role_obj = await svc_create_role(db, payload)
     # Invalidate roles cache after creation
     await invalidate_pattern("roles:*")
@@ -189,7 +187,11 @@ async def create_new_role(payload: RoleCreate, db: AsyncSession = Depends(get_db
 # 🔹 READ - Fetch list of all roles
 # ==============================================================
 @roles_and_permissions_router.get("/", response_model=List[RoleResponse])
-async def list_roles(db: AsyncSession = Depends(get_db), _ok: bool = Depends(ensure_not_basic_user), user_perms: dict = Depends(get_user_permissions)):
+async def list_roles(
+    db: AsyncSession = Depends(get_db),
+    _ok: bool = Depends(ensure_not_basic_user),
+    token_payload: dict = Security(check_permission, scopes=["ADMIN_CREATION:READ"]),
+):
     """
     Retrieve all system roles.
     
@@ -203,7 +205,7 @@ async def list_roles(db: AsyncSession = Depends(get_db), _ok: bool = Depends(ens
     Args:
         db (AsyncSession): Database session dependency.
         _ok (bool): Authentication check (ensure_not_basic_user).
-        user_perms (dict): User permissions dependency.
+        token_payload (dict): Token validation with ADMIN_CREATION:READ scope requirement.
     
     Returns:
         List[RoleResponse]: List of all role records with success message and cache status.
@@ -215,9 +217,6 @@ async def list_roles(db: AsyncSession = Depends(get_db), _ok: bool = Depends(ens
         - Uses Redis cache with key "roles:all" and TTL of 300 seconds.
         - Returns cached results if available, otherwise queries database and caches result.
     """
-    # Require ADMIN_CREATION:READ permission to access roles endpoints
-    if not user_perms or "ADMIN_CREATION" not in user_perms or "READ" not in user_perms.get("ADMIN_CREATION", set()):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient privileges: ADMIN_CREATION:READ required")
     cache_key = "roles:all"
     cached = await get_cached(cache_key)
     if cached is not None:

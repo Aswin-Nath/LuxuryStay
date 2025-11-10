@@ -1,7 +1,4 @@
-from sqlalchemy import Column, Integer, Enum,UniqueConstraint,ForeignKey
-from sqlalchemy.dialects.postgresql import ENUM as PgEnum
-from enum import Enum as PyEnum
-
+from sqlalchemy import Column, Integer, String, UniqueConstraint, ForeignKey
 from sqlalchemy.orm import relationship
 from app.database.postgres_connection import Base
 
@@ -9,17 +6,8 @@ from app.database.postgres_connection import Base
 # =========================================================
 # ENUM DEFINITIONS
 # =========================================================
-# =========================================================
-# ENUM DEFINITIONS
-# =========================================================
-class GenderTypes(str, PyEnum):
-    Male = "Male"
-    Female = "Female"
-    Other = "Other"
-
-
-class Resources(str, PyEnum):
-    # canonical uppercase member names (match DB stored values)
+class Resources(str):
+    """Resource constants matching database format"""
     BOOKING = "BOOKING"
     ADMIN_CREATION = "ADMIN_CREATION"
     ROOM_MANAGEMENT = "ROOM_MANAGEMENT"
@@ -33,29 +21,24 @@ class Resources(str, PyEnum):
     RESTORE_OPERATIONS = "RESTORE_OPERATIONS"
     OFFER_MANAGEMENT = "OFFER_MANAGEMENT"
 
-    # NOTE: previous mixed-case aliases removed — use uppercase underscore names (e.g. Resources.ROOM_MANAGEMENT)
 
-
-
-
-class PermissionTypes(str, PyEnum):
+class PermissionTypes(str):
+    """Permission type constants matching database format"""
     READ = "READ"
     WRITE = "WRITE"
     DELETE = "DELETE"
-    MANAGE = "MANAGE"
-    APPROVE = "APPROVE"
-    EXECUTE = "EXECUTE"
+    UPDATE = "UPDATE"
 
 
 class Permissions(Base):
     __tablename__ = "permissions"
 
     permission_id = Column(Integer, primary_key=True, autoincrement=True)
-    resource = Column(Enum(Resources, name="resources", native_enum=False), unique=True, index=True, nullable=False)
-    permission_type = Column(Enum(PermissionTypes, name="permission_types", native_enum=False), index=True, nullable=False)
-    __table_args__ = (UniqueConstraint('resource', 'permission_type', name='unique_resource_permission'),)
+    permission_name = Column(String(255), unique=True, index=True, nullable=False)
+    # Format: "RESOURCE:PERMISSION" (e.g., "BOOKING:READ", "ADMIN_CREATION:WRITE")
 
     roles = relationship("PermissionRoleMap", back_populates="permission")
+
 
 class PermissionRoleMap(Base):
     __tablename__ = "permission_role_map"

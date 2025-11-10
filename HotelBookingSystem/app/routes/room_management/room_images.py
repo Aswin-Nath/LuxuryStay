@@ -5,6 +5,7 @@ from fastapi import (
     Form,
     HTTPException,
     Depends,
+    Security,
     status,
     Query,
 )
@@ -16,10 +17,10 @@ from app.services.room_service.images_service import create_image, get_images_fo
 from app.services.room_service.images_service import hard_delete_image, set_image_primary
 from app.database.postgres_connection import get_db
 from app.schemas.pydantic_models.images import ImageResponse
-from app.dependencies.authentication import get_current_user, get_user_permissions
+from app.dependencies.authentication import get_current_user, check_permission
 from app.models.sqlalchemy_schemas.users import Users
-from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
 from app.utils.audit_helper import log_audit
+from app.core.exceptions import ForbiddenError
 
 
 router = APIRouter(prefix="/rooms/{room_id}/images", tags=["ROOM_IMAGES"])
@@ -31,24 +32,13 @@ router = APIRouter(prefix="/rooms/{room_id}/images", tags=["ROOM_IMAGES"])
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=ImageResponse)
 async def upload_image_for_room(
     room_type_id: int,
-    image: UploadFile = File(...),  # ✅ Corrected here (was Form)
+    image: UploadFile = File(...),
     caption: Optional[str] = Form(None),
     is_primary: Optional[bool] = Form(False),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    user_permissions: dict = Depends(get_user_permissions),
+    token_payload: dict = Security(check_permission, scopes=["ROOM_MANAGEMENT:WRITE"]),
 ):
-    # ----------------------------------------------------------
-    # Permission check: require room_service.WRITE
-    # ----------------------------------------------------------
-    allowed = (
-        Resources.ROOM_MANAGEMENT.value in (user_permissions or {})
-        and PermissionTypes.WRITE.value in (user_permissions or {})[Resources.ROOM_MANAGEMENT.value]
-    )
-    if not allowed:
-        from app.core.exceptions import ForbiddenError
-
-        raise ForbiddenError("Insufficient permissions to upload room images")
     """
     Upload a new image for a room.
     Accepts multipart/form-data with image, caption, and is_primary flag.
@@ -99,12 +89,11 @@ async def delete_images_for_room(
     image_ids: List[int] = Query(..., description="List of image IDs to delete"),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    user_permissions: dict = Depends(get_user_permissions),
+    token_payload: dict = Security(check_permission, scopes=["ROOM_MANAGEMENT:DELETE"]),
 ):
-    """Hard-delete one or more images. The requester must be the uploader of each image or have room_service.WRITE."""
-    # Call hard_delete_image for each id to reuse permission checks per-image
+    """Hard-delete one or more images."""
     for image_id in image_ids:
-        await hard_delete_image(db, image_id, requester_id=current_user.user_id, requester_permissions=user_permissions)
+        await hard_delete_image(db, image_id, requester_id=current_user.user_id)
     return {"message":"images deleted"}
 
 
@@ -116,8 +105,8 @@ async def mark_image_primary(
     image_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    user_permissions: dict = Depends(get_user_permissions),
+    token_payload: dict = Security(check_permission, scopes=["ROOM_MANAGEMENT:WRITE"]),
 ):
-    """Mark a specific image as primary for the room's images. Only the uploader or users with ROOM_MANAGEMENT.WRITE may do this."""
-    await set_image_primary(db, image_id, requester_id=current_user.user_id, requester_permissions=user_permissions)
+    """Mark a specific image as primary for the room's images."""
+    await set_image_primary(db, image_id, requester_id=current_user.user_id)
     return {"message": "Image marked as primary"}

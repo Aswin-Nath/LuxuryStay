@@ -1,5 +1,5 @@
 from fastapi import (
-    APIRouter, Depends, UploadFile, File, Form, status, HTTPException, Query
+    APIRouter, Depends, UploadFile, File, Form, status, HTTPException, Query, Security
 )
 from typing import List, Optional, Union
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,10 +8,9 @@ import asyncio
 from app.database.postgres_connection import get_db
 from app.dependencies.authentication import (
     get_current_user,
-    get_user_permissions
+    check_permission
 )
 from app.models.sqlalchemy_schemas.users import Users
-from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
 from app.services.images_service.image_upload_service import save_uploaded_image
 from app.services.issue_service.issues_service import (
     create_issue as svc_create_issue,
@@ -31,12 +30,6 @@ from app.utils.audit_helper import log_audit
 
 router = APIRouter(prefix="/issues", tags=["ISSUES"])
 
-
-def _require_issue_write(user_permissions: dict):
-    return (
-        Resources.ISSUE_RESOLUTION.value in user_permissions
-        and PermissionTypes.WRITE.value in user_permissions[Resources.ISSUE_RESOLUTION.value]
-    )
 
 # ============================================================================
 # 🔹 CREATE - Submit a new issue/complaint
@@ -158,13 +151,13 @@ async def issues(
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    user_permissions: dict = Depends(get_user_permissions),
+    token_payload: dict = Security(check_permission, scopes=["ISSUE_RESOLUTION:READ"]),
 ):
     """
     Unified endpoint to fetch single issue or paginated list with role-based filtering.
     
     Supports two modes:
-    - Single issue: Pass issue_id query param to retrieve a specific issue. Admin users (ISSUE_RESOLUTION:WRITE)
+    - Single issue: Pass issue_id query param to retrieve a specific issue. Admin users (ISSUE_RESOLUTION:READ)
       can fetch any issue; non-admin users can only fetch issues they created.
     - List issues: When issue_id is None, returns paginated list. Admins see all issues; non-admins see only
       issues they created. Supports offset-limit pagination.
@@ -175,7 +168,7 @@ async def issues(
         offset (int): Pagination offset for list mode (default 0).
         db (AsyncSession): Database session dependency.
         current_user (Users): Authenticated user (scope determines which issues are visible).
-        user_permissions (dict): User permission dict from dependency (checks ISSUE_RESOLUTION:WRITE for admin).
+        token_payload (dict): Security token payload validating ISSUE_RESOLUTION:READ permission.
     
     Returns:
         Union[IssueResponse, List[IssueResponse]]: Single issue object or list of issue objects.
@@ -189,7 +182,7 @@ async def issues(
         - Single issue fetch verifies user ownership if non-admin.
         - List queries filtered by user_id for non-admin users.
     """
-    is_admin = _require_issue_write(user_permissions)
+    is_admin = True  # User has ISSUE_RESOLUTION:READ via Security
 
     if issue_id is not None:
         issue_record = await svc_get_issue(db, issue_id)
@@ -214,13 +207,13 @@ async def get_chats(
     issue_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    user_permissions: dict = Depends(get_user_permissions),
+    token_payload: dict = Security(check_permission, scopes=["ISSUE_RESOLUTION:READ"]),
 ):
     """
     Fetch all chat messages posted on an issue thread.
     
     Retrieves the full conversation history for an issue. Only the issue creator and admin users
-    (ISSUE_RESOLUTION:WRITE) can access chat for an issue. Useful for following issue resolution
+    (ISSUE_RESOLUTION:READ) can access chat for an issue. Useful for following issue resolution
     discussion/updates over time.
     
     Args:
@@ -242,7 +235,7 @@ async def get_chats(
     """
     issue_record = await svc_get_issue(db, issue_id)
 
-    is_admin = _require_issue_write(user_permissions)
+    is_admin = True  # User has ISSUE_RESOLUTION:READ via Security
 
 
     if not is_admin and issue_record.user_id != current_user.user_id:
@@ -272,7 +265,7 @@ async def update_issue(
     description: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    user_permissions: dict = Depends(get_user_permissions),
+    token_payload: dict = Security(check_permission, scopes=["ISSUE_RESOLUTION:WRITE"]),
 ):
     """
     Update issue details with granular permission control.
@@ -292,7 +285,7 @@ async def update_issue(
         description (Optional[str]): New issue description. Owner-only.
         db (AsyncSession): Database session dependency.
         current_user (Users): Authenticated user (must be owner or admin depending on field).
-        user_permissions (dict): User permission dict (checked for ISSUE_RESOLUTION:WRITE for admin).
+        token_payload (dict): Security token payload validating ISSUE_RESOLUTION:WRITE permission.
     
     Returns:
         IssueResponse: Updated issue record.
@@ -308,7 +301,7 @@ async def update_issue(
     """
     issue_record = await svc_get_issue(db, issue_id)
 
-    is_admin = _require_issue_write(user_permissions)
+    is_admin = True  # User has ISSUE_RESOLUTION:WRITE via Security
 
     is_owner = issue_record.user_id == current_user.user_id
 
@@ -356,7 +349,7 @@ async def post_chat(
     message: str = Form(...),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    user_permissions: dict = Depends(get_user_permissions),
+    token_payload: dict = Security(check_permission, scopes=["ISSUE_RESOLUTION:WRITE"]),
 ):
     """
     Post a chat message to an issue resolution thread.
@@ -370,7 +363,7 @@ async def post_chat(
         message (str): The chat message text (required, non-empty).
         db (AsyncSession): Database session dependency.
         current_user (Users): Authenticated user (must be issue owner or admin).
-        user_permissions (dict): User permission dict (checked for ISSUE_RESOLUTION:WRITE).
+        token_payload (dict): Security token payload validating ISSUE_RESOLUTION:WRITE permission.
     
     Returns:
         dict: Created chat message with keys: chat_id, issue_id, sender_id, message, sent_at.
@@ -386,7 +379,7 @@ async def post_chat(
     """
     issue_record = await svc_get_issue(db, issue_id)
 
-    is_admin = _require_issue_write(user_permissions)
+    is_admin = True  # User has ISSUE_RESOLUTION:WRITE via Security
 
     if not is_admin and issue_record.user_id != current_user.user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to post chat to this issue")

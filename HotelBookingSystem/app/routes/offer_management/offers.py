@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status, Query
+from fastapi import APIRouter, Depends, status, Query, Security
 from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -6,9 +6,8 @@ from app.database.postgres_connection import get_db
 from app.schemas.pydantic_models.offers import OfferCreate, OfferResponse
 from app.services.offer_service.offers_service import create_offer as svc_create_offer, get_offer as svc_get_offer, list_offers as svc_list_offers
 from app.services.offer_service.offers_service import update_offer as svc_update_offer, soft_delete_offer as svc_soft_delete_offer
-from app.dependencies.authentication import get_user_permissions, get_current_user
+from app.dependencies.authentication import check_permission, get_current_user
 from app.models.sqlalchemy_schemas.users import Users
-from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
 from app.core.exceptions import ForbiddenError
 from app.core.cache import get_cached, set_cached, invalidate_pattern
 from app.utils.audit_helper import log_audit
@@ -23,7 +22,7 @@ router = APIRouter(prefix="/offers", tags=["OFFERS"])
 # 🔹 CREATE - Create a new offer with room mappings
 # ============================================================================
 @router.post("/", response_model=OfferResponse, status_code=status.HTTP_201_CREATED)
-async def create_offer(payload: OfferCreate, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions), current_user: Users = Depends(get_current_user)):
+async def create_offer(payload: OfferCreate, db: AsyncSession = Depends(get_db), token_payload: dict = Security(check_permission, scopes=["OFFER_MANAGEMENT:WRITE"]), current_user: Users = Depends(get_current_user)):
     """
     Create a new promotional offer.
     
@@ -36,7 +35,7 @@ async def create_offer(payload: OfferCreate, db: AsyncSession = Depends(get_db),
     Args:
         payload (OfferCreate): Offer details (name, description, discount_percentage, valid_from, valid_to, room_ids).
         db (AsyncSession): Database session dependency.
-        user_permissions (dict): Current user's permissions.
+        token_payload (dict): Security token payload validating OFFER_MANAGEMENT:WRITE permission.
         current_user (Users): Authenticated user creating the offer.
     
     Returns:
@@ -50,13 +49,6 @@ async def create_offer(payload: OfferCreate, db: AsyncSession = Depends(get_db),
         - Invalidates offers cache pattern ("offers:*").
         - Creates audit log entry.
     """
-    # Permission check: require OFFER_MANAGEMENT.WRITE (user_permissions keys are normalized to strings)
-    if not (
-        Resources.OFFER_MANAGEMENT.value in user_permissions
-        and PermissionTypes.WRITE.value in user_permissions[Resources.OFFER_MANAGEMENT.value]
-    ):
-        raise ForbiddenError("Insufficient permissions to create offers")
-
     # Use current authenticated user as the creator — ignore any client-provided created_by value
     offer_record = await svc_create_offer(db, payload, created_by=current_user.user_id)
     # invalidate offer list caches
@@ -136,7 +128,7 @@ async def list_offers(limit: int = Query(20, ge=1, le=200), offset: int = Query(
 # 🔹 UPDATE - Modify existing offer details
 # ============================================================================
 @router.put("/{offer_id}", response_model=OfferResponse)
-async def edit_offer(offer_id: int, payload: OfferCreate, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions), current_user: Users = Depends(get_current_user)):
+async def edit_offer(offer_id: int, payload: OfferCreate, db: AsyncSession = Depends(get_db), token_payload: dict = Security(check_permission, scopes=["OFFER_MANAGEMENT:WRITE"]), current_user: Users = Depends(get_current_user)):
     """
     Update an existing offer.
     
@@ -149,7 +141,7 @@ async def edit_offer(offer_id: int, payload: OfferCreate, db: AsyncSession = Dep
         offer_id (int): The offer ID to update.
         payload (OfferCreate): Updated offer details.
         db (AsyncSession): Database session dependency.
-        user_permissions (dict): Current user's permissions.
+        token_payload (dict): Security token payload validating OFFER_MANAGEMENT:WRITE permission.
         current_user (Users): Authenticated user.
     
     Returns:
@@ -163,12 +155,6 @@ async def edit_offer(offer_id: int, payload: OfferCreate, db: AsyncSession = Dep
         - Invalidates offers cache pattern ("offers:*").
         - Creates audit log entry.
     """
-    if not (
-        Resources.OFFER_MANAGEMENT.value in user_permissions
-        and PermissionTypes.WRITE.value in user_permissions[Resources.OFFER_MANAGEMENT.value]
-    ):
-        raise ForbiddenError("Insufficient permissions to edit offers")
-
     offer_record = await svc_update_offer(db, offer_id, payload, updated_by=current_user.user_id)
     # invalidate offers cache on update
     await invalidate_pattern("offers:*")
@@ -186,7 +172,7 @@ async def edit_offer(offer_id: int, payload: OfferCreate, db: AsyncSession = Dep
 # 🔹 DELETE - Remove offer from system (soft delete)
 # ============================================================================
 @router.delete("/{offer_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_offer(offer_id: int, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
+async def delete_offer(offer_id: int, db: AsyncSession = Depends(get_db), token_payload: dict = Security(check_permission, scopes=["OFFER_MANAGEMENT:WRITE"])):
     """
     Delete an offer (soft delete).
     
@@ -212,12 +198,6 @@ async def delete_offer(offer_id: int, db: AsyncSession = Depends(get_db), user_p
         - Soft-deletes the offer record.
         - Invalidates offers cache pattern ("offers:*").
     """
-    if not (
-        Resources.OFFER_MANAGEMENT.value in user_permissions
-        and PermissionTypes.WRITE.value in user_permissions[Resources.OFFER_MANAGEMENT.value]
-    ):
-        raise ForbiddenError("Insufficient permissions to delete offers")
-
     await svc_soft_delete_offer(db, offer_id)
     await invalidate_pattern("offers:*")
     return {"message":"offer deleted"}

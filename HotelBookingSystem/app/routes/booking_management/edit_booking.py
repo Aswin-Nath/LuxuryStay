@@ -1,10 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Security
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.postgres_connection import get_db
-from app.dependencies.authentication import get_current_user, get_user_permissions
-from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
+from app.dependencies.authentication import get_current_user, check_permission
 from app.schemas.pydantic_models.booking_edits import BookingEditCreate, BookingEditResponse, ReviewPayload, DecisionPayload, UpdateRoomOccupancyRequest
 from app.services.booking_service.booking_edit import (
     create_booking_edit_service,
@@ -71,7 +70,7 @@ async def get_booking_edits(
     booking_id: int,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
-    user_permissions: dict = Depends(get_user_permissions),
+    token_payload: dict = Security(check_permission, scopes=["REFUND_APPROVAL:WRITE"]),
 ):
     """
     Retrieve all booking edit requests for a specific booking.
@@ -84,7 +83,7 @@ async def get_booking_edits(
         booking_id (int): The booking ID to fetch edits for.
         db (AsyncSession): Database session dependency.
         current_user: Authenticated user.
-        user_permissions (dict): Current user's permissions.
+        token_payload (dict): Security token payload validating REFUND_APPROVAL:WRITE permission.
     
     Returns:
         BookingEditResponse | list[BookingEditResponse]: Single edit or list of all edit requests.
@@ -102,10 +101,6 @@ async def get_booking_edits(
         booking = query_result.scalars().first()
         if not booking or booking.user_id != current_user.user_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient privileges to access this booking's edits")
-    else:
-        # require BOOKING.WRITE permission for non-basic users
-        if not (Resources.REFUND_APPROVAL.value in user_permissions and PermissionTypes.WRITE.value in user_permissions.get(Resources.REFUND_APPROVAL.value, set())):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin permission required to access booking edits")
 
     return await get_all_booking_edits_service(booking_id, db)
 
@@ -116,12 +111,27 @@ async def get_booking_edits(
 # 🔹 UPDATE - Admin review and suggest new rooms for booking edit
 # ============================================================================
 @router.post("/{edit_id}/review")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 async def review_booking_edit(
     edit_id: int,
     payload: ReviewPayload,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
-    user_permissions: dict = Depends(get_user_permissions),
+    token_payload: dict = Security(check_permission, scopes=["ROOM_MANAGEMENT:WRITE"]),
 ):
     """
     Admin review and suggest room changes for a booking edit request.
@@ -137,7 +147,7 @@ async def review_booking_edit(
         payload (ReviewPayload): Admin's decision with suggested rooms and notes.
         db (AsyncSession): Database session dependency.
         current_user: Authenticated admin user.
-        user_permissions (dict): Admin's permissions.
+        token_payload (dict): Security token payload validating ROOM_MANAGEMENT:WRITE permission.
     
     Returns:
         BookingEditResponse: Updated edit request with status UNDER_REVIEW and suggested rooms.
@@ -151,13 +161,6 @@ async def review_booking_edit(
         - Changes edit status to UNDER_REVIEW.
         - Creates audit log entry.
     """
-    # Check admin access against canonical permission enums
-    if not user_permissions or (
-        Resources.ROOM_MANAGEMENT.value not in user_permissions
-        or PermissionTypes.WRITE.value not in user_permissions.get(Resources.ROOM_MANAGEMENT.value, set())
-    ):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin permission required")
-
     booking_edit_record = await review_booking_edit_service(edit_id, payload, db, current_user)
     # audit admin review action
     try:

@@ -58,9 +58,6 @@ async def signup(db: AsyncSession, payload: UserCreate, created_by: Optional[int
         ConflictError: If email already registered.
     """
     
-    if payload.role_id is not None and payload.role_id != 1:
-        raise BadRequestError("Cannot create admin users via this endpoint")
-
     # ✅ Validate Email
     email_valid, email_error = is_valid_email(payload.email)
     if not email_valid:
@@ -358,7 +355,6 @@ async def register_admin(
     db: AsyncSession,
     payload: UserCreate,
     current_user_id: int,
-    user_permissions: dict,
 ):
     """
     Admin registration with email, password, and phone validation.

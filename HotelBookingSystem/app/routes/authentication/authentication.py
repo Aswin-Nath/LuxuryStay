@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status, Request
+from fastapi import APIRouter, Depends, status, Request, Security
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.postgres_connection import get_db
 from app.models.sqlalchemy_schemas.users import Users
@@ -14,9 +14,8 @@ from app.services.authentication_service.authentication_usecases import (
     register_admin as svc_register_admin,
 )
 from fastapi.security import OAuth2PasswordRequestForm
-from app.dependencies.authentication import get_current_user,get_user_permissions
+from app.dependencies.authentication import get_current_user, check_permission
 auth_router = APIRouter(prefix="/auth", tags=["AUTH"])
-from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
 from pydantic import BaseModel
 from typing import Optional
 from app.core.security import oauth2_scheme
@@ -229,7 +228,7 @@ async def register_admin(
     payload: UserCreate,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    user_permissions: dict = Depends(get_user_permissions),
+    token_payload: dict = Security(check_permission, scopes=["ADMIN_CREATION:WRITE"]),
 ):
     """
     Create a new Admin user (permission-protected).
@@ -245,7 +244,7 @@ async def register_admin(
         payload (UserCreate): Admin user creation request with email, password, name, etc.
         db (AsyncSession): Database session dependency.
         current_user (Users): Currently authenticated user (verified non-basic user).
-        user_permissions (dict): Current user's permission dictionary.
+        token_payload (dict): Token payload (validated by Security dependency).
     
     Returns:
         UserResponse: Newly created admin user record with user_id and profile info.
@@ -259,18 +258,5 @@ async def register_admin(
         - Creates audit log entry for admin creation.
     """
 
-    # ----------------------------------------------------------
-    # 🔐 Permission Check
-    # ----------------------------------------------------------
-    # Permission check (route dependency already enforces, but double-check)
-    allowed = (
-        Resources.ADMIN_CREATION.value in user_permissions
-        and PermissionTypes.WRITE.value in user_permissions[Resources.ADMIN_CREATION.value]
-    )
-    if not allowed:
-        from app.core.exceptions import ForbiddenError
-
-        raise ForbiddenError("Insufficient permissions to create Admins")
-
-    user_obj = await svc_register_admin(db, payload, current_user.user_id, user_permissions)
+    user_obj = await svc_register_admin(db, payload, current_user.user_id)
     return UserResponse.model_validate(user_obj)

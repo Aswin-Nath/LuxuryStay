@@ -40,7 +40,7 @@ class BookingEditCreate(BaseModel):
     """
     booking_id: int
     primary_customer_name: Optional[str] = Field(None, max_length=150)
-    primary_customer_phno: Optional[str] = Field(None, max_length=20)
+    primary_customer_phno: str = Field(..., max_length=20, description="Primary customer phone number - required for booking edit")
     primary_customer_dob: Optional[date] = None
     check_in_date: Optional[date] = None
     check_out_date: Optional[date] = None
@@ -91,8 +91,8 @@ class DecisionPayload(BaseModel):
 class RoomOccupancyUpdate(BaseModel):
     """Individual room occupancy update within a booking."""
     room_id: int = Field(..., description="Room ID in the booking to update")
-    adults: conint(ge=1) = Field(..., description="Number of adults (minimum 1 required)")
-    children: conint(ge=0) = Field(..., description="Number of children (minimum 0 allowed)")
+    adults: int = Field(..., ge=1,description="Number of adults (minimum 1 required)")
+    children: int = Field(..., ge=0,description="Number of children (minimum 0 allowed)")
 
     model_config = {"from_attributes": True}
 

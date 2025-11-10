@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status, Query
+from fastapi import APIRouter, Depends, status, Query, Security
 from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -7,8 +7,7 @@ from app.schemas.pydantic_models.refunds import RefundCreate, RefundResponse
 from app.schemas.pydantic_models.booking import BookingCreate, BookingResponse
 from app.services.booking_service.bookings_service import create_booking as svc_create_booking, get_booking as svc_get_booking, list_bookings as svc_list_bookings, query_bookings as svc_query_bookings
 from app.models.sqlalchemy_schemas.users import Users
-from app.dependencies.authentication import get_current_user, get_user_permissions, ensure_only_basic_user
-from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
+from app.dependencies.authentication import get_current_user, check_permission, ensure_only_basic_user
 from app.core.exceptions import ForbiddenError
 from app.services.refunds_service.refunds_service import cancel_booking_and_create_refund as svc_cancel_booking
 from app.core.cache import get_cached, set_cached, invalidate_pattern
@@ -26,7 +25,7 @@ router = APIRouter(prefix="/bookings", tags=["BOOKINGS"])
 async def create_booking(
 	payload: BookingCreate,
 	db: AsyncSession = Depends(get_db),
-	user_permissions: dict = Depends(get_user_permissions),
+	token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE"]),
 	current_user: Users = Depends(get_current_user),
 	_basic_user_check: bool = Depends(ensure_only_basic_user),
 ):
@@ -42,7 +41,7 @@ async def create_booking(
 	Args:
 		payload (BookingCreate): Booking request with room_id, check_in, check_out, guest count, etc.
 		db (AsyncSession): Database session dependency.
-		user_permissions (dict): Current user's permissions.
+		token_payload (dict): Security token payload validating BOOKING:WRITE permission.
 		current_user (Users): Authenticated user making the booking.
 		_basic_user_check (bool): Ensure only basic users can create bookings.
 	
@@ -59,12 +58,6 @@ async def create_booking(
 		- Creates audit log entry.
 		- Reserves room capacity for specified dates.
 	"""
-	if not (
-		Resources.BOOKING.value in user_permissions
-		and PermissionTypes.WRITE.value in user_permissions[Resources.BOOKING.value]
-	):
-		raise ForbiddenError("Insufficient permissions to create bookings")
-
 	# Pass user_id to service (enforced from authenticated user)
 	booking_record = await svc_create_booking(db, payload, user_id=current_user.user_id)
 	# create audit log for booking creation
@@ -132,7 +125,7 @@ async def get_bookings(
     limit: int = Query(20, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
-    user_permissions: dict = Depends(get_user_permissions),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:READ"]),
     current_user: Users = Depends(get_current_user),
 ):
     """
@@ -140,7 +133,7 @@ async def get_bookings(
     
     Flexible GET endpoint supporting multiple query modes:
     - **Basic users (role_id=1):** Can only view their own bookings (optionally filter by status).
-    - **Privileged users (BOOKING:WRITE):** Can view all bookings system-wide (with optional status filter).
+    - **Privileged users (BOOKING:READ):** Can view all bookings system-wide (with optional status filter).
     
     Respects pagination with limit and offset. Supports optional status filtering for both roles.
     Basic users cannot access bookings they don't own; attempting so returns 403.
@@ -151,22 +144,19 @@ async def get_bookings(
         limit (int): Pagination limit (default 20, max 200).
         offset (int): Pagination offset (default 0).
         db (AsyncSession): Database session dependency.
-        user_permissions (dict): Current user's permissions.
+        token_payload (dict): Security token payload validating BOOKING:READ permission.
         current_user (Users): Authenticated user.
     
     Returns:
         List[BookingResponse]: List of bookings matching criteria (basic users get only their own).
     
     Raises:
-        HTTPException (403): If user lacks BOOKING:WRITE and tries to access other user's booking.
+        HTTPException (403): If user lacks BOOKING:READ and tries to access other user's booking.
         HTTPException (404): If booking_id not found.
     """
 
     is_basic_user = getattr(current_user, "role_id", None) == 1
-    has_booking_write = (
-        Resources.BOOKING.value in user_permissions
-        and PermissionTypes.WRITE.value in user_permissions[Resources.BOOKING.value]
-    )
+    has_booking_read = True  # User has BOOKING:READ via Security
 
     # BASIC USER LOGIC
     if is_basic_user:
@@ -181,7 +171,7 @@ async def get_bookings(
         return [BookingResponse.model_validate(i).model_dump(exclude={"created_at"}) for i in items]
 
     # PRIVILEGED USER LOGIC
-    if not has_booking_write:
+    if not has_booking_read:
         raise ForbiddenError("Insufficient permissions to access bookings")
 
     if booking_id:

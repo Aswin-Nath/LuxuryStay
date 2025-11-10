@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, status, HTTPException
+from fastapi import APIRouter, Depends, Query, status, HTTPException, Security
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
 from typing import List, Optional
@@ -8,33 +8,13 @@ from app.database.postgres_connection import get_db
 from app.models.sqlalchemy_schemas.payments import Payments
 from app.models.sqlalchemy_schemas.bookings import Bookings
 from app.schemas.pydantic_models.payments import PaymentResponse
-from app.dependencies.authentication import get_current_user, get_user_permissions
+from app.dependencies.authentication import get_current_user, check_permission
 from app.models.sqlalchemy_schemas.users import Users
-from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
 from app.core.cache import get_cached, set_cached
 from app.core.exceptions import ForbiddenError
 
 
 router = APIRouter(prefix="/payments", tags=["PAYMENTS"])
-
-
-async def _is_admin_or_has_payment_access(
-    current_user: Users,
-    user_permissions: dict,
-) -> bool:
-    """
-    Check if user is admin or has payment processing permissions.
-    Returns True if user can view all payments, False if restricted to own payments.
-    """
-    # Check if user has PAYMENT_PROCESSING READ or WRITE permission (admin access)
-    has_payment_permission = (
-        Resources.PAYMENT_PROCESSING.value in user_permissions
-        and (
-            PermissionTypes.READ.value in user_permissions[Resources.PAYMENT_PROCESSING.value]
-            or PermissionTypes.WRITE.value in user_permissions[Resources.PAYMENT_PROCESSING.value]
-        )
-    )
-    return has_payment_permission
 
 
 async def _get_user_bookings(db: AsyncSession, user_id: int) -> List[int]:
@@ -63,7 +43,7 @@ async def get_payments(
     offset: int = Query(0, ge=0, description="Pagination offset"),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    user_permissions: dict = Depends(get_user_permissions),
+    token_payload: dict = Security(check_permission, scopes=["PAYMENT_PROCESSING:READ"]),
 ) -> List[PaymentResponse]:
     """
     Get payments with flexible filtering by various query parameters.
@@ -85,8 +65,9 @@ async def get_payments(
     - offset: Pagination offset (default: 0)
     """
     
-    # Check authorization
-    is_admin = await _is_admin_or_has_payment_access(current_user, user_permissions)
+    # Since user has PAYMENT_PROCESSING:READ via Security, they can see all payments
+    # No need for additional admin checks
+    is_admin = True
     
     # If not admin and user_id filter is attempted, reject
     if user_id is not None and not is_admin:
@@ -173,7 +154,7 @@ async def get_payment_by_id(
     payment_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    user_permissions: dict = Depends(get_user_permissions),
+    token_payload: dict = Security(check_permission, scopes=["PAYMENT_PROCESSING:READ"]),
 ) -> PaymentResponse:
     """
     Get a specific payment by its ID.
@@ -201,7 +182,7 @@ async def get_payment_by_id(
         )
     
     # Check authorization
-    is_admin = await _is_admin_or_has_payment_access(current_user, user_permissions)
+    is_admin = True  # User has PAYMENT_PROCESSING:READ via Security
     
     if not is_admin:
         # Get the booking for this payment and check ownership
@@ -228,7 +209,7 @@ async def get_payments_by_booking(
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    user_permissions: dict = Depends(get_user_permissions),
+    token_payload: dict = Security(check_permission, scopes=["PAYMENT_PROCESSING:READ"]),
 ) -> List[PaymentResponse]:
     """
     Get all payments for a specific booking.
@@ -245,7 +226,7 @@ async def get_payments_by_booking(
         return cached_result
     
     # Check authorization
-    is_admin = await _is_admin_or_has_payment_access(current_user, user_permissions)
+    is_admin = True  # User has PAYMENT_PROCESSING:READ via Security
     
     if not is_admin:
         # Get the booking and check ownership

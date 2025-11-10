@@ -2,7 +2,6 @@ from typing import List, Optional
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
-from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
 
 from app.models.sqlalchemy_schemas.images import Images
 from app.models.sqlalchemy_schemas.rooms import RoomTypes
@@ -109,9 +108,12 @@ async def get_images_for_entity(db: AsyncSession, entity_type: str, entity_id: i
     return items
 
 
-async def hard_delete_image(db: AsyncSession, image_id: int, requester_id: int | None = None, requester_permissions: dict | None = None) -> None:
-    """Permanently delete an image row. Only the uploader or users with room_service.WRITE may delete.
+async def hard_delete_image(db: AsyncSession, image_id: int, requester_id: int | None = None) -> None:
+    """Permanently delete an image row. Only the uploader or users with ROOM_MANAGEMENT:WRITE may delete.
 
+    Permission validation is handled at the route level via Security dependency.
+    This function handles the database deletion logic.
+    
     This removes the DB row; it does NOT attempt to delete remote file contents (external upload providers may
     require separate deletion APIs).
     """
@@ -120,53 +122,40 @@ async def hard_delete_image(db: AsyncSession, image_id: int, requester_id: int |
     if not image_record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
 
-    # If it's a room/room_type image, requester must either be uploader or have room_service.WRITE
-    allowed = False
-    if requester_id and image_record.uploaded_by and requester_id == image_record.uploaded_by:
-        allowed = True
-    if requester_permissions:
-        if (
-            Resources.ROOM_MANAGEMENT.value in requester_permissions
-            and PermissionTypes.WRITE.value in requester_permissions.get(Resources.ROOM_MANAGEMENT.value, set())
-        ):
-            allowed = True
-    # Allow review owner to delete images attached to their review
-    if not allowed and image_record.entity_type == "review" and requester_id:
-        query_result = await db.execute(select(Reviews).where(Reviews.review_id == image_record.entity_id))
-        review_record = query_result.scalars().first()
-        if review_record and review_record.user_id == requester_id:
-            allowed = True
-
-    if not allowed:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to delete image")
+    # Additional owner check: if requester_id provided, verify they are the uploader or review owner
+    if requester_id:
+        # Allow uploader to delete their own image
+        if image_record.uploaded_by and requester_id == image_record.uploaded_by:
+            pass  # Allowed
+        # Allow review owner to delete images attached to their review
+        elif image_record.entity_type == "review":
+            query_result = await db.execute(select(Reviews).where(Reviews.review_id == image_record.entity_id))
+            review_record = query_result.scalars().first()
+            if not review_record or review_record.user_id != requester_id:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to delete image")
+        else:
+            # For non-review entities, only uploader can delete
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to delete image")
 
     # Permanently delete the DB row
     await db.delete(image_record)
     await db.commit()
 
 
-async def set_image_primary(db: AsyncSession, image_id: int, requester_id: int | None = None, requester_permissions: dict | None = None) -> None:
+async def set_image_primary(db: AsyncSession, image_id: int, requester_id: int | None = None) -> None:
     """Mark the given image as primary for its entity (unset others).
 
-    Only uploader or users with ROOM_MANAGEMENT.WRITE may perform this.
+    Only uploader or users with ROOM_MANAGEMENT:WRITE may perform this.
+    Permission validation is handled at the route level via Security dependency.
+    This function handles the database logic.
     """
     query = await db.execute(select(Images).where(Images.image_id == image_id))
     image_record = query.scalars().first()
     if not image_record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
 
-    # Permission check: uploader or ROOM_MANAGEMENT.WRITE
-    allowed = False
-    if requester_id and image_record.uploaded_by and requester_id == image_record.uploaded_by:
-        allowed = True
-    if requester_permissions:
-        if (
-            Resources.ROOM_MANAGEMENT.value in requester_permissions
-            and PermissionTypes.WRITE.value in requester_permissions.get(Resources.ROOM_MANAGEMENT.value, set())
-        ):
-            allowed = True
-
-    if not allowed:
+    # Additional owner check: allow uploader to set their image as primary
+    if requester_id and image_record.uploaded_by and requester_id != image_record.uploaded_by:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to set primary image")
 
     # Unset other primary images for same entity

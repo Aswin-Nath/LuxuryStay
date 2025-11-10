@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status, Query, UploadFile, File
+from fastapi import APIRouter, Depends, Security, status, Query, UploadFile, File
 from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -6,8 +6,7 @@ from app.database.postgres_connection import get_db
 from app.schemas.pydantic_models.room import (
     RoomCreate, RoomResponse, Room, RoomUpdate, BulkRoomUploadResponse
 )
-from app.dependencies.authentication import get_user_permissions, get_current_user, ensure_not_basic_user
-from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
+from app.dependencies.authentication import check_permission, get_current_user, ensure_not_basic_user
 from app.core.exceptions import ForbiddenError
 from app.services.room_service.rooms_service import (
     create_room as svc_create_room,
@@ -23,44 +22,15 @@ from app.utils.audit_helper import log_audit
 router = APIRouter(prefix="/rooms", tags=["ROOMS"])
 
 
-def _require_permissions(user_permissions: dict, required_resources: list, perm: PermissionTypes, require_all: bool = True):
-    """
-    Validate user permissions for accessing resources.
-    
-    Checks if the user has the required permission on the specified resources.
-    Can enforce that user must have permission on ALL resources (require_all=True) or at least ONE (require_all=False).
-    
-    Args:
-        user_permissions (dict): Dictionary mapping resource names to lists of allowed permissions.
-        required_resources (list): List of Resources enum values to check.
-        perm (PermissionTypes): The permission type to validate (READ, WRITE, DELETE, etc).
-        require_all (bool): If True, user must have permission on all required resources; if False, on any one.
-    
-    Returns:
-        None: Returns if permission check passes.
-    
-    Raises:
-        ForbiddenError: If user lacks the required permissions.
-    """
-    # Normalize required resources and permission to strings (enum.value)
-    req_keys = [r.value if hasattr(r, 'value') else str(r).upper() for r in required_resources]
-    perm_key = perm.value if hasattr(perm, 'value') else str(perm).upper()
-
-    satisfied = 0
-    for res_key, perms in user_permissions.items():
-        if res_key in req_keys and perm_key in perms:
-            satisfied += 1
-    if require_all and satisfied < len(required_resources):
-        raise ForbiddenError("Insufficient permissions")
-    if not require_all and satisfied == 0:
-        raise ForbiddenError("Insufficient permissions")
-
-
 # ============================================================================
 # 🔹 CREATE - Add a new room to the system
 # ============================================================================
 @router.post("/", response_model=RoomResponse, status_code=status.HTTP_201_CREATED)
-async def create_room(payload: RoomCreate, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
+async def create_room(
+    payload: RoomCreate,
+    db: AsyncSession = Depends(get_db),
+    token_payload: dict = Security(check_permission, scopes=["ROOM_MANAGEMENT:WRITE"]),
+):
     """
     Create a new room in the system.
     
@@ -90,15 +60,12 @@ async def create_room(payload: RoomCreate, db: AsyncSession = Depends(get_db), u
         HTTPException (409): If room number already exists.
         HTTPException (404): If room type not found.
     """
-    # Require WRITE on both Booking and Room_Management
-    _require_permissions(user_permissions, [Resources.BOOKING, Resources.ROOM_MANAGEMENT], PermissionTypes.WRITE, require_all=True)
     room_record = await svc_create_room(db, payload)
     # create audit log for room creation
     try:
         new_val = RoomResponse.model_validate(room_record).model_dump()
         entity_id = f"room:{getattr(room_record, 'room_id', None)}"
-        changed_by = getattr(locals().get('current_user'), 'user_id', None) or getattr(payload, 'user_id', None)
-        await log_audit(entity="room", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=changed_by, user_id=changed_by)
+        await log_audit(entity="room", entity_id=entity_id, action="INSERT", new_value=new_val)
     except Exception:
         pass
     # invalidate rooms cache
@@ -173,7 +140,7 @@ async def get_rooms(
 # 🔹 UPDATE - Modify existing room details
 # ============================================================================
 @router.put("/{room_id}", response_model=RoomResponse)
-async def update_room(room_id: int, payload: RoomUpdate, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
+async def update_room(room_id: int, payload: RoomUpdate, db: AsyncSession = Depends(get_db), token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "ROOM_MANAGEMENT:WRITE"])):
     """
     Update an existing room's information.
     
@@ -206,8 +173,6 @@ async def update_room(room_id: int, payload: RoomUpdate, db: AsyncSession = Depe
         HTTPException (404): If room not found.
         HTTPException (409): If new room number conflicts with another room.
     """
-    # Require WRITE on both Booking and Room_Management
-    _require_permissions(user_permissions, [Resources.BOOKING, Resources.ROOM_MANAGEMENT], PermissionTypes.WRITE, require_all=True)
     room_record = await svc_update_room(db, room_id, payload)
     # audit update
     try:
@@ -226,7 +191,7 @@ async def update_room(room_id: int, payload: RoomUpdate, db: AsyncSession = Depe
 # 🔹 DELETE - Remove room from system
 # ============================================================================
 @router.delete("/{room_id}")
-async def delete_room(room_id: int, db: AsyncSession = Depends(get_db), user_permissions: dict = Depends(get_user_permissions)):
+async def delete_room(room_id: int, db: AsyncSession = Depends(get_db), token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "ROOM_MANAGEMENT:WRITE"])):
     """
     Soft-delete a room from the system.
     
@@ -254,8 +219,6 @@ async def delete_room(room_id: int, db: AsyncSession = Depends(get_db), user_per
         ForbiddenError: If user lacks required permissions.
         HTTPException (404): If room not found.
     """
-    # Require WRITE on both Booking and Room_Management
-    _require_permissions(user_permissions, [Resources.BOOKING, Resources.ROOM_MANAGEMENT], PermissionTypes.WRITE, require_all=True)
     await svc_delete_room(db, room_id)
     # invalidate rooms cache after delete
     await invalidate_pattern("rooms:*")
@@ -269,7 +232,7 @@ async def delete_room(room_id: int, db: AsyncSession = Depends(get_db), user_per
 async def bulk_upload_rooms(
     file: UploadFile = File(..., description="Excel file with columns: room_no, room_type_id, room_status, freeze_reason"),
     db: AsyncSession = Depends(get_db),
-    user_permissions: dict = Depends(get_user_permissions),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "ROOM_MANAGEMENT:WRITE"]),
     _ok: bool = Depends(ensure_not_basic_user),
 ):
     """
@@ -297,9 +260,6 @@ async def bulk_upload_rooms(
       -F "file=@rooms.xlsx"
     ```
     """
-    # Require WRITE on both Booking and Room_Management
-    _require_permissions(user_permissions, [Resources.BOOKING, Resources.ROOM_MANAGEMENT], PermissionTypes.WRITE, require_all=True)
-    
     # Read file content
     content = await file.read()
     

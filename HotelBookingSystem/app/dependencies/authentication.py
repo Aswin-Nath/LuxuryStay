@@ -1,4 +1,5 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Security
+from fastapi.security import SecurityScopes
 from jose import jwt, JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -75,99 +76,73 @@ async def get_current_user(
 
 
 # ======================================================
-# 2️⃣ Extract permissions for the current user
+# 1.5️⃣ Check permissions using SecurityScopes (Resource:permission format)
 # ======================================================
-async def get_user_permissions(
-    current_user: Users = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+
+async def check_permission(
+    security_scopes: SecurityScopes,
+    token: str = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db)
 ):
     """
-    Extracts all permissions for the current user via their role with Redis caching.
-    
-    Retrieves user permissions from Redis cache first. If not cached, queries database,
-    builds permission map, and stores in Redis with 1-hour TTL (3600 seconds).
-    
-    Returns -> dict[resource_name: set(permission_types)]
-    
-    Side Effects:
-        - Queries database if cache miss (queries permissions by role_id).
-        - Caches result in Redis with key: `user_perms:{role_id}` TTL 3600 seconds.
-        - Normalizes resource and permission_type to uppercase strings.
-    
-    Raises:
-        HTTPException (403): If user has no role_id assigned.
+    Validate JWT, check blacklist, verify user's role and permissions against required scopes.
+    Permissions follow "RESOURCE:PERMISSION" format.
     """
 
-    # Step 1: Validate role_id
-    role_id = current_user.role_id
-    if not role_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User role not found for permission mapping",
-        )
+    # --- Token validation
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
-    # Step 2: Check Redis cache first
-    cache_key = f"user_perms:{role_id}"
-    permissions_map = None
-    
     try:
-        if redis:
-            cached_data = await redis.get(cache_key)
-            if cached_data:
-                # Convert cached JSON back to dict with sets
-                cached_dict = json.loads(cached_data)
-                permissions_map = {k: set(v) for k, v in cached_dict.items()}
-    except Exception as e:
-        # Log error but continue - cache miss should not block request
-        print(f"⚠️  Redis cache retrieval failed: {e}")
-        pass
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = int(payload.get("sub") or 0)
+        if not user_id:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
 
-    # Step 3: If not in cache, query database
-    if not permissions_map:
-        result = await db.execute(
-            select(Permissions.resource, Permissions.permission_type)
-            .join(PermissionRoleMap, PermissionRoleMap.permission_id == Permissions.permission_id)
-            .where(PermissionRoleMap.role_id == role_id)
-        )
+    # --- User validation
+    user = (await db.execute(select(Users).where(Users.user_id == user_id))).scalars().first()
+    if not user:
+        raise credentials_exception
 
-        records = result.all()
+    # --- Token blacklist check
+    token_hash = _hash_token(token)
+    if (await db.execute(
+        select(BlacklistedTokens).where(BlacklistedTokens.token_value_hash == token_hash)
+    )).scalars().first():
+        raise credentials_exception
 
-        # Step 4: Build a permission map
-        # Normalize to plain uppercase strings for both resource and permission type so route checks
-        # can safely compare against enum.value (which are uppercase strings in this project).
-        permissions_map = {}
-        for resource, perm_type in records:
-            # resource and perm_type may be Enum members or plain strings depending on driver; normalize
-            if hasattr(resource, "value"):
-                resource_key = str(resource.value).upper()
-            else:
-                resource_key = str(resource).upper()
+    # --- Role validation
+    role = (await db.execute(select(Roles).where(Roles.role_id == user.role_id))).scalars().first()
+    if not role:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found")
 
-            if hasattr(perm_type, "value"):
-                perm_key = str(perm_type.value).upper()
-            else:
-                perm_key = str(perm_type).upper()
+    # --- Permissions fetch & flatten
+    permissions_result = await db.execute(
+        select(Permissions.permission_name)
+        .join(PermissionRoleMap, PermissionRoleMap.permission_id == Permissions.permission_id)
+        .where(PermissionRoleMap.role_id == user.role_id)
+    )
 
-            permissions_map.setdefault(resource_key, set()).add(perm_key)
+    # Flatten tuple results like [('X',), ('Y',)] → ['X', 'Y']
+    user_permissions = [perm[0].upper() for perm in permissions_result.all()]
+    # --- Permission check
+    for scope in security_scopes.scopes:
+        if scope.upper() not in user_permissions:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access forbidden: insufficient privileges"
+            )
 
-        # Step 5: Cache in Redis (convert sets to lists for JSON serialization)
-        try:
-            if redis and permissions_map:
-                cache_data = {k: list(v) for k, v in permissions_map.items()}
-                await redis.setex(cache_key, 3600, json.dumps(cache_data))  # 1-hour TTL
-        except Exception as e:
-            # Cache write failure should not block request
-            print(f"⚠️  Redis cache storage failed: {e}")
-            pass
-
-    # Step 6: Return empty map if no permissions found
-    if not permissions_map:
-        return {}
-
-    return permissions_map
-
+    return payload
 
 # ======================================================
+# 2️⃣ Extract permissions for the current user
+
 # 3️⃣ Invalidate permissions cache (called when permissions change)
 # ======================================================
 async def invalidate_permissions_cache(role_id: int):

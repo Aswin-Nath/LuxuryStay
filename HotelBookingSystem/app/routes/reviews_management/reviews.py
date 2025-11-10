@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, Depends, status, UploadFile, File, Form, HTTPException, Security
 from typing import List, Optional, Union
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,7 +12,7 @@ from app.services.reviews_service.reviews_service import (
     admin_respond_review as svc_admin_respond,
     update_review_by_user as svc_update_review,
 )
-from app.dependencies.authentication import get_current_user, ensure_not_basic_user, get_user_permissions
+from app.dependencies.authentication import get_current_user, ensure_not_basic_user, check_permission
 from app.models.sqlalchemy_schemas.users import Users
 from app.services.images_service.image_upload_service import save_uploaded_image
 from app.services.room_service.images_service import create_image, hard_delete_image, get_images_for_review
@@ -308,7 +308,7 @@ async def list_review_images(review_id: int, db: AsyncSession = Depends(get_db))
 # 🔹 DELETE - Remove images from review
 # ============================================================================
 @router.delete("/{review_id}/images")
-async def delete_review_images(review_id: int, image_ids: List[int], db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user), user_permissions: dict = Depends(get_user_permissions)):
+async def delete_review_images(review_id: int, image_ids: List[int], db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user), token_payload: dict = Security(check_permission, scopes=["ROOM_MANAGEMENT:WRITE"])):
     """
     Delete images from a review.
     
@@ -340,7 +340,7 @@ async def delete_review_images(review_id: int, image_ids: List[int], db: AsyncSe
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="image_ids is required")
     deleted = []
     for img_id in image_ids:
-        await hard_delete_image(db, img_id, requester_id=current_user.user_id, requester_permissions=user_permissions)
+        await hard_delete_image(db, img_id, requester_id=current_user.user_id)
         deleted.append(img_id)
     # invalidate caches for this review
     await invalidate_pattern(f"reviews:*{review_id}*")
