@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
-from typing import Optional, Literal, Dict, List,Tuple
+from pydantic import BaseModel, Field, conint
+from typing import Optional, Literal, Dict, List, Tuple
 from datetime import date, datetime
 
 class BookingEditBase(BaseModel):
@@ -86,3 +86,21 @@ class DecisionPayload(BaseModel):
             "Example: {2: ('ACCEPT', 101), 5: ('KEEP', -1), 7: ('REFUND', -1)}"
         )
     )
+
+
+class RoomOccupancyUpdate(BaseModel):
+    """Individual room occupancy update within a booking."""
+    room_id: int = Field(..., description="Room ID in the booking to update")
+    adults: conint(ge=1) = Field(..., description="Number of adults (minimum 1 required)")
+    children: conint(ge=0) = Field(..., description="Number of children (minimum 0 allowed)")
+
+    model_config = {"from_attributes": True}
+
+
+class UpdateRoomOccupancyRequest(BaseModel):
+    """Request body for updating room occupancy (adults/children count) in a booking."""
+    room_updates: List[RoomOccupancyUpdate] = Field(
+        ..., description="List of room occupancy updates"
+    )
+
+    model_config = {"from_attributes": True}

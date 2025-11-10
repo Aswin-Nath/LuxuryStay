@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.postgres_connection import get_db
 from app.dependencies.authentication import get_current_user, get_user_permissions
 from app.models.sqlalchemy_schemas.permissions import Resources, PermissionTypes
-from app.schemas.pydantic_models.booking_edits import BookingEditCreate, BookingEditResponse,ReviewPayload,DecisionPayload
+from app.schemas.pydantic_models.booking_edits import BookingEditCreate, BookingEditResponse, ReviewPayload, DecisionPayload, UpdateRoomOccupancyRequest
 from app.services.booking_service.booking_edit import (
     create_booking_edit_service,
     get_all_booking_edits_service,
@@ -223,7 +223,7 @@ async def decision_booking_edit(
 @router.patch("/{booking_id}/occupancy", status_code=status.HTTP_200_OK)
 async def update_occupancy(
     booking_id: int,
-    room_occupancy_updates: dict,
+    payload: UpdateRoomOccupancyRequest,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -300,7 +300,7 @@ async def update_occupancy(
     """
     updated_rooms = await update_room_occupancy_service(
         booking_id=booking_id,
-        room_occupancy_updates=room_occupancy_updates,
+        room_occupancy_updates=payload.model_dump(),
         db=db,
         current_user=current_user
     )

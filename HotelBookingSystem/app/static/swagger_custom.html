@@ -32,6 +32,13 @@
             flex-grow: 1;
             width: 400px;
         }
+        /* 🔹 Tag color badges */
+        .tag-colored {
+            color: white !important;
+            padding: 5px 12px !important;
+            border-radius: 8px;
+            font-weight: 500;
+        }
     </style>
 </head>
 <body>
@@ -52,7 +59,7 @@
         ],
         onComplete: () => {
 
-            // Rename username/password → Email/Password dynamically
+            // 🔹 Rename username/password → Email/Password
             setInterval(() => {
                 const modal = document.querySelector('.modal-ux');
                 if (!modal) return;
@@ -68,7 +75,52 @@
             }, 1000);
 
 
-            // Add search + filter toolbar
+            // 🔹 Tag Color Mapping
+            const tagColors = {
+                // 🟢 Core
+                rooms: '#22c55e',
+                amenities: '#22c55e',
+                room_types: '#22c55e',
+                room_images: '#22c55e',
+                bookings: '#22c55e',
+                'booking-edits': '#22c55e',
+                // 🟡 Intermediate
+                offers: '#eab308',
+                profile: '#eab308',
+                wishlist: '#eab308',
+                // 🔴 Admin
+                refunds: '#ef4444',
+                issues: '#ef4444',
+                logs: '#ef4444',
+                reports_admin: '#ef4444',
+                // 🔵 System
+                notifications: '#3b82f6',
+                backups: '#3b82f6',
+                restores: '#3b82f6',
+                reports_customer: '#3b82f6',
+                // 🟣 Access
+                roles: '#a855f7',
+                auth: '#a855f7',
+                // ⚫ Misc
+                content: '#6b7280',
+                payments: '#6b7280'
+            };
+
+            // 🔹 Apply color labels to each tag dynamically
+            const applyTagColors = () => {
+                document.querySelectorAll('.opblock-tag').forEach(tag => {
+                    const tagText = tag.textContent.trim().toLowerCase().replace(/\s|-/g, '_');
+                    const color = tagColors[tagText];
+                    if (color) {
+                        tag.classList.add('tag-colored');
+                        tag.style.backgroundColor = color;
+                    }
+                });
+            };
+            setInterval(applyTagColors, 1500);
+
+
+            // 🔹 Add search + filter toolbar
             setTimeout(() => {
                 const authWrapper = document.querySelector('.auth-wrapper');
                 if (!authWrapper) return;
@@ -76,51 +128,38 @@
                 const toolbar = document.createElement('div');
                 toolbar.className = 'custom-toolbar';
 
-                // 🔹 Search Bar
+                // 🔸 Search Input
                 const search = document.createElement('input');
                 search.type = 'text';
                 search.placeholder = 'Search endpoint or module...';
 
-                // 🔹 Dropdown
+                // 🔸 Dropdown Filter
                 const dropdown = document.createElement('select');
                 dropdown.innerHTML = `
 <option value=""> 🧭 Show All </option>
-
-<!-- 🟢 Core Functional Modules -->
-<option value="Rooms" style="background:#22c55e;color:white;">🟢 Rooms</option>
-<option value="Amenities" style="background:#22c55e;color:white;">🟢 Amenities</option>
-<option value="Room_types" style="background:#22c55e;color:white;">🟢 Room Types</option>
-<option value="Room_Images" style="background:#22c55e;color:white;">🟢 Room Images</option>
-<option value="Bookings" style="background:#22c55e;color:white;">🟢 Bookings</option>
-<option value="Booking-Edits" style="background:#22c55e;color:white;">🟢 Edit Booking</option>
-
-<!-- 🟡 Intermediate -->
-<option value="Offers" style="background:#eab308;color:white;">🟡 Offers</option>
-<option value="Profile" style="background:#eab308;color:white;">🟡 Profile</option>
-<option value="wishlist" style="background:#eab308;color:white;">🟡 Wishlist</option>
-
-<!-- 🔴 Admin / Critical -->
-<option value="Refunds" style="background:#ef4444;color:white;">🔴 Refunds</option>
-<option value="Issues" style="background:#ef4444;color:white;">🔴 Issues</option>
-<option value="Logs" style="background:#ef4444;color:white;">🔴 Logs</option>
-<option value="REPORTS_ADMIN" style="background:#ef4444;color:white;">🔴 Admin Reports</option>
-
-<!-- 🔵 System -->
-<option value="Notifications" style="background:#3b82f6;color:white;">🔵 Notifications</option>
-<option value="Backups" style="background:#3b82f6;color:white;">🔵 Backups</option>
-<option value="Restores" style="background:#3b82f6;color:white;">🔵 Restores</option>
-<option value="REPORTS_CUSTOMER" style="background:#3b82f6;color:white;">🔵 Customer Reports</option>
-
-<!-- 🟣 Access -->
-<option value="ROLES" style="background:#a855f7;color:white;">🟣 Roles</option>
-<option value="Auth" style="background:#a855f7;color:white;">🟣 Auth</option>
-
-<!-- ⚫ Misc -->
-<option value="content" style="background:#6b7280;color:white;">⚫ Content Management</option>
-<option value="payments" style="background:#6b7280;color:white;">⚫ Payments</option>
+<option value="rooms">🟢 Rooms</option>
+<option value="amenities">🟢 Amenities</option>
+<option value="room_types">🟢 Room Types</option>
+<option value="room_images">🟢 Room Images</option>
+<option value="bookings">🟢 Bookings</option>
+<option value="booking-edits">🟢 Edit Booking</option>
+<option value="offers">🟡 Offers</option>
+<option value="profile">🟡 Profile</option>
+<option value="wishlist">🟡 Wishlist</option>
+<option value="refunds">🔴 Refunds</option>
+<option value="issues">🔴 Issues</option>
+<option value="logs">🔴 Logs</option>
+<option value="reports_admin">🔴 Admin Reports</option>
+<option value="notifications">🔵 Notifications</option>
+<option value="backups">🔵 Backups</option>
+<option value="restores">🔵 Restores</option>
+<option value="reports_customer">🔵 Customer Reports</option>
+<option value="roles">🟣 Roles</option>
+<option value="auth">🟣 Auth</option>
+<option value="content">⚫ Content Management</option>
+<option value="payments">⚫ Payments</option>
                 `;
 
-                // 🔹 Filter by dropdown
                 dropdown.onchange = function() {
                     const tag = this.value.toLowerCase();
                     document.querySelectorAll('.opblock-tag-section').forEach(sec => {
@@ -129,27 +168,24 @@
                     });
                 };
 
-                // 🔹 Live search filter
+                // 🔸 Live search
                 search.addEventListener('input', function() {
                     const query = this.value.toLowerCase();
                     document.querySelectorAll('.opblock-tag-section').forEach(sec => {
                         const tagText = sec.querySelector('.opblock-tag').textContent.toLowerCase();
-                        const matchesTag = tagText.includes(query);
                         const endpoints = sec.querySelectorAll('.opblock-summary');
-                        let matchesEndpoint = false;
+                        let matches = tagText.includes(query);
                         endpoints.forEach(ep => {
                             const txt = ep.textContent.toLowerCase();
                             ep.style.display = txt.includes(query) ? '' : 'none';
-                            if (txt.includes(query)) matchesEndpoint = true;
+                            if (txt.includes(query)) matches = true;
                         });
-                        sec.style.display = (matchesTag || matchesEndpoint || query === '') ? '' : 'none';
+                        sec.style.display = matches || query === '' ? '' : 'none';
                     });
                 });
 
-                // Assemble toolbar
                 toolbar.appendChild(search);
                 toolbar.appendChild(dropdown);
-
                 authWrapper.parentNode.insertBefore(toolbar, authWrapper);
             }, 1000);
         }
