@@ -72,10 +72,6 @@ async def signup(payload: UserCreate, db: AsyncSession = Depends(get_db)):
 # ==================================================
 # 🔹 CREATE - Request OTP for password reset or verification
 # ==================================================
-# OTP / PASSWORD RESET / CHANGE PASSWORD endpoints
-# ==================================================
-
-
 @auth_router.post("/otp/request", status_code=status.HTTP_202_ACCEPTED)
 async def request_otp(payload: OTPRequest, request: Request = None, db: AsyncSession = Depends(get_db)):
     """

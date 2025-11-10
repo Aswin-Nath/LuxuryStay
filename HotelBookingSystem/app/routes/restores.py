@@ -34,9 +34,6 @@ router = APIRouter(prefix="/restores", tags=["RESTORES"])
 # ============================================================================
 # 🔹 CREATE - Restore database from backup file
 # ============================================================================
-# ───────────────────────────────
-# POST: RESTORE DATABASE
-# ───────────────────────────────
 @router.post("/restore/{backup_id}", response_model=dict)
 async def restore_database_from_backup(
     backup_id: str,
@@ -45,12 +42,38 @@ async def restore_database_from_backup(
 ) -> Dict[str, str]:
     """
     Restore PostgreSQL database from backup ZIP file.
-    Steps:
-      1. Fetch backup metadata from MongoDB.
-      2. Unzip the .zip to extract .dump file.
-      3. Create a new restore DB (hotel_restore_<timestamp>).
-      4. Run pg_restore into it.
-      5. Log the restore details in restored_data_collections.
+    
+    Initiates a database restoration workflow. Fetches backup metadata from MongoDB,
+    extracts the dump file, creates a new timestamped restore database, and runs
+    pg_restore. The restore database persists for manual validation before production
+    deployment. Access restricted to administrators with RESTORE_OPERATIONS:WRITE scope.
+    
+    Restoration steps:
+    1. Fetch backup metadata from MongoDB by backup_id
+    2. Unzip the backup file to extract .dump file
+    3. Create new PostgreSQL database (hotel_restore_<timestamp>)
+    4. Execute pg_restore to populate new database
+    5. Log restore record in restored_data_collections with metadata
+    6. Cleanup temporary .dump file
+    
+    Args:
+        backup_id (str): MongoDB ObjectId of the backup to restore.
+        current_user (Users): Authenticated administrator (must have RESTORE_OPERATIONS:WRITE).
+        _permissions (dict): Security dependency verifying restore scope.
+    
+    Returns:
+        dict: Restoration confirmation with restoredDatabase name, zipPath, checksum,
+              sizeMB, mongoId, and success message.
+    
+    Raises:
+        HTTPException (404): If backup_id not found or backup file missing on disk.
+        HTTPException (500): If unzip, database creation, or pg_restore fails.
+    
+    Side Effects:
+        - Creates new PostgreSQL database on server
+        - Creates restore record in MongoDB
+        - Extracts and cleans up temporary .dump files
+        - Requires pg_restore and createdb utilities on system PATH
     """
 
     # Step 1: Fetch backup record
@@ -160,9 +183,6 @@ async def restore_database_from_backup(
 # ============================================================================
 # 🔹 READ - Fetch list of database restore records
 # ============================================================================
-# ───────────────────────────────
-# GET: LIST RESTORES
-# ───────────────────────────────
 @router.get("/", response_model=List[dict])
 async def get_restores(
     backupRefId: Optional[str] = Query(None),
@@ -175,7 +195,33 @@ async def get_restores(
     _permissions: dict = Security(check_permission, scopes=["RESTORE_OPERATIONS:READ"]),
 ):
     """
-    Fetch list of restore records from MongoDB with optional filters.
+    Retrieve list of database restore records with optional filtering.
+    
+    Queries MongoDB restored_data_collections with advanced filtering by backup reference,
+    status, database type, and timestamp range. Results are sorted by timestamp descending.
+    Useful for audit trail and restore history tracking. Access restricted to users with
+    RESTORE_OPERATIONS:READ scope.
+    
+    Args:
+        backupRefId (Optional[str]): Filter by source backup MongoDB ObjectId.
+        status (Optional[str]): Filter by restore status ("completed", "failed", etc.).
+        databaseType (Optional[str]): Filter by database type (default: "postgres").
+        start_ts (Optional[str]): ISO 8601 datetime start for range filtering.
+        end_ts (Optional[str]): ISO 8601 datetime end for range filtering.
+        limit (int): Records per page (default: 50, max: 1000).
+        skip (int): Pagination offset (default: 0).
+        _permissions (dict): Security dependency verifying restore read scope.
+    
+    Returns:
+        List[dict]: Array of restore records with _id, backupRefId, status, timestamps,
+                   restoredDatabase name, and checksum metadata.
+    
+    Raises:
+        HTTPException (404): If no restore records match query filters.
+        HTTPException (403): If user lacks RESTORE_OPERATIONS:READ permission.
+    
+    Side Effects:
+        - None
     """
 
     query = {}

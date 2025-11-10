@@ -38,9 +38,6 @@ backup_col = mongo_db["backup_data_collections"]
 # ============================================================================
 # 🔹 CREATE - Create a new database backup (PostgreSQL + metadata)
 # ============================================================================
-# ───────────────────────────────
-# CREATE BACKUP (with user context)
-# ───────────────────────────────
 @router.post("/create", response_model=dict)
 async def create_database_backup(
     snapshot_name: Optional[str] = Query(default=None, description="Name for the snapshot"),
@@ -48,6 +45,32 @@ async def create_database_backup(
     current_user: Users = Depends(get_current_user),
     token_payload: dict = Security(check_permission, scopes=["BACKUP_OPERATIONS:WRITE"])
 ) -> Dict[str, str]:
+    """
+    Create a PostgreSQL backup (.zip), calculate checksum, and log metadata in MongoDB.
+    
+    Creates a full database backup using pg_dump, compresses it to ZIP format, and stores
+    metadata in MongoDB. The backup is automatically timestamped and checksummed for integrity
+    verification. Only users with BACKUP_OPERATIONS:WRITE permission can trigger backups.
+    
+    Args:
+        snapshot_name (Optional[str]): Custom name for the backup snapshot.
+        trigger_type (Optional[str]): Type of trigger - "manual" or "scheduled".
+        current_user (Users): Authenticated user initiating the backup.
+        token_payload (dict): Security token validating BACKUP_OPERATIONS:WRITE permission.
+    
+    Returns:
+        dict: Backup metadata including snapshot name, file path, size, checksum, and MongoDB ID.
+    
+    Raises:
+        HTTPException (400): If POSTGRES_DB not configured in environment.
+        HTTPException (500): If backup or compression fails.
+    
+    Side Effects:
+        - Creates backup directory structure if not exists.
+        - Generates .dump file and compresses to .zip.
+        - Stores metadata in MongoDB backup_data_collections.
+        - Sets initiatedBy to current user's user_id.
+    """
     """
     Create a PostgreSQL backup (.zip), calculate checksum, and log metadata in MongoDB.
     The `initiatedBy` field is automatically set to the authenticated user's user_id.
@@ -149,9 +172,6 @@ async def create_database_backup(
 # ============================================================================
 # 🔹 READ - Fetch list of database backups with filters
 # ============================================================================
-# ───────────────────────────────
-# GET BACKUPS
-# ───────────────────────────────
 @router.get("/", response_model=List[dict])
 async def get_backups(
     snapshotName: Optional[str] = Query(None),
@@ -164,6 +184,29 @@ async def get_backups(
     skip: int = Query(0, ge=0),
     token_payload: dict = Security(check_permission, scopes=["BACKUP_OPERATIONS:WRITE"])
 ):
+    """
+    Retrieve list of database backups with optional filters and pagination.
+    
+    Fetches all backup records from MongoDB with flexible filtering by snapshot name, trigger type,
+    status, database type, and date range. Results are paginated for performance.
+    
+    Args:
+        snapshotName (Optional[str]): Filter by backup snapshot name.
+        triggerType (Optional[str]): Filter by trigger type - "manual" or "scheduled".
+        status (Optional[str]): Filter by backup status.
+        databaseType (Optional[str]): Filter by database type.
+        start_ts (Optional[str]): ISO datetime string for start of date range.
+        end_ts (Optional[str]): ISO datetime string for end of date range.
+        limit (int): Number of records to return (default: 50, max: 1000).
+        skip (int): Number of records to skip for pagination (default: 0).
+        token_payload (dict): Security token validating permissions.
+    
+    Returns:
+        List[dict]: List of backup records with metadata, checksums, and timestamps.
+    
+    Raises:
+        HTTPException (403): If user lacks BACKUP_OPERATIONS:WRITE permission.
+    """
     """List backups with optional filters and pagination."""
     results = await list_backups(
         snapshotName=snapshotName,

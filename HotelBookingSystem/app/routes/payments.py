@@ -46,6 +46,39 @@ async def get_payments(
     token_payload: dict = Security(check_permission, scopes=["PAYMENT_PROCESSING:READ"]),
 ) -> List[PaymentResponse]:
     """
+    Retrieve payments with flexible filtering and authorization.
+    
+    Fetches payment records with advanced filtering. Admin users can view all payments;
+    regular users can only view payments for their own bookings. Results are cached for performance.
+    
+    Args:
+        payment_id (Optional[int]): Filter by specific payment ID.
+        booking_id (Optional[int]): Filter by booking ID.
+        user_id (Optional[int]): Filter by user ID (admin only).
+        method_id (Optional[int]): Filter by payment method.
+        status (Optional[str]): Filter by status (SUCCESS, PENDING, FAILED).
+        amount_min (Optional[float]): Minimum payment amount filter.
+        amount_max (Optional[float]): Maximum payment amount filter.
+        start_date (Optional[datetime]): Filter from this date onwards.
+        end_date (Optional[datetime]): Filter until this date.
+        is_deleted (Optional[bool]): Include soft-deleted records (default: False).
+        limit (int): Records per page (default: 20, max: 200).
+        offset (int): Pagination offset (default: 0).
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user.
+        token_payload (dict): Security token with PAYMENT_PROCESSING:READ permission.
+    
+    Returns:
+        List[PaymentResponse]: Array of payment records matching criteria.
+    
+    Raises:
+        HTTPException (403): If non-admin user tries to filter by user_id.
+        HTTPException (400): If invalid filter parameters.
+    
+    Side Effects:
+        - Results cached with dynamic key based on filters and user.
+    """
+    """
     Get payments with flexible filtering by various query parameters.
     
     Authorization:
