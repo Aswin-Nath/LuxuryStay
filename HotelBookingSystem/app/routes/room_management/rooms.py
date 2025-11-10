@@ -6,8 +6,8 @@ from app.database.postgres_connection import get_db
 from app.schemas.pydantic_models.room import (
     RoomCreate, RoomResponse, Room, RoomUpdate, BulkRoomUploadResponse
 )
-from app.dependencies.authentication import check_permission, get_current_user, ensure_not_basic_user
-from app.core.exceptions import ForbiddenError
+from app.dependencies.authentication import check_permission, get_current_user
+from app.core.exceptions import ForbiddenException
 from app.services.room_service.rooms_service import (
     create_room as svc_create_room,
     list_rooms as svc_list_rooms,
@@ -17,7 +17,7 @@ from app.services.room_service.rooms_service import (
     bulk_upload_rooms as svc_bulk_upload_rooms,
 )
 from app.core.cache import get_cached, set_cached, invalidate_pattern
-from app.utils.audit_helper import log_audit
+from app.utils.audit_util import log_audit
 
 router = APIRouter(prefix="/rooms", tags=["ROOMS"])
 
@@ -56,7 +56,7 @@ async def create_room(
         RoomResponse: The newly created room object with success message.
     
     Raises:
-        ForbiddenError: If user lacks required permissions.
+        ForbiddenException: If user lacks required permissions.
         HTTPException (409): If room number already exists.
         HTTPException (404): If room type not found.
     """
@@ -84,9 +84,9 @@ async def get_rooms(
     status_filter: Optional[str] = Query(None),
     is_freezed: Optional[bool] = Query(None),
     db: AsyncSession = Depends(get_db),
-    # Authenticate user first, then ensure they are not a basic user (admins/managers allowed)
+    # Authenticate user first, then check permissions
     _current_user = Depends(get_current_user),
-    _ok: bool = Depends(ensure_not_basic_user),
+    _permissions: dict = Security(check_permission, scopes=["ROOM_MANAGEMENT:READ"]),
 ):
     """
     Fetch room(s) with optional filters and caching.
@@ -119,7 +119,7 @@ async def get_rooms(
     
     Raises:
         HTTPException (404): If room_id is provided but room not found.
-        ForbiddenError: If user is a basic user.
+        ForbiddenException: If user is a basic user.
     """
     if room_id is not None:
         room_record = await svc_get_room(db, room_id)
@@ -169,7 +169,7 @@ async def update_room(room_id: int, payload: RoomUpdate, db: AsyncSession = Depe
         RoomResponse: The updated room object with success message.
     
     Raises:
-        ForbiddenError: If user lacks required permissions.
+        ForbiddenException: If user lacks required permissions.
         HTTPException (404): If room not found.
         HTTPException (409): If new room number conflicts with another room.
     """
@@ -216,7 +216,7 @@ async def delete_room(room_id: int, db: AsyncSession = Depends(get_db), token_pa
         dict: Dictionary with "message" key confirming deletion.
     
     Raises:
-        ForbiddenError: If user lacks required permissions.
+        ForbiddenException: If user lacks required permissions.
         HTTPException (404): If room not found.
     """
     await svc_delete_room(db, room_id)
@@ -233,7 +233,6 @@ async def bulk_upload_rooms(
     file: UploadFile = File(..., description="Excel file with columns: room_no, room_type_id, room_status, freeze_reason"),
     db: AsyncSession = Depends(get_db),
     token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "ROOM_MANAGEMENT:WRITE"]),
-    _ok: bool = Depends(ensure_not_basic_user),
 ):
     """
     Bulk upload rooms from an Excel file (only ADMIN/MANAGER allowed).

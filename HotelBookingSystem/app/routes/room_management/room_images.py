@@ -12,15 +12,15 @@ from fastapi import (
 from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.images_service.image_upload_service import save_uploaded_image
-from app.services.room_service.images_service import create_image, get_images_for_room
-from app.services.room_service.images_service import hard_delete_image, set_image_primary
+from app.services.image_upload_service import save_uploaded_image
+from app.utils.images_util import create_image, get_images_for_room
+from app.utils.images_util import hard_delete_image, set_image_primary
 from app.database.postgres_connection import get_db
 from app.schemas.pydantic_models.images import ImageResponse
 from app.dependencies.authentication import get_current_user, check_permission
 from app.models.sqlalchemy_schemas.users import Users
-from app.utils.audit_helper import log_audit
-from app.core.exceptions import ForbiddenError
+from app.utils.audit_util import log_audit
+from app.core.exceptions import ForbiddenException
 
 
 router = APIRouter(prefix="/rooms/{room_id}/images", tags=["ROOM_IMAGES"])

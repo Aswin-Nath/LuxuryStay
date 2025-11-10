@@ -13,7 +13,7 @@ from app.schemas.pydantic_models.room import (
     RoomAmenityMapResponse,
 )
 from app.dependencies.authentication import check_permission, get_current_user
-from app.core.exceptions import ForbiddenError
+from app.core.exceptions import ForbiddenException
 from app.services.room_service.amenities_service import (
     create_amenity as svc_create_amenity,
     list_amenities as svc_list_amenities,
@@ -28,7 +28,7 @@ from app.services.room_service.room_amenities_service import (
     map_amenities_bulk as svc_map_amenities_bulk,
     unmap_amenities_bulk as svc_unmap_amenities_bulk,
 )
-from app.utils.audit_helper import log_audit
+from app.utils.audit_util import log_audit
 
 
 # ===============================================

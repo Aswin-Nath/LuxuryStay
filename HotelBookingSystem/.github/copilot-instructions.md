@@ -20,7 +20,7 @@ Key patterns and conventions (do not assume defaults elsewhere):
 - Dual persistence: project uses both Postgres (SQLAlchemy) and Mongo (motor). Use the appropriate folder (`sqlalchemy_schemas` vs `motor_schemas`) depending on the model.
 - Pydantic models are the canonical API contract. Example: `app/models/pydantic_models/reviews.py` models request/response shapes used by review endpoints.
 - Error handling: custom exceptions live in `app/core/exceptions.py`. The middleware `app/middlewares/error_handler.py` maps those to HTTP responses — raise domain exceptions rather than HTTPExceptions where appropriate.
-- Authentication & authorization: look at `dependencies/authentication.py` and `app/core/security.py`. Routes use dependencies like `ensure_not_basic_user` to restrict admin/manager actions.
+- Authentication & authorization: look at `dependencies/authentication.py` and `app/core/security.py`. 
 - File uploads: room images endpoints use multipart/form-data; see `app/routes/room_management` and `app/services/image_service.py` for handling and storage patterns.
 
 Developer workflows (how to run & test locally):

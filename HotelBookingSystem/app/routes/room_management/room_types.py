@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.postgres_connection import get_db
 from app.schemas.pydantic_models.room import RoomTypeCreate, RoomTypeResponse, RoomTypeUpdate
 from app.dependencies.authentication import get_current_user, check_permission
-from app.core.exceptions import ForbiddenError
+from app.core.exceptions import ForbiddenException
 from app.services.room_service.room_types_service import (
     create_room_type as svc_create_room_type,
     list_room_types as svc_list_room_types,
@@ -14,7 +14,7 @@ from app.services.room_service.room_types_service import (
     soft_delete_room_type as svc_soft_delete_room_type,
 )
 from app.core.cache import get_cached, set_cached, invalidate_pattern
-from app.utils.audit_helper import log_audit
+from app.utils.audit_util import log_audit
 
 router = APIRouter(prefix="/room-types", tags=["ROOM_TYPES"])
 

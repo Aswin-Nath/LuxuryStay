@@ -3,28 +3,26 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 
-from app.middlewares.error_handler import error_handler_middleware
 from app.middlewares.logging_middleware import logging_middleware
 
-from app.routes.roles_and_permissions_management.roles_and_permissions import roles_and_permissions_router
-from app.routes.authentication.authentication import auth_router
+from app.routes.roles_and_permissions import roles_and_permissions_router
+from app.routes.authentication import auth_router
 from app.routes.room_management import router as room_management_router
-from app.routes.offer_management.offers import router as offers_router
-from app.routes.booking_management.booking import router as booking_customer_router
-from app.routes.wishlist_management.wishlist import router as wishlist_router
-from app.routes.notifications_management.notifications import router as notifications_router
-from app.routes.issue_management.issues import router as issue_router
-from app.routes.reviews_management.reviews import router as reviews_router
-from app.routes.refund_management.refund import router as refunds_router
-from app.routes.booking_management.edit_booking import router as booking_edits_router
-from app.routes.profile_management.profile import router as profile_router
-from app.routes.logs_management.audit_logs import router as audit_logs_router
-from app.routes.logs_management.booking_logs import router as booking_logs_router
-from app.routes.backup_and_restore_management.backups import router as backups_router
-from app.routes.backup_and_restore_management.restores import router as restores_router
-from app.routes.report_management import router as reports_router
-from app.routes.content_management.content import router as content_router
-from app.routes.payment_management import router as payment_router
+from app.routes.offers import router as offers_router
+from app.routes.booking import router as booking_customer_router
+from app.routes.wishlist import router as wishlist_router
+from app.routes.notifications import router as notifications_router
+from app.routes.issues import router as issue_router
+from app.routes.reviews import router as reviews_router
+from app.routes.refund import router as refunds_router
+from app.routes.edit_booking import router as booking_edits_router
+from app.routes.profile import router as profile_router
+from app.routes.logs import router as logs_router
+from app.routes.backups import router as backups_router
+from app.routes.restores import router as restores_router
+from app.routes.reports import router as reports_router
+from app.routes.content import router as content_router
+from app.routes.payments import router as payment_router
 
 # -------------------------------------------------
 # ✅ FastAPI App Configuration
@@ -49,9 +47,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.middleware("http")(error_handler_middleware)
-app.middleware("http")(logging_middleware)
-
+app.add_middleware(logging_middleware)
 
 # -------------------------------------------------
 # ✅ Routers
@@ -69,8 +65,7 @@ app.include_router(refunds_router)
 app.include_router(booking_edits_router)
 app.include_router(profile_router)
 app.include_router(backups_router)
-app.include_router(audit_logs_router)
-app.include_router(booking_logs_router)
+app.include_router(logs_router)
 app.include_router(restores_router)
 app.include_router(reports_router)
 app.include_router(content_router)

@@ -12,7 +12,7 @@ from app.models.sqlalchemy_schemas.users import Users
 from app.models.sqlalchemy_schemas.permissions import Permissions,PermissionRoleMap
 from app.core.security import oauth2_scheme
 from app.models.sqlalchemy_schemas.authentication import BlacklistedTokens
-from app.services.authentication_service.authentication_core import _hash_token
+from app.utils.authentication_util import _hash_token
 from app.models.sqlalchemy_schemas.roles import Roles
 from app.core.redis_manager import redis
 
@@ -23,8 +23,8 @@ load_dotenv()
 # =========================
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 15))
-REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", 30))
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
+REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS"))
 
 
 # ======================================================
@@ -171,77 +171,3 @@ async def invalidate_permissions_cache(role_id: int):
         pass
 
 
-async def invalidate_all_permissions_cache():
-    """
-    Invalidate all permissions caches (all roles).
-    
-    Called during system-wide permission changes. Clears all keys matching pattern:
-    `user_perms:*` from Redis.
-    
-    Side Effects:
-        - Scans Redis for all `user_perms:*` keys and deletes them.
-        - Silently ignores Redis errors.
-    """
-    try:
-        if redis:
-            # Use SCAN to iterate keys matching pattern (non-blocking)
-            cursor = 0
-            pattern = "user_perms:*"
-            deleted_count = 0
-            
-            while True:
-                cursor, keys = await redis.scan(cursor, match=pattern, count=100)
-                if keys:
-                    await redis.delete(*keys)
-                    deleted_count += len(keys)
-                
-                if cursor == 0:
-                    break
-            
-            print(f"✅ Invalidated all permission caches ({deleted_count} keys deleted)")
-    except Exception as e:
-        # Cache invalidation failure should not block response
-        print(f"⚠️  Redis cache invalidation failed: {e}")
-        pass
-
-
-async def ensure_not_basic_user(current_user: Users = Depends(get_current_user)):
-    """Dependency that rejects requests coming from the basic 'user' role (role_id == 1).
-
-    Use this dependency on routes or routers that must not be accessible to regular users.
-    """
-    if getattr(current_user, "role_id", None) == 1:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient privileges: action not available for basic users",
-        )
-    return True
-
-
-async def ensure_only_basic_user(current_user: Users = Depends(get_current_user)):
-    """Dependency that permits only users with the basic 'customer' role (role_id == 1).
-
-    Use this dependency on routes that should only be accessible to regular/basic users.
-    """
-    if getattr(current_user, "role_id", None) != 1:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="This action is only available for basic users",
-        )
-    return True
-
-
-async def ensure_admin(current_user: Users = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Dependency that permits only users whose role name is 'ADMIN'.
-
-    This queries the `roles_utility` table to verify the human-readable role name.
-    """
-    role_id = getattr(current_user, "role_id", None)
-    if not role_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient privileges")
-
-    result = await db.execute(select(Roles).where(Roles.role_id == role_id))
-    role = result.scalars().first()
-    if not role or not getattr(role, "role_name", "").upper() == "ADMIN":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required")
-    return True
