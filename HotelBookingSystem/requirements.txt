@@ -1,8 +1,7 @@
-pip install python-dateutilfastapi
+# python-dateutilfastapi
 uvicorn[standard]
 sqlalchemy[asyncio]
 asyncpg
-motor
 python-dotenv
 pydantic
 python-jose[cryptography]
@@ -17,3 +16,4 @@ redis[asyncio]
 openpyxl
 pandas
 reportlab
+motor

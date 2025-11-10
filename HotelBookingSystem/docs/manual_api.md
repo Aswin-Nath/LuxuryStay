@@ -1,4 +1,4 @@
-# 🏨 Hotel Booking System – API Documentation
+# Hotel Booking System – API Documentation
 
 **Version:** 1.0.0
 
@@ -16,13 +16,13 @@
 
 ---
 
-## 📋 Overview
+## Overview
 
 The **Hotel Booking System** is a comprehensive backend built with **FastAPI**. It provides role-based access for **Customers**, **Admins**, and **Super Admins**, enabling secure operations such as room management, booking lifecycle, payments, refunds, reviews, and comprehensive audit logging.
 
 ---
 
-## 🔐 Roles & Permissions
+## Roles & Permissions
 
 | Role | Capabilities | Access Level |
 |------|--------------|--------------|
@@ -50,13 +50,13 @@ Resources:
 
 ---
 
-## 🔑 Authentication Endpoints (`/auth`)
+## Authentication Endpoints (`/auth`)
 
-### 1️⃣ **Register New User (Signup)**
+### 1. **Register New User (Signup)**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `POST` | `/auth/signup` | ❌ No | Register a new customer account |
+| `POST` | `/auth/signup` | No | Register a new customer account |
 
 **Request Body:**
 ```json
@@ -83,11 +83,11 @@ Resources:
 
 ---
 
-### 2️⃣ **Login**
+### 2. **Login**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `POST` | `/auth/login` | ❌ No | Authenticate user and issue JWT tokens |
+| `POST` | `/auth/login` | No | Authenticate user and issue JWT tokens |
 
 **Request Body:**
 ```json
@@ -110,11 +110,11 @@ Resources:
 
 ---
 
-### 3️⃣ **Request OTP**
+### 3. **Request OTP**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `POST` | `/auth/otp/request` | ❌ No | Request OTP for password reset or verification |
+| `POST` | `/auth/otp/request` | No | Request OTP for password reset or verification |
 
 **Request Body:**
 ```json
@@ -135,11 +135,11 @@ Resources:
 
 ---
 
-### 4️⃣ **Verify OTP & Reset Password**
+### 4. **Verify OTP & Reset Password**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `POST` | `/auth/otp/verify` | ❌ No | Verify OTP and optionally reset password |
+| `POST` | `/auth/otp/verify` | No | Verify OTP and optionally reset password |
 
 **Request Body:**
 ```json
@@ -160,11 +160,11 @@ Resources:
 
 ---
 
-### 5️⃣ **Refresh Access Token**
+### 5. **Refresh Access Token**
 
-| Method | Endpoint | Auth | ✅ Yes |
-|--------|----------|------|--------|
-| `POST` | `/auth/refresh` | ✅ Yes | Generate new access token using refresh token |
+| Method | Endpoint | Auth | Yes |
+|--------|----------|------|-----|
+| `POST` | `/auth/refresh` | Yes | Generate new access token using refresh token |
 
 **Request Body:**
 ```json
@@ -185,11 +185,11 @@ Resources:
 
 ---
 
-### 6️⃣ **Logout**
+### 6. **Logout**
 
-| Method | Endpoint | Auth | ✅ Yes |
-|--------|----------|------|--------|
-| `POST` | `/auth/logout` | ✅ Yes | Revoke tokens and logout user |
+| Method | Endpoint | Auth | Yes |
+|--------|----------|------|-----|
+| `POST` | `/auth/logout` | Yes | Revoke tokens and logout user |
 
 **Response (200 OK):**
 ```json
@@ -200,11 +200,11 @@ Resources:
 
 ---
 
-### 7️⃣ **Register Admin (Protected)**
+### 7. **Register Admin (Protected)**
 
 | Method | Endpoint | Auth | Permission |
 |--------|----------|------|------------|
-| `POST` | `/auth/register` | ✅ Yes | `ADMIN_CREATION:WRITE` |
+| `POST` | `/auth/register` | Yes | `ADMIN_CREATION:WRITE` |
 
 **Request Body:**
 ```json
@@ -229,13 +229,13 @@ Resources:
 
 ---
 
-## 🛏️ Room Management Endpoints (`/rooms`)
+## Room Management Endpoints (`/rooms`)
 
-### 1️⃣ **List All Rooms**
+### 1. **List All Rooms**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `GET` | `/rooms/` | ❌ No | Fetch available rooms with filters |
+| `GET` | `/rooms/` | No | Fetch available rooms with filters |
 
 **Query Parameters:**
 ```
@@ -272,11 +272,11 @@ Resources:
 
 ---
 
-### 2️⃣ **Get Room Details**
+### 2. **Get Room Details**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `GET` | `/rooms/{room_id}` | ❌ No | Get single room details |
+| `GET` | `/rooms/{room_id}` | No | Get single room details |
 
 **Response (200 OK):**
 ```json
@@ -296,11 +296,11 @@ Resources:
 
 ---
 
-### 3️⃣ **Create Room (Admin)**
+### 3. **Create Room (Admin)**
 
 | Method | Endpoint | Auth | Permission |
 |--------|----------|------|------------|
-| `POST` | `/rooms/` | ✅ Yes | `ROOM_MANAGEMENT:WRITE` |
+| `POST` | `/rooms/` | Yes | `ROOM_MANAGEMENT:WRITE` |
 
 **Request Body:**
 ```json
@@ -329,11 +329,11 @@ Resources:
 
 ---
 
-### 4️⃣ **Update Room (Admin)**
+### 4. **Update Room (Admin)**
 
 | Method | Endpoint | Auth | Permission |
 |--------|----------|------|------------|
-| `PUT` | `/rooms/{room_id}` | ✅ Yes | `ROOM_MANAGEMENT:WRITE` |
+| `PUT` | `/rooms/{room_id}` | Yes | `ROOM_MANAGEMENT:WRITE` |
 
 **Request Body:**
 ```json
@@ -354,11 +354,11 @@ Resources:
 
 ---
 
-### 5️⃣ **Delete Room (Admin)**
+### 5. **Delete Room (Admin)**
 
 | Method | Endpoint | Auth | Permission |
 |--------|----------|------|------------|
-| `DELETE` | `/rooms/{room_id}` | ✅ Yes | `ROOM_MANAGEMENT:DELETE` |
+| `DELETE` | `/rooms/{room_id}` | Yes | `ROOM_MANAGEMENT:DELETE` |
 
 **Response (200 OK):**
 ```json
@@ -369,11 +369,11 @@ Resources:
 
 ---
 
-### 6️⃣ **Upload Room Images**
+### 6. **Upload Room Images**
 
 | Method | Endpoint | Auth | Permission |
 |--------|----------|------|------------|
-| `POST` | `/rooms/{room_id}/images` | ✅ Yes | `ROOM_MANAGEMENT:WRITE` |
+| `POST` | `/rooms/{room_id}/images` | Yes | `ROOM_MANAGEMENT:WRITE` |
 
 **Request Body:** Form data with multiple files
 ```
@@ -401,13 +401,13 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-## 📅 Booking Management Endpoints (`/bookings`)
+## Booking Management Endpoints (`/bookings`)
 
-### 1️⃣ **Create Booking**
+### 1. **Create Booking**
 
 | Method | Endpoint | Auth | Permission |
 |--------|----------|------|------------|
-| `POST` | `/bookings/` | ✅ Yes | `BOOKING:WRITE` |
+| `POST` | `/bookings/` | Yes | `BOOKING:WRITE` |
 
 **Request Body:**
 ```json
@@ -439,11 +439,11 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-### 2️⃣ **Get All Bookings**
+### 2. **Get All Bookings**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `GET` | `/bookings/` | ✅ Yes | Get bookings (own or all if admin) |
+| `GET` | `/bookings/` | Yes | Get bookings (own or all if admin) |
 
 **Query Parameters:**
 ```
@@ -480,11 +480,11 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-### 3️⃣ **Cancel Booking**
+### 3. **Cancel Booking**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `POST` | `/bookings/{booking_id}/cancel` | ✅ Yes | Cancel booking and initiate refund |
+| `POST` | `/bookings/{booking_id}/cancel` | Yes | Cancel booking and initiate refund |
 
 **Request Body:**
 ```json
@@ -509,13 +509,13 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-## 💳 Payment Endpoints (`/payments`)
+## Payment Endpoints (`/payments`)
 
-### 1️⃣ **Get All Payments**
+### 1. **Get All Payments**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `GET` | `/payments/` | ✅ Yes | Get payments (own or all if admin) |
+| `GET` | `/payments/` | Yes | Get payments (own or all if admin) |
 
 **Query Parameters:**
 ```
@@ -550,11 +550,11 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-### 2️⃣ **Create Payment**
+### 2. **Create Payment**
 
 | Method | Endpoint | Auth | Permission |
 |--------|----------|------|------------|
-| `POST` | `/payments/` | ✅ Yes | `PAYMENT_PROCESSING:WRITE` |
+| `POST` | `/payments/` | Yes | `PAYMENT_PROCESSING:WRITE` |
 
 **Request Body:**
 ```json
@@ -579,13 +579,13 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-## 💰 Refund Endpoints (`/refunds`)
+## Refund Endpoints (`/refunds`)
 
-### 1️⃣ **Get All Refunds**
+### 1. **Get All Refunds**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `GET` | `/refunds/` | ✅ Yes | Get refunds (own or all if admin) |
+| `GET` | `/refunds/` | Yes | Get refunds (own or all if admin) |
 
 **Response (200 OK):**
 ```json
@@ -605,11 +605,11 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-### 2️⃣ **Approve Refund**
+### 2. **Approve Refund**
 
 | Method | Endpoint | Auth | Permission |
 |--------|----------|------|------------|
-| `PUT` | `/refunds/{refund_id}/approve` | ✅ Yes | `REFUND_APPROVAL:APPROVE` |
+| `PUT` | `/refunds/{refund_id}/approve` | Yes | `REFUND_APPROVAL:APPROVE` |
 
 **Request Body:**
 ```json
@@ -633,13 +633,13 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-## ⭐ Review Endpoints (`/reviews`)
+## Review Endpoints (`/reviews`)
 
-### 1️⃣ **Post Review**
+### 1. **Post Review**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `POST` | `/reviews/` | ✅ Yes | Post a review for a room/booking |
+| `POST` | `/reviews/` | Yes | Post a review for a room/booking |
 
 **Request Body:**
 ```json
@@ -669,11 +669,11 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-### 2️⃣ **Get All Reviews**
+### 2. **Get All Reviews**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `GET` | `/reviews/` | ❌ No | Get reviews (filtered by room/user) |
+| `GET` | `/reviews/` | No | Get reviews (filtered by room/user) |
 
 **Query Parameters:**
 ```
@@ -698,13 +698,13 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-## 🎁 Offer Endpoints (`/offers`)
+## Offer Endpoints (`/offers`)
 
-### 1️⃣ **Get Active Offers**
+### 1. **Get Active Offers**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `GET` | `/offers/` | ❌ No | Get all active promotional offers |
+| `GET` | `/offers/` | No | Get all active promotional offers |
 
 **Response (200 OK):**
 ```json
@@ -736,11 +736,11 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-### 2️⃣ **Create Offer (Admin)**
+### 2. **Create Offer (Admin)**
 
 | Method | Endpoint | Auth | Permission |
 |--------|----------|------|------------|
-| `POST` | `/offers/` | ✅ Yes | `OFFER_MANAGEMENT:WRITE` |
+| `POST` | `/offers/` | Yes | `OFFER_MANAGEMENT:WRITE` |
 
 **Request Body:**
 ```json
@@ -766,13 +766,13 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-## 💬 Issue Management Endpoints (`/issues`)
+## Issue Management Endpoints (`/issues`)
 
-### 1️⃣ **Create Support Ticket**
+### 1. **Create Support Ticket**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `POST` | `/issues/` | ✅ Yes | Submit a support ticket |
+| `POST` | `/issues/` | Yes | Submit a support ticket |
 
 **Request Body:**
 ```json
@@ -800,11 +800,11 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-### 2️⃣ **Get All Issues**
+### 2. **Get All Issues**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `GET` | `/issues/` | ✅ Yes | Get issues (own or all if admin) |
+| `GET` | `/issues/` | Yes | Get issues (own or all if admin) |
 
 **Response (200 OK):**
 ```json
@@ -824,11 +824,11 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-### 3️⃣ **Update Issue (Admin)**
+### 3. **Update Issue (Admin)**
 
 | Method | Endpoint | Auth | Permission |
 |--------|----------|------|------------|
-| `PUT` | `/issues/{issue_id}` | ✅ Yes | `ISSUE_RESOLUTION:MANAGE` |
+| `PUT` | `/issues/{issue_id}` | Yes | `ISSUE_RESOLUTION:MANAGE` |
 
 **Request Body:**
 ```json
@@ -850,13 +850,13 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-## 🔔 Notification Endpoints (`/notifications`)
+## Notification Endpoints (`/notifications`)
 
-### 1️⃣ **Get Notifications**
+### 1. **Get Notifications**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `GET` | `/notifications/` | ✅ Yes | Get user's notifications |
+| `GET` | `/notifications/` | Yes | Get user's notifications |
 
 **Query Parameters:**
 ```
@@ -889,11 +889,11 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-### 2️⃣ **Mark Notification as Read**
+### 2. **Mark Notification as Read**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `PUT` | `/notifications/{notification_id}/read` | ✅ Yes | Mark notification as read |
+| `PUT` | `/notifications/{notification_id}/read` | Yes | Mark notification as read |
 
 **Response (200 OK):**
 ```json
@@ -906,13 +906,13 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-## ❤️ Wishlist Endpoints (`/wishlist`)
+## Wishlist Endpoints (`/wishlist`)
 
-### 1️⃣ **Get Wishlist**
+### 1. **Get Wishlist**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `GET` | `/wishlist/` | ✅ Yes | Get user's wishlist |
+| `GET` | `/wishlist/` | Yes | Get user's wishlist |
 
 **Response (200 OK):**
 ```json
@@ -938,11 +938,11 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-### 2️⃣ **Add to Wishlist**
+### 2. **Add to Wishlist**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `POST` | `/wishlist/` | ✅ Yes | Add room to wishlist |
+| `POST` | `/wishlist/` | Yes | Add room to wishlist |
 
 **Request Body:**
 ```json
@@ -962,11 +962,11 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-### 3️⃣ **Remove from Wishlist**
+### 3. **Remove from Wishlist**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `DELETE` | `/wishlist/{wishlist_id}` | ✅ Yes | Remove room from wishlist |
+| `DELETE` | `/wishlist/{wishlist_id}` | Yes | Remove room from wishlist |
 
 **Response (200 OK):**
 ```json
@@ -977,13 +977,13 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-## 👤 Profile Endpoints (`/profile`)
+## Profile Endpoints (`/profile`)
 
-### 1️⃣ **Get Profile**
+### 1. **Get Profile**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `GET` | `/profile/me` | ✅ Yes | Get current user's profile |
+| `GET` | `/profile/me` | Yes | Get current user's profile |
 
 **Response (200 OK):**
 ```json
@@ -1004,11 +1004,11 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-### 2️⃣ **Update Profile**
+### 2. **Update Profile**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `PUT` | `/profile/me` | ✅ Yes | Update user's profile |
+| `PUT` | `/profile/me` | Yes | Update user's profile |
 
 **Request Body:**
 ```json
@@ -1032,11 +1032,11 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-### 3️⃣ **Change Password**
+### 3. **Change Password**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `POST` | `/profile/change-password` | ✅ Yes | Change user's password |
+| `POST` | `/profile/change-password` | Yes | Change user's password |
 
 **Request Body:**
 ```json
@@ -1055,13 +1055,13 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-## 🛡️ Roles & Permissions Endpoints (`/roles`)
+## Roles & Permissions Endpoints (`/roles`)
 
-### 1️⃣ **List All Roles**
+### 1. **List All Roles**
 
 | Method | Endpoint | Auth | Permission |
 |--------|----------|------|------------|
-| `GET` | `/roles/` | ✅ Yes | `ADMIN_CREATION:READ` |
+| `GET` | `/roles/` | Yes | `ADMIN_CREATION:READ` |
 
 **Response (200 OK):**
 ```json
@@ -1089,11 +1089,11 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-### 2️⃣ **Create Role (Admin)**
+### 2. **Create Role (Admin)**
 
 | Method | Endpoint | Auth | Permission |
 |--------|----------|------|------------|
-| `POST` | `/roles/` | ✅ Yes | `ADMIN_CREATION:READ` |
+| `POST` | `/roles/` | Yes | `ADMIN_CREATION:READ` |
 
 **Request Body:**
 ```json
@@ -1115,11 +1115,11 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-### 3️⃣ **Get Permissions**
+### 3. **Get Permissions**
 
 | Method | Endpoint | Auth | Permission |
 |--------|----------|------|------------|
-| `GET` | `/roles/permissions` | ✅ Yes | `ADMIN_CREATION:READ` |
+| `GET` | `/roles/permissions` | Yes | `ADMIN_CREATION:READ` |
 
 **Query Parameters (choose one):**
 ```
@@ -1149,11 +1149,11 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-### 4️⃣ **Assign Permissions to Role (Admin)**
+### 4. **Assign Permissions to Role (Admin)**
 
 | Method | Endpoint | Auth | Permission |
 |--------|----------|------|------------|
-| `POST` | `/roles/assign` | ✅ Yes | `ADMIN_CREATION:READ` |
+| `POST` | `/roles/assign` | Yes | `ADMIN_CREATION:READ` |
 
 **Request Body:**
 ```json
@@ -1179,13 +1179,13 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-## 📊 Reports Endpoints (`/reports`)
+## Reports Endpoints (`/reports`)
 
-### 1️⃣ **Revenue Report**
+### 1. **Revenue Report**
 
 | Method | Endpoint | Auth | Permission |
 |--------|----------|------|------------|
-| `GET` | `/reports/revenue` | ✅ Yes | `ANALYTICS_VIEW:READ` |
+| `GET` | `/reports/revenue` | Yes | `ANALYTICS_VIEW:READ` |
 
 **Query Parameters:**
 ```
@@ -1215,11 +1215,11 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-### 2️⃣ **Occupancy Report**
+### 2. **Occupancy Report**
 
 | Method | Endpoint | Auth | Permission |
 |--------|----------|------|------------|
-| `GET` | `/reports/occupancy` | ✅ Yes | `ANALYTICS_VIEW:READ` |
+| `GET` | `/reports/occupancy` | Yes | `ANALYTICS_VIEW:READ` |
 
 **Response (200 OK):**
 ```json
@@ -1238,13 +1238,13 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-## 🗄️ Audit & Logs Endpoints (`/audit`, `/logs`)
+## Audit & Logs Endpoints (`/audit`, `/logs`)
 
-### 1️⃣ **Get Audit Logs**
+### 1. **Get Audit Logs**
 
 | Method | Endpoint | Auth | Permission |
 |--------|----------|------|------------|
-| `GET` | `/audit/` | ✅ Yes | `ADMIN_CREATION:READ` |
+| `GET` | `/audit/` | Yes | `ADMIN_CREATION:READ` |
 
 **Query Parameters:**
 ```
@@ -1284,11 +1284,11 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-### 2️⃣ **Get Booking Logs**
+### 2. **Get Booking Logs**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `GET` | `/logs/bookings` | ✅ Yes | Get booking transaction logs |
+| `GET` | `/logs/bookings` | Yes | Get booking transaction logs |
 
 **Response (200 OK):**
 ```json
@@ -1305,13 +1305,13 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-## 💾 Backup & Restore Endpoints (`/backups`, `/restores`)
+## Backup & Restore Endpoints (`/backups`, `/restores`)
 
-### 1️⃣ **Create Backup (Admin)**
+### 1. **Create Backup (Admin)**
 
 | Method | Endpoint | Auth | Permission |
 |--------|----------|------|------------|
-| `POST` | `/backups/` | ✅ Yes | `BACKUP_OPERATIONS:WRITE` |
+| `POST` | `/backups/` | Yes | `BACKUP_OPERATIONS:WRITE` |
 
 **Request Body:**
 ```json
@@ -1334,11 +1334,11 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-### 2️⃣ **Get Backups**
+### 2. **Get Backups**
 
 | Method | Endpoint | Auth | Permission |
 |--------|----------|------|------------|
-| `GET` | `/backups/` | ✅ Yes | `BACKUP_OPERATIONS:READ` |
+| `GET` | `/backups/` | Yes | `BACKUP_OPERATIONS:READ` |
 
 **Response (200 OK):**
 ```json
@@ -1356,11 +1356,11 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-### 3️⃣ **Restore from Backup (Admin)**
+### 3. **Restore from Backup (Admin)**
 
 | Method | Endpoint | Auth | Permission |
 |--------|----------|------|------------|
-| `POST` | `/restores/` | ✅ Yes | `RESTORE_OPERATIONS:WRITE` |
+| `POST` | `/restores/` | Yes | `RESTORE_OPERATIONS:WRITE` |
 
 **Request Body:**
 ```json
@@ -1382,13 +1382,13 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-## 📝 Content Management Endpoints (`/content`)
+## Content Management Endpoints (`/content`)
 
-### 1️⃣ **Get CMS Content**
+### 1. **Get CMS Content**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `GET` | `/content/` | ❌ No | Get all published CMS content |
+| `GET` | `/content/` | No | Get all published CMS content |
 
 **Response (200 OK):**
 ```json
@@ -1406,11 +1406,11 @@ files: [image1.jpg, image2.jpg]
 
 ---
 
-### 2️⃣ **Create Content (Admin)**
+### 2. **Create Content (Admin)**
 
 | Method | Endpoint | Auth | Permission |
 |--------|----------|------|------------|
-| `POST` | `/content/` | ✅ Yes | `CONTENT_MANAGEMENT:WRITE` |
+| `POST` | `/content/` | Yes | `CONTENT_MANAGEMENT:WRITE` |
 
 **Request Body:** Form data
 ```
@@ -1435,7 +1435,7 @@ images: [file1, file2]
 
 ---
 
-## ❌ Error Handling
+## Error Handling
 
 | Status Code | Error Type | Description |
 |-------------|-----------|-------------|
@@ -1458,7 +1458,7 @@ images: [file1, file2]
 
 ---
 
-## 🔄 Token Lifecycle
+## Token Lifecycle
 
 | Token Type | Validity | Purpose |
 |-----------|----------|---------|
@@ -1477,7 +1477,7 @@ images: [file1, file2]
 
 ---
 
-## 🔐 Sample Authorization Header
+## Sample Authorization Header
 
 ```http
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyXzQyIiwiZXhwIjoxNzMxNjAwOTAwfQ.signature_here
