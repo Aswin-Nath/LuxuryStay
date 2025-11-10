@@ -12,7 +12,8 @@ from app.services.roles_and_permissions_service import (
     get_roles_for_permission as svc_get_roles_for_permission,
     create_role as svc_create_role, list_roles as svc_list_roles
 )
-from app.dependencies.authentication import  invalidate_permissions_cache, check_permission
+from app.dependencies.authentication import check_permission
+from app.utils.authentication_util import invalidate_permissions_cache
 from app.core.cache import get_cached, set_cached, invalidate_pattern
 from app.utils.audit_util import log_audit
 

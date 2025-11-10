@@ -32,13 +32,6 @@
             flex-grow: 1;
             width: 400px;
         }
-        /* 🔹 Tag color badges */
-        .tag-colored {
-            color: white !important;
-            padding: 5px 12px !important;
-            border-radius: 8px;
-            font-weight: 500;
-        }
     </style>
 </head>
 <body>
@@ -74,52 +67,6 @@
                 });
             }, 1000);
 
-
-            // 🔹 Tag Color Mapping
-            const tagColors = {
-                // 🟢 Core
-                rooms: '#22c55e',
-                amenities: '#22c55e',
-                room_types: '#22c55e',
-                room_images: '#22c55e',
-                bookings: '#22c55e',
-                'booking-edits': '#22c55e',
-                // 🟡 Intermediate
-                offers: '#eab308',
-                profile: '#eab308',
-                wishlist: '#eab308',
-                // 🔴 Admin
-                refunds: '#ef4444',
-                issues: '#ef4444',
-                logs: '#ef4444',
-                reports_admin: '#ef4444',
-                // 🔵 System
-                notifications: '#3b82f6',
-                backups: '#3b82f6',
-                restores: '#3b82f6',
-                reports_customer: '#3b82f6',
-                // 🟣 Access
-                roles: '#a855f7',
-                auth: '#a855f7',
-                // ⚫ Misc
-                content: '#6b7280',
-                payments: '#6b7280'
-            };
-
-            // 🔹 Apply color labels to each tag dynamically
-            const applyTagColors = () => {
-                document.querySelectorAll('.opblock-tag').forEach(tag => {
-                    const tagText = tag.textContent.trim().toLowerCase().replace(/\s|-/g, '_');
-                    const color = tagColors[tagText];
-                    if (color) {
-                        tag.classList.add('tag-colored');
-                        tag.style.backgroundColor = color;
-                    }
-                });
-            };
-            setInterval(applyTagColors, 1500);
-
-
             // 🔹 Add search + filter toolbar
             setTimeout(() => {
                 const authWrapper = document.querySelector('.auth-wrapper');
@@ -133,31 +80,31 @@
                 search.type = 'text';
                 search.placeholder = 'Search endpoint or module...';
 
-                // 🔸 Dropdown Filter
+                // 🔸 Dropdown Filter (no emojis or colors)
                 const dropdown = document.createElement('select');
                 dropdown.innerHTML = `
-<option value=""> 🧭 Show All </option>
-<option value="rooms">🟢 Rooms</option>
-<option value="amenities">🟢 Amenities</option>
-<option value="room_types">🟢 Room Types</option>
-<option value="room_images">🟢 Room Images</option>
-<option value="bookings">🟢 Bookings</option>
-<option value="booking-edits">🟢 Edit Booking</option>
-<option value="offers">🟡 Offers</option>
-<option value="profile">🟡 Profile</option>
-<option value="wishlist">🟡 Wishlist</option>
-<option value="refunds">🔴 Refunds</option>
-<option value="issues">🔴 Issues</option>
-<option value="logs">🔴 Logs</option>
-<option value="reports_admin">🔴 Admin Reports</option>
-<option value="notifications">🔵 Notifications</option>
-<option value="backups">🔵 Backups</option>
-<option value="restores">🔵 Restores</option>
-<option value="reports_customer">🔵 Customer Reports</option>
-<option value="roles">🟣 Roles</option>
-<option value="auth">🟣 Auth</option>
-<option value="content">⚫ Content Management</option>
-<option value="payments">⚫ Payments</option>
+<option value="">Show All</option>
+<option value="rooms">Rooms</option>
+<option value="amenities">Amenities</option>
+<option value="room_types">Room Types</option>
+<option value="room_images">Room Images</option>
+<option value="bookings">Bookings</option>
+<option value="booking-edits">Edit Booking</option>
+<option value="offers">Offers</option>
+<option value="profile">Profile</option>
+<option value="wishlist">Wishlist</option>
+<option value="refunds">Refunds</option>
+<option value="issues">Issues</option>
+<option value="logs">Logs</option>
+<option value="reports_admin">Admin Reports</option>
+<option value="notifications">Notifications</option>
+<option value="backups">Backups</option>
+<option value="restores">Restores</option>
+<option value="reports_customer">Customer Reports</option>
+<option value="roles">Roles</option>
+<option value="auth">Auth</option>
+<option value="content">Content Management</option>
+<option value="payments">Payments</option>
                 `;
 
                 dropdown.onchange = function() {

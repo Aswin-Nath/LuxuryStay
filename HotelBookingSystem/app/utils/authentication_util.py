@@ -20,6 +20,7 @@ from sqlalchemy import select
 from datetime import datetime, timedelta
 import uuid
 import re
+from app.core.redis_manager import redis
 from typing import Optional, Tuple
 load_dotenv()
 _logger = logging.getLogger(__name__)
@@ -521,3 +522,34 @@ def is_valid_phone(phone: str) -> Tuple[bool, Optional[str]]:
     Alias for is_valid_indian_phone for backward compatibility.
     """
     return is_valid_indian_phone(phone)
+
+# ======================================================
+# 2️⃣ Extract permissions for the current user
+
+# 3️⃣ Invalidate permissions cache (called when permissions change)
+# ======================================================
+async def invalidate_permissions_cache(role_id: int):
+    """
+    Invalidate the permissions cache for a specific role.
+    
+    Called when permissions are assigned/revoked for a role to ensure all users
+    with that role fetch fresh permissions on next request.
+    
+    Args:
+        role_id (int): The role ID whose permissions were modified.
+    
+    Side Effects:
+        - Deletes Redis cache key: `user_perms:{role_id}`.
+        - Silently ignores Redis errors (cache invalidation failure non-blocking).
+    """
+    cache_key = f"user_perms:{role_id}"
+    
+    try:
+        if redis:
+            await redis.delete(cache_key)
+            print(f"✅ Invalidated permission cache for role_id={role_id}")
+    except Exception as e:
+        # Cache invalidation failure should not block response
+        print(f"⚠️  Redis cache invalidation failed for role_id={role_id}: {e}")
+        pass
+

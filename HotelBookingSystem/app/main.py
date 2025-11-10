@@ -2,8 +2,9 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
+import asyncio
 
-from app.middlewares.logging_middleware import logging_middleware
+from app.middlewares.logging_middleware import LoggingMiddleware
 
 from app.routes.roles_and_permissions import roles_and_permissions_router
 from app.routes.authentication import auth_router
@@ -23,6 +24,7 @@ from app.routes.restores import router as restores_router
 from app.routes.reports import router as reports_router
 from app.routes.content import router as content_router
 from app.routes.payments import router as payment_router
+from app.workers.unlock_worker import start_unlock_worker
 
 # -------------------------------------------------
 # ✅ FastAPI App Configuration
@@ -47,7 +49,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.add_middleware(logging_middleware)
+app.add_middleware(LoggingMiddleware)
 
 # -------------------------------------------------
 # ✅ Routers
@@ -76,3 +78,15 @@ def custom_docs():
     """Serve custom Swagger UI from static HTML file"""
     html_file = Path(__file__).parent / "static" / "swagger_custom.html"
     return FileResponse(path=html_file, media_type="text/html")
+
+
+# -------------------------------------------------
+# ✅ Startup Events
+# -------------------------------------------------
+@app.on_event("startup")
+async def startup_event():
+    """
+    Run background workers when the app starts.
+    - Unlock expired room reservations worker
+    """
+    asyncio.create_task(start_unlock_worker())
