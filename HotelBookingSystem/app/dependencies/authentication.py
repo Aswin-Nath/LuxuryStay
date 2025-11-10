@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from dotenv import load_dotenv
 import os
+import json
 
 from app.database.postgres_connection import get_db
 from app.models.sqlalchemy_schemas.users import Users
@@ -12,6 +13,7 @@ from app.core.security import oauth2_scheme
 from app.models.sqlalchemy_schemas.authentication import BlacklistedTokens
 from app.services.authentication_service.authentication_core import _hash_token
 from app.models.sqlalchemy_schemas.roles import Roles
+from app.core.redis_manager import redis
 
 load_dotenv()
 
@@ -80,8 +82,20 @@ async def get_user_permissions(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Extracts all permissions for the current user via their role.
+    Extracts all permissions for the current user via their role with Redis caching.
+    
+    Retrieves user permissions from Redis cache first. If not cached, queries database,
+    builds permission map, and stores in Redis with 1-hour TTL (3600 seconds).
+    
     Returns -> dict[resource_name: set(permission_types)]
+    
+    Side Effects:
+        - Queries database if cache miss (queries permissions by role_id).
+        - Caches result in Redis with key: `user_perms:{role_id}` TTL 3600 seconds.
+        - Normalizes resource and permission_type to uppercase strings.
+    
+    Raises:
+        HTTPException (403): If user has no role_id assigned.
     """
 
     # Step 1: Validate role_id
@@ -92,38 +106,128 @@ async def get_user_permissions(
             detail="User role not found for permission mapping",
         )
 
-    # Step 2: Join role-permission map with permissions table
-    result = await db.execute(
-        select(Permissions.resource, Permissions.permission_type)
-        .join(PermissionRoleMap, PermissionRoleMap.permission_id == Permissions.permission_id)
-        .where(PermissionRoleMap.role_id == role_id)
-    )
+    # Step 2: Check Redis cache first
+    cache_key = f"user_perms:{role_id}"
+    permissions_map = None
+    
+    try:
+        if redis:
+            cached_data = await redis.get(cache_key)
+            if cached_data:
+                # Convert cached JSON back to dict with sets
+                cached_dict = json.loads(cached_data)
+                permissions_map = {k: set(v) for k, v in cached_dict.items()}
+    except Exception as e:
+        # Log error but continue - cache miss should not block request
+        print(f"⚠️  Redis cache retrieval failed: {e}")
+        pass
 
-    records = result.all()
+    # Step 3: If not in cache, query database
+    if not permissions_map:
+        result = await db.execute(
+            select(Permissions.resource, Permissions.permission_type)
+            .join(PermissionRoleMap, PermissionRoleMap.permission_id == Permissions.permission_id)
+            .where(PermissionRoleMap.role_id == role_id)
+        )
 
-    # Step 3: Build a permission map
-    # Normalize to plain uppercase strings for both resource and permission type so route checks
-    # can safely compare against enum.value (which are uppercase strings in this project).
-    permissions_map = {}
-    for resource, perm_type in records:
-        # resource and perm_type may be Enum members or plain strings depending on driver; normalize
-        if hasattr(resource, "value"):
-            resource_key = str(resource.value).upper()
-        else:
-            resource_key = str(resource).upper()
+        records = result.all()
 
-        if hasattr(perm_type, "value"):
-            perm_key = str(perm_type.value).upper()
-        else:
-            perm_key = str(perm_type).upper()
+        # Step 4: Build a permission map
+        # Normalize to plain uppercase strings for both resource and permission type so route checks
+        # can safely compare against enum.value (which are uppercase strings in this project).
+        permissions_map = {}
+        for resource, perm_type in records:
+            # resource and perm_type may be Enum members or plain strings depending on driver; normalize
+            if hasattr(resource, "value"):
+                resource_key = str(resource.value).upper()
+            else:
+                resource_key = str(resource).upper()
 
-        permissions_map.setdefault(resource_key, set()).add(perm_key)
+            if hasattr(perm_type, "value"):
+                perm_key = str(perm_type.value).upper()
+            else:
+                perm_key = str(perm_type).upper()
 
-    # Step 4: Return empty map if no permissions found
+            permissions_map.setdefault(resource_key, set()).add(perm_key)
+
+        # Step 5: Cache in Redis (convert sets to lists for JSON serialization)
+        try:
+            if redis and permissions_map:
+                cache_data = {k: list(v) for k, v in permissions_map.items()}
+                await redis.setex(cache_key, 3600, json.dumps(cache_data))  # 1-hour TTL
+        except Exception as e:
+            # Cache write failure should not block request
+            print(f"⚠️  Redis cache storage failed: {e}")
+            pass
+
+    # Step 6: Return empty map if no permissions found
     if not permissions_map:
         return {}
 
     return permissions_map
+
+
+# ======================================================
+# 3️⃣ Invalidate permissions cache (called when permissions change)
+# ======================================================
+async def invalidate_permissions_cache(role_id: int):
+    """
+    Invalidate the permissions cache for a specific role.
+    
+    Called when permissions are assigned/revoked for a role to ensure all users
+    with that role fetch fresh permissions on next request.
+    
+    Args:
+        role_id (int): The role ID whose permissions were modified.
+    
+    Side Effects:
+        - Deletes Redis cache key: `user_perms:{role_id}`.
+        - Silently ignores Redis errors (cache invalidation failure non-blocking).
+    """
+    cache_key = f"user_perms:{role_id}"
+    
+    try:
+        if redis:
+            await redis.delete(cache_key)
+            print(f"✅ Invalidated permission cache for role_id={role_id}")
+    except Exception as e:
+        # Cache invalidation failure should not block response
+        print(f"⚠️  Redis cache invalidation failed for role_id={role_id}: {e}")
+        pass
+
+
+async def invalidate_all_permissions_cache():
+    """
+    Invalidate all permissions caches (all roles).
+    
+    Called during system-wide permission changes. Clears all keys matching pattern:
+    `user_perms:*` from Redis.
+    
+    Side Effects:
+        - Scans Redis for all `user_perms:*` keys and deletes them.
+        - Silently ignores Redis errors.
+    """
+    try:
+        if redis:
+            # Use SCAN to iterate keys matching pattern (non-blocking)
+            cursor = 0
+            pattern = "user_perms:*"
+            deleted_count = 0
+            
+            while True:
+                cursor, keys = await redis.scan(cursor, match=pattern, count=100)
+                if keys:
+                    await redis.delete(*keys)
+                    deleted_count += len(keys)
+                
+                if cursor == 0:
+                    break
+            
+            print(f"✅ Invalidated all permission caches ({deleted_count} keys deleted)")
+    except Exception as e:
+        # Cache invalidation failure should not block response
+        print(f"⚠️  Redis cache invalidation failed: {e}")
+        pass
 
 
 async def ensure_not_basic_user(current_user: Users = Depends(get_current_user)):

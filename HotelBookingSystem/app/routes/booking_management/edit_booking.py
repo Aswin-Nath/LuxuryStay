@@ -12,8 +12,9 @@ from app.services.booking_service.booking_edit import (
     review_booking_edit_service,
     decision_on_booking_edit_service,
     change_room_status,
+    update_room_occupancy_service,
 )
-from app.models.sqlalchemy_schemas.bookings import Bookings
+from app.models.sqlalchemy_schemas.bookings import Bookings, BookingRoomMap
 from app.utils.audit_helper import log_audit
 
 router = APIRouter(prefix="/booking-edits", tags=["BOOKING-EDITS"])
@@ -108,58 +109,6 @@ async def get_booking_edits(
 
     return await get_all_booking_edits_service(booking_id, db)
 
-
-
-# ============================================================================
-# 🔹 UPDATE - Lock or unlock a room status
-# ============================================================================
-@router.post("/rooms/{room_id}/status")
-async def change_room_status_route(
-    room_id: int,
-    lock: bool = Query(True, description="true to lock the room, false to unlock"),
-    db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
-    user_permissions: dict = Depends(get_user_permissions),
-):
-    """
-    Lock or unlock a room status.
-    
-    Admin-only endpoint to lock or unlock room availability. Locked rooms cannot be booked or
-    edited during the lock period. Used during maintenance, overbooking disputes, or edit review.
-    
-    **Authorization:** Requires ROOM_MANAGEMENT:WRITE permission.
-    
-    Args:
-        room_id (int): The room ID to lock/unlock.
-        lock (bool): True to lock, False to unlock the room.
-        db (AsyncSession): Database session dependency.
-        current_user: Authenticated user (admin).
-        user_permissions (dict): Current user's permissions.
-    
-    Returns:
-        dict: Confirmation with room_id, room_status, and freeze_reason.
-    
-    Raises:
-        HTTPException (403): If user lacks ROOM_MANAGEMENT:WRITE permission.
-        HTTPException (404): If room_id not found.
-    """
-    # Permission check: only admins/managers with ROOM_MANAGEMENT.WRITE can perform this
-    if not user_permissions or (
-        Resources.ROOM_MANAGEMENT.value not in user_permissions
-        or PermissionTypes.WRITE.value not in user_permissions.get(Resources.ROOM_MANAGEMENT.value, set())
-    ):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin permission required")
-
-    room = await change_room_status(db, room_id, lock)
-    # Normalize enum values to strings for JSON response
-    r_status = getattr(room, 'room_status', None)
-    fr = getattr(room, 'freeze_reason', None)
-    return {
-        "ok": True,
-        "room_id": room_id,
-        "room_status": str(r_status),
-        "freeze_reason": str(fr)
-    }
 
 
 
@@ -266,3 +215,132 @@ async def decision_booking_edit(
     except Exception:
         pass
     return booking_edit_record
+
+
+# ============================================================================
+# 🔹 UPDATE - Customer update room occupancy (adults/children) directly
+# ============================================================================
+@router.patch("/{booking_id}/occupancy", status_code=status.HTTP_200_OK)
+async def update_occupancy(
+    booking_id: int,
+    room_occupancy_updates: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    Customer update room occupancy (adults and children count) for their booking.
+    
+    Allows customers to update the number of adults and children in each room of their booking
+    without requiring admin approval. This is a direct update to the booking_room_map table.
+    
+    Only the booking owner (customer) can update occupancy for their bookings.
+    Each room must maintain at least 1 adult - validation enforces this requirement.
+    
+    **Authorization:** Only the booking owner (customer who made the booking) can update occupancy.
+    
+    **Request Format:**
+    ```json
+    {
+      "room_updates": [
+        {
+          "room_id": 101,
+          "adults": 2,
+          "children": 1
+        },
+        {
+          "room_id": 102,
+          "adults": 1,
+          "children": 0
+        }
+      ]
+    }
+    ```
+    
+    Args:
+        booking_id (int): The booking ID to update occupancy for.
+        room_occupancy_updates (dict): Dictionary with "room_updates" key containing list of room occupancy updates.
+        db (AsyncSession): Database session dependency.
+        current_user: Authenticated user (must be booking owner).
+    
+    Returns:
+        dict: Updated booking rooms with new occupancy details.
+    
+    Raises:
+        HTTPException (403): If user is not the booking owner.
+        HTTPException (404): If booking_id not found.
+        HTTPException (404): If room_id not in the booking.
+        HTTPException (400): If room has 0 adults (violates minimum 1 adult requirement).
+        HTTPException (400): If adults or children values are negative.
+    
+    Side Effects:
+        - Updates booking_room_map table with new occupancy values.
+        - Creates audit log entry for each room updated.
+        - No admin approval needed.
+    
+    Example:
+        >>> # Update occupancy for booking 1001
+        >>> # Room 101: 2 adults, 1 child
+        >>> # Room 102: 1 adult, 0 children
+        >>> response = await client.patch(
+        ...     "/booking-edits/1001/occupancy",
+        ...     json={
+        ...         "room_updates": [
+        ...             {"room_id": 101, "adults": 2, "children": 1},
+        ...             {"room_id": 102, "adults": 1, "children": 0}
+        ...         ]
+        ...     }
+        ... )
+        >>> # Returns: {
+        >>> #     "booking_id": 1001,
+        >>> #     "rooms": [
+        >>> #         {"room_id": 101, "adults": 2, "children": 1, ...},
+        >>> #         {"room_id": 102, "adults": 1, "children": 0, ...}
+        >>> #     ]
+        >>> # }
+    """
+    updated_rooms = await update_room_occupancy_service(
+        booking_id=booking_id,
+        room_occupancy_updates=room_occupancy_updates,
+        db=db,
+        current_user=current_user
+    )
+    
+    # audit occupancy update
+    try:
+        entity_id = f"booking_room_maps:{booking_id}"
+        new_val = {
+            "booking_id": booking_id,
+            "rooms": [
+                {
+                    "room_id": room.room_id,
+                    "room_type_id": room.room_type_id,
+                    "adults": room.adults,
+                    "children": room.children
+                }
+                for room in updated_rooms
+            ]
+        }
+        await log_audit(
+            entity="booking_occupancy",
+            entity_id=entity_id,
+            action="UPDATE",
+            new_value=new_val,
+            changed_by_user_id=getattr(current_user, 'user_id', None),
+            user_id=getattr(current_user, 'user_id', None)
+        )
+    except Exception:
+        pass
+    
+    return {
+        "booking_id": booking_id,
+        "rooms": [
+            {
+                "room_id": room.room_id,
+                "room_type_id": room.room_type_id,
+                "adults": room.adults,
+                "children": room.children,
+                "is_room_active": room.is_room_active
+            }
+            for room in updated_rooms
+        ]
+    }

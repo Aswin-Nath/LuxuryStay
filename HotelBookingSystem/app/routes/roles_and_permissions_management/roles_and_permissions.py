@@ -12,7 +12,7 @@ from app.services.roles_and_permissions_service.roles_and_permissions_service im
     get_roles_for_permission as svc_get_roles_for_permission,
     create_role as svc_create_role, list_roles as svc_list_roles
 )
-from app.dependencies.authentication import get_user_permissions, ensure_not_basic_user
+from app.dependencies.authentication import get_user_permissions, ensure_not_basic_user, invalidate_permissions_cache
 from app.core.cache import get_cached, set_cached, invalidate_pattern
 from app.utils.audit_helper import log_audit
 
@@ -52,6 +52,10 @@ async def assign_permissions_to_role(payload: RolePermissionAssign, db: AsyncSes
     if not user_perms or "ADMIN_CREATION" not in user_perms or "READ" not in user_perms.get("ADMIN_CREATION", set()):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient privileges: ADMIN_CREATION:READ required")
     assignment_result = await svc_assign_permissions_to_role(db, payload.role_id, payload.permission_ids)
+    
+    # Invalidate permissions cache for this role (permissions changed)
+    await invalidate_permissions_cache(payload.role_id)
+    
     # audit permission assignment
     try:
         new_val = RolePermissionResponse.model_validate(assignment_result).model_dump()

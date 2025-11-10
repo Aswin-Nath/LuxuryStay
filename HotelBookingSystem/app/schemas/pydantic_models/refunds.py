@@ -8,21 +8,12 @@ class RefundCreate(BaseModel):
 
 	booking_id is supplied via the path parameter, and user_id is derived from the authenticated user.
 	The body should contain only the minimal fields needed for a refund request.
+	Transaction details (method_id and transaction_number) are NOT accepted here - 
+	they can only be updated later via the update endpoint.
 	"""
 	full_cancellation: Optional[bool] = False
-	refund_amount: Optional[float] = None
-	# refund_rooms should be a list of room IDs that were part of the booking
 	refund_rooms: Optional[List[int]] = None
 	remarks: Optional[str] = None
-	transaction_method_id: Optional[int] = None
-	transaction_number: Optional[str] = None
-	@model_validator(mode="before")
-	def normalize_zero_to_none(cls, values):
-		if not isinstance(values, dict):
-			return values
-		if values.get("transaction_method_id") == 0:
-			values["transaction_method_id"] = None
-		return values
 class RefundResponse(BaseModel):
 	refund_id: int
 	booking_id: int

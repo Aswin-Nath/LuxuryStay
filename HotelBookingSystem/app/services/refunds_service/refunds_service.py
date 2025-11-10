@@ -82,8 +82,8 @@ async def cancel_booking_and_create_refund(db: AsyncSession, booking_id: int, pa
         status="INITIATED",
         refund_amount=refund_amount,
         remarks=refund_payload.get("remarks"),
-        transaction_method_id=refund_payload.get("transaction_method_id"),
-        transaction_number=refund_payload.get("transaction_number"),
+        transaction_method_id=None,
+        transaction_number=None,
     )
 
     rf = await insert_refund_record(db, rf_data)
