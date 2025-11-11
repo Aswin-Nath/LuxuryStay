@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, status, UploadFile, File, Form, HTTPException, Security
-from typing import List, Optional, Union
+from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.postgres_connection import get_db
@@ -89,51 +89,83 @@ async def create_review(
 
 
 # ============================================================================
-# 🔹 READ - Fetch reviews (single or list with filters)
+# 🔹 READ - List reviews with optional filters (optimized for tables)
 # ============================================================================
-@router.get("/", response_model=Union[ReviewResponse, List[ReviewResponse]])
-async def list_or_get_reviews(review_id: Optional[int] = None, booking_id: Optional[int] = None, room_id: Optional[int] = None, user_id: Optional[int] = None, db: AsyncSession = Depends(get_db)):
+@router.get("/", response_model=List[ReviewResponse])
+async def list_reviews(
+    booking_id: Optional[int] = None,
+    room_id: Optional[int] = None,
+    user_id: Optional[int] = None,
+    limit: int = 20,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db)
+):
     """
-    Retrieve reviews (single or list with optional filters).
+    Retrieve list of reviews with optional filters (light response for table display).
     
-    Flexible GET endpoint supporting two modes:
-    - **By review_id:** Returns single review with all attached images.
-    - **By filters:** Returns list of reviews optionally filtered by booking_id, room_id, or user_id.
+    Returns a paginated list of reviews optionally filtered by booking_id, room_id, or user_id.
+    Images are NOT included in list responses to reduce payload. Use GET /reviews/{review_id} 
+    for detailed view with images.
     
-    Results are cached for 120 seconds to reduce database load. Images are included in responses.
+    Results are cached for 120 seconds to reduce database load.
     
     Args:
-        review_id (Optional[int]): Query parameter - if provided, return specific review.
-        booking_id (Optional[int]): Query parameter - filter reviews by booking.
-        room_id (Optional[int]): Query parameter - filter reviews by room.
-        user_id (Optional[int]): Query parameter - filter reviews by reviewer.
+        booking_id (Optional[int]): Filter reviews by booking ID.
+        room_id (Optional[int]): Filter reviews by room ID.
+        user_id (Optional[int]): Filter reviews by reviewer user ID.
+        limit (int): Number of reviews to return (default: 20, max: 100).
+        offset (int): Number of reviews to skip for pagination (default: 0).
         db (AsyncSession): Database session dependency.
     
     Returns:
-        ReviewResponse | List[ReviewResponse]: Single review or list with attached images.
+        List[ReviewResponse]: List of reviews without images for table display.
     
-    Raises:
-        HTTPException (404): If review_id not found.
+    Examples:
+        GET /reviews/ → All reviews
+        GET /reviews/?booking_id=5 → Reviews for booking 5
+        GET /reviews/?room_id=10&limit=50 → First 50 reviews for room 10
     """
-    if review_id is not None:
-        review_record = await svc_get_review(db, review_id)
-        imgs = await get_images_for_review(db, review_id)
-        img_resps = [ImageResponse.model_validate(i) for i in imgs]
-        return ReviewResponse.model_validate(review_record).model_copy(update={"images": img_resps})
-
-    cache_key = f"reviews:booking:{booking_id}:room:{room_id}:user:{user_id}"
+    cache_key = f"reviews:list:booking:{booking_id}:room:{room_id}:user:{user_id}:limit:{limit}:offset:{offset}"
     cached = await get_cached(cache_key)
     if cached is not None:
         return cached
 
     items = await svc_list_reviews(db, booking_id=booking_id, room_id=room_id, user_id=user_id)
-    out = []
-    for i in items:
-        imgs = await get_images_for_review(db, i.review_id)
-        img_resps = [ImageResponse.model_validate(img) for img in imgs]
-        out.append(ReviewResponse.model_validate(i).model_copy(update={"images": img_resps}))
+    # Apply pagination
+    items = items[offset:offset+limit]
+    out = [ReviewResponse.model_validate(i) for i in items]
     await set_cached(cache_key, out, ttl=120)
     return out
+
+
+# ============================================================================
+# 🔹 READ - Get single review with full details (includes images)
+# ============================================================================
+@router.get("/{review_id}", response_model=ReviewResponse)
+async def get_review(review_id: int, db: AsyncSession = Depends(get_db)):
+    """
+    Retrieve a single review with all details and attached images.
+    
+    Returns complete review data including all attached images, rating, comment, and admin response.
+    Use this endpoint for detailed review pages and modals.
+    
+    Args:
+        review_id (int): The review ID to retrieve (path parameter).
+        db (AsyncSession): Database session dependency.
+    
+    Returns:
+        ReviewResponse: Complete review with images, admin response, and all metadata.
+    
+    Raises:
+        HTTPException (404): If review_id not found.
+    
+    Examples:
+        GET /reviews/1 → Detailed view of review #1 with all images
+    """
+    review_record = await svc_get_review(db, review_id)
+    imgs = await get_images_for_review(db, review_id)
+    img_resps = [ImageResponse.model_validate(i) for i in imgs]
+    return ReviewResponse.model_validate(review_record).model_copy(update={"images": img_resps})
 
 
 # ============================================================================

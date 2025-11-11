@@ -308,12 +308,14 @@ async def refresh_tokens(db: AsyncSession, current_user, access_token: str) -> T
     """
     Refresh access token using OAuth2 scheme extracted tokens.
     
-    Validates the refresh token against the blacklist by checking JTI (JWT ID).
-    If not blacklisted, rotates the access token for the user. The refresh token 
-    and access token are extracted from the OAuth2 scheme, not taken as input parameters.
+    Security checks:
+    1. Validates that the refresh token hasn't been blacklisted/revoked
+    2. Checks if the session is still active
+    3. If all checks pass, generates new access token (keeps same refresh_token for 7 days)
     
-    Uses current_user.user_id to fetch the most recent session instead of old access_token,
-    allowing multiple consecutive refreshes to work properly.
+    The refresh token remains the same for 7 days, allowing multiple access token refreshes
+    without needing to regenerate the refresh token. If user logs out or refresh token expires,
+    they must login again.
     
     Args:
         db (AsyncSession): Database session for executing queries.
@@ -321,19 +323,24 @@ async def refresh_tokens(db: AsyncSession, current_user, access_token: str) -> T
         access_token (str): The current access token extracted from OAuth2 Bearer scheme.
     
     Returns:
-        TokenResponse: Object with new access_token, refresh_token, expires_in, token_type, role_id, and message.
+        TokenResponse: Object with new access_token (same refresh_token), expires_in, token_type, role_id, and message.
     
     Raises:
-        UnauthorizedException: If refresh token is blacklisted or invalid.
+        UnauthorizedException: If refresh token is blacklisted, session invalid, or token expired.
         NotFoundException: If user or session not found.
     """
     try:
-        # Get the most recent session for this user (not by old access_token)
+        # Step 1: Get the most recent session for this user
         session = await get_session_by_user_id(db, current_user.user_id)
         if not session:
             raise UnauthorizedException("Session not found")
         
-        # Check if session's JTI is in blacklist (more efficient than checking entire token hash)
+        # Step 2: Check if session is active (not already revoked)
+        if not session.is_active:
+            raise UnauthorizedException("Session has been revoked")
+        
+        # Step 3: Check if refresh token has been blacklisted (revoked during logout/security event)
+        # This checks the session_id which covers both access and refresh tokens
         result = await db.execute(
             select(BlacklistedTokens).where(
                 BlacklistedTokens.session_id == session.session_id
@@ -342,15 +349,16 @@ async def refresh_tokens(db: AsyncSession, current_user, access_token: str) -> T
         blacklisted_token = result.scalars().first()
         
         if blacklisted_token:
-            raise UnauthorizedException("Refresh token has been revoked (blacklisted)")
+            raise UnauthorizedException("Refresh token has been revoked (blacklisted). Please login again.")
         
-        # Refresh the access token using the current access_token from session
+        # Step 4: Refresh the access token (keeps same refresh_token & jti for 7 days)
         session = await refresh_access_token(db, session.access_token)
     except UnauthorizedException:
         raise
     except Exception as e:
         raise UnauthorizedException(str(e))
 
+    # Step 5: Fetch user details for response
     user = await get_user_by_id(db, session.user_id)
     if not user:
         raise NotFoundException("User not found")
@@ -363,7 +371,7 @@ async def refresh_tokens(db: AsyncSession, current_user, access_token: str) -> T
 
     return TokenResponse(
         access_token=session.access_token,
-        refresh_token=session.refresh_token,
+        refresh_token=session.refresh_token,  # ← Same refresh_token (valid for 7 days)
         expires_in=expires_in,
         token_type="Bearer",
         role_id=user.role_id,

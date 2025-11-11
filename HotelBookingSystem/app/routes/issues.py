@@ -1,7 +1,7 @@
 from fastapi import (
     APIRouter, Depends, UploadFile, File, Form, status, HTTPException, Query, Security
 )
-from typing import List, Optional, Union
+from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 import asyncio
 
@@ -148,11 +148,10 @@ async def add_issue_images(
 
 
 # ============================================================================
-# 🔹 READ - Fetch issues (ADMIN: all issues, single or list)
+# 🔹 READ - List all issues (ADMIN only - light response)
 # ============================================================================
-@router.get("/admin/issues", response_model=Union[IssueResponse, List[IssueResponse]])
-async def issues_admin(
-    issue_id: Optional[int] = Query(None, description="If provided, returns the single issue."),
+@router.get("/admin/", response_model=List[IssueResponse])
+async def list_issues_admin(
     limit: int = 50,
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
@@ -160,45 +159,74 @@ async def issues_admin(
     token_payload: dict = Security(check_permission, scopes=["BOOKING:READ", "ADMIN"]),
 ):
     """
-    Fetch single issue or paginated list of all issues (ADMIN only).
+    Fetch paginated list of all issues (ADMIN only - light response for tables).
     
-    Admin users can fetch any issue or list all issues in the system.
+    Admin users can list all issues in the system. Returns lightweight response for table display.
+    Use GET /issues/admin/{issue_id} for detailed view with full data.
     
     **Authorization:** Requires BOOKING:READ permission AND ADMIN role.
     
     Args:
-        issue_id (Optional[int]): If provided, returns single issue record.
-        limit (int): Page size for list mode (default 50).
-        offset (int): Pagination offset for list mode (default 0).
+        limit (int): Page size for list (default 50, max 100).
+        offset (int): Pagination offset (default 0).
         db (AsyncSession): Database session dependency.
         current_user (Users): Authenticated admin user.
         token_payload (dict): Security token payload validating BOOKING:READ and ADMIN.
     
     Returns:
-        Union[IssueResponse, List[IssueResponse]]: Single issue object or list of all issue objects.
+        List[IssueResponse]: List of all issue objects (light response).
     
-    Raises:
-        HTTPException (404): If issue_id provided but not found in database.
-    
-    Side Effects:
-        - Queries database without user filtering.
+    Examples:
+        GET /issues/admin/ → All issues
+        GET /issues/admin/?limit=100 → First 100 issues
     """
-    if issue_id is not None:
-        issue_record = await svc_get_issue(db, issue_id)
-        return IssueResponse.model_validate(issue_record).model_dump()
-
-    # list all issues
     items = await svc_list_issues(db, limit=limit, offset=offset)
     result = [IssueResponse.model_validate(i).model_dump() for i in items]
     return result
 
 
 # ============================================================================
-# 🔹 READ - Fetch issues (CUSTOMER: own issues only)
+# 🔹 READ - Get single issue (ADMIN - detail view)
 # ============================================================================
-@router.get("/customer/issues", response_model=Union[IssueResponse, List[IssueResponse]])
-async def issues_customer(
-    issue_id: Optional[int] = Query(None, description="If provided, returns the single issue created by you."),
+@router.get("/admin/{issue_id}", response_model=IssueResponse)
+async def get_issue_admin(
+    issue_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:READ", "ADMIN"]),
+):
+    """
+    Fetch single issue with full details (ADMIN only - detail view).
+    
+    Admin users can fetch any issue with all details. Returns complete issue data.
+    Use GET /issues/admin/ for list view.
+    
+    **Authorization:** Requires BOOKING:READ permission AND ADMIN role.
+    
+    Args:
+        issue_id (int): The issue ID to fetch (path parameter).
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated admin user.
+        token_payload (dict): Security token payload validating BOOKING:READ and ADMIN.
+    
+    Returns:
+        IssueResponse: Complete issue object with all details.
+    
+    Raises:
+        HTTPException (404): If issue_id not found.
+    
+    Examples:
+        GET /issues/admin/5 → Full details of issue #5
+    """
+    issue_record = await svc_get_issue(db, issue_id)
+    return IssueResponse.model_validate(issue_record).model_dump()
+
+
+# ============================================================================
+# 🔹 READ - List customer's own issues (CUSTOMER only - light response)
+# ============================================================================
+@router.get("/customer/", response_model=List[IssueResponse])
+async def list_issues_customer(
     limit: int = 50,
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
@@ -206,39 +234,70 @@ async def issues_customer(
     token_payload: dict = Security(check_permission, scopes=["BOOKING:READ", "CUSTOMER"]),
 ):
     """
-    Fetch single issue or paginated list of customer's own issues (CUSTOMER only).
+    Fetch paginated list of customer's own issues (CUSTOMER only - light response for tables).
     
-    Customer users can only fetch their own issues.
+    Customer users can only list their own issues. Returns lightweight response for table display.
+    Use GET /issues/customer/{issue_id} for detailed view with full data.
     
     **Authorization:** Requires BOOKING:READ permission AND CUSTOMER role.
     
     Args:
-        issue_id (Optional[int]): If provided, returns single issue created by customer.
-        limit (int): Page size for list mode (default 50).
-        offset (int): Pagination offset for list mode (default 0).
+        limit (int): Page size for list (default 50, max 100).
+        offset (int): Pagination offset (default 0).
         db (AsyncSession): Database session dependency.
         current_user (Users): Authenticated customer user.
         token_payload (dict): Security token payload validating BOOKING:READ and CUSTOMER.
     
     Returns:
-        Union[IssueResponse, List[IssueResponse]]: Single issue object or list of customer's issues.
+        List[IssueResponse]: List of customer's issues (light response).
     
-    Raises:
-        HTTPException (404): If issue_id provided but not found or not owned by customer.
-    
-    Side Effects:
-        - Queries database filtered by current_user.user_id.
+    Examples:
+        GET /issues/customer/ → All my issues
+        GET /issues/customer/?limit=20 → First 20 of my issues
     """
-    if issue_id is not None:
-        issue_record = await svc_get_issue(db, issue_id)
-        if issue_record.user_id != current_user.user_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found")
-        return IssueResponse.model_validate(issue_record).model_dump()
-
-    # list customer's issues only
     items = await svc_list_issues(db, user_id=current_user.user_id, limit=limit, offset=offset)
     result = [IssueResponse.model_validate(i).model_dump() for i in items]
     return result
+
+
+# ============================================================================
+# 🔹 READ - Get single issue (CUSTOMER - detail view, own issues only)
+# ============================================================================
+@router.get("/customer/{issue_id}", response_model=IssueResponse)
+async def get_issue_customer(
+    issue_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:READ", "CUSTOMER"]),
+):
+    """
+    Fetch single issue with full details (CUSTOMER only - own issues only, detail view).
+    
+    Customer users can only fetch their own issues with all details. Returns complete issue data.
+    Use GET /issues/customer/ for list view of own issues.
+    
+    **Authorization:** Requires BOOKING:READ permission AND CUSTOMER role. User must own the issue.
+    
+    Args:
+        issue_id (int): The issue ID to fetch (path parameter, must own).
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated customer user.
+        token_payload (dict): Security token payload validating BOOKING:READ and CUSTOMER.
+    
+    Returns:
+        IssueResponse: Complete issue object with all details.
+    
+    Raises:
+        HTTPException (403): If user doesn't own the issue.
+        HTTPException (404): If issue_id not found.
+    
+    Examples:
+        GET /issues/customer/3 → Full details of my issue #3
+    """
+    issue_record = await svc_get_issue(db, issue_id)
+    if issue_record.user_id != current_user.user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found")
+    return IssueResponse.model_validate(issue_record).model_dump()
 
 # ============================================================================
 # 🔹 READ - Fetch all chat messages for an issue (ADMIN)

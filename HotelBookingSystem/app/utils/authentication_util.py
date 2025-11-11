@@ -300,35 +300,15 @@ async def revoke_session(db: AsyncSession, *, session: Sessions, reason: str | N
 
     This will create BlacklistedTokens entries for both tokens and update the session row.
     """
-    # Blacklist access token
-    try:
-        await blacklist_token(
-            db,
-            user_id=session.user_id,
-            session_id=session.session_id,
-            token_value=session.access_token,
-            token_type=TokenType.ACCESS,
-            reason=reason,
-            revoked_type=RevokedType.MANUAL_REVOKED,
-        )
-    except Exception:
-        # best-effort; continue
-        pass
-
-    # Blacklist refresh token
-    try:
-        await blacklist_token(
-            db,
-            user_id=session.user_id,
-            session_id=session.session_id,
-            token_value=session.refresh_token,
-            token_type=TokenType.REFRESH,
-            reason=reason,
-            revoked_type=RevokedType.MANUAL_REVOKED,
-        )
-    except Exception:
-        pass
-
+    await blacklist_token(
+        db,
+        user_id=session.user_id,
+        session_id=session.session_id,
+        token_value=session.refresh_token,
+        token_type=TokenType.REFRESH,
+        reason=reason,
+        revoked_type=RevokedType.MANUAL_REVOKED,
+    )
     # mark session as inactive
     session.is_active = False
     session.revoked_at = datetime.utcnow()
@@ -342,11 +322,20 @@ async def revoke_session(db: AsyncSession, *, session: Sessions, reason: str | N
 
 async def refresh_access_token(db: AsyncSession, access_token_value: str):
     """
-    Complete token rotation:
-    - Validate refresh token
-    - Verify session + expiry
-    - Rotate access token, refresh token, and JTI for better security
-    - Return updated session with all new tokens
+    Refresh access token only (keep same refresh token for 7 days).
+    
+    Security approach:
+    - Keep same refresh_token and jti for the full 7 day period
+    - Only rotate access_token on each refresh
+    - This allows multiple access token refreshes with same refresh token
+    - Reduces token rotation overhead while maintaining access security
+    
+    Flow:
+    1. Validate current access token and find session
+    2. Verify refresh token hasn't expired (7 days)
+    3. Generate NEW access token with NEW JTI (same JTI as refresh token)
+    4. Keep refresh_token and refresh_token_expires_at unchanged
+    5. Return updated session with new access token
     """
 
     # Step 1: Decode access token and extract user
@@ -364,7 +353,7 @@ async def refresh_access_token(db: AsyncSession, access_token_value: str):
     if not session or not session.is_active:
         raise Exception("Invalid or inactive session")
 
-    # Step 3: Check refresh token expiry
+    # Step 3: Check refresh token expiry (7 days)
     if session.refresh_token_expires_at and datetime.utcnow() > session.refresh_token_expires_at:
         session.is_active = False
         session.revoked_at = datetime.utcnow()
@@ -372,27 +361,19 @@ async def refresh_access_token(db: AsyncSession, access_token_value: str):
         await db.commit()
         raise Exception("Refresh token expired")
 
-    # Step 4: Generate new JTI for the rotated session
-    new_jti = uuid.uuid4()
-    
-    # Step 5: Rotate (overwrite) the access token with new JTI
+    # Step 4: Generate NEW access token ONLY (keep same jti from refresh token)
+    # The JTI stays the same - this is the key difference from full rotation
     new_access_token, new_access_exp = create_access_token(
         {"sub": str(user_id), "scope": "access_token"},
-        jti=str(new_jti)
+        jti=str(session.jti)  # ← REUSE existing JTI (same as refresh token's JTI)
     )
 
-    # Step 6: Also rotate the refresh token with new JTI for better security
-    new_refresh_token, new_refresh_exp = create_refresh_token(
-        {"sub": str(user_id), "scope": "refresh_token"},
-        jti=str(new_jti)
-    )
-
-    # Step 7: Update session record with all new tokens
+    # Step 5: Update session with new access token ONLY
+    # ✅ Keep refresh_token unchanged
+    # ✅ Keep jti unchanged
+    # ✅ Keep refresh_token_expires_at unchanged (still valid for 7 days)
     session.access_token = new_access_token
     session.access_token_expires_at = new_access_exp
-    session.refresh_token = new_refresh_token
-    session.refresh_token_expires_at = new_refresh_exp
-    session.jti = new_jti
     session.last_active = datetime.utcnow()
     db.add(session)
     await db.commit()

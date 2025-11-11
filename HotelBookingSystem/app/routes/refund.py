@@ -73,11 +73,10 @@ async def complete_refund(
 
 
 # ============================================================================
-# 🔹 READ - Customer endpoint to fetch own refunds
+# 🔹 READ - List customer's own refunds (light response)
 # ============================================================================
-@router.get("/customer", response_model=list[RefundResponse])
-async def get_customer_refunds(
-    refund_id: int | None = None,
+@router.get("/customer/", response_model=list[RefundResponse])
+async def list_customer_refunds(
     booking_id: int | None = None,
     status: str | None = None,
     type: str | None = None,
@@ -90,12 +89,11 @@ async def get_customer_refunds(
     _permissions: dict = Security(check_permission, scopes=["BOOKING:READ", "CUSTOMER"]),
 ):
     """
-    Retrieve current user's own refunds only.
+    Retrieve current user's own refunds list (light response for tables).
     
     **Authorization:** Requires BOOKING:READ permission AND CUSTOMER role. Users can only see their own refunds.
     
     Args:
-        refund_id (Optional[int]): Fetch specific refund (must belong to current user).
         booking_id (Optional[int]): Filter by booking ID (must belong to current user).
         status (Optional[str]): Filter by refund status.
         type (Optional[str]): Filter by refund type.
@@ -107,26 +105,16 @@ async def get_customer_refunds(
         current_user (Users): Authenticated user.
     
     Returns:
-        list[RefundResponse]: List of current user's refunds matching filters.
+        list[RefundResponse]: List of current user's refunds matching filters (light response).
     
-    Raises:
-        HTTPException (404): If refund_id not found or doesn't belong to user.
+    Examples:
+        GET /refunds/customer/ → All my refunds
+        GET /refunds/customer/?status=COMPLETED&limit=50 → First 50 completed refunds
     """
     from app.core.cache import get_cached, set_cached
-    from fastapi import HTTPException, status as http_status
-    
-    # If specific refund requested, verify ownership
-    if refund_id is not None:
-        refund_record = await svc_get_refund(db, refund_id)
-        if getattr(refund_record, "user_id", None) != current_user.user_id:
-            raise HTTPException(
-                status_code=http_status.HTTP_403_FORBIDDEN,
-                detail="You don't have permission to access this refund"
-            )
-        return [RefundResponse.model_validate(refund_record)]
     
     # Build cache key for list query
-    cache_key = f"refunds:customer:{current_user.user_id}:booking_id:{booking_id}:status:{status}:type:{type}:from:{from_date}:to:{to_date}:limit:{limit}:offset:{offset}"
+    cache_key = f"refunds:customer:list:{current_user.user_id}:booking_id:{booking_id}:status:{status}:type:{type}:from:{from_date}:to:{to_date}:limit:{limit}:offset:{offset}"
     cached = await get_cached(cache_key)
     if cached is not None:
         return cached
@@ -134,7 +122,6 @@ async def get_customer_refunds(
     # Fetch only current user's refunds
     items = await svc_list_refunds(
         db,
-        refund_id=refund_id,
         booking_id=booking_id,
         user_id=current_user.user_id,  # ALWAYS filter by current user
         status=status,
@@ -152,11 +139,51 @@ async def get_customer_refunds(
 
 
 # ============================================================================
-# 🔹 READ - Admin endpoint to fetch all refunds with advanced filtering
+# 🔹 READ - Get single customer refund (detail view)
 # ============================================================================
-@router.get("/admin", response_model=list[RefundResponse])
-async def get_admin_refunds(
-    refund_id: int | None = None,
+@router.get("/customer/{refund_id}", response_model=RefundResponse)
+async def get_customer_refund(
+    refund_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    _permissions: dict = Security(check_permission, scopes=["BOOKING:READ", "CUSTOMER"]),
+):
+    """
+    Retrieve single refund with full details (customer's own refund only).
+    
+    **Authorization:** Requires BOOKING:READ permission AND CUSTOMER role. User must own the refund.
+    
+    Args:
+        refund_id (int): The refund ID to fetch (path parameter, must own).
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user (refund owner).
+    
+    Returns:
+        RefundResponse: Complete refund record with all transaction details.
+    
+    Raises:
+        HTTPException (403): If user doesn't own the refund.
+        HTTPException (404): If refund_id not found.
+    
+    Examples:
+        GET /refunds/customer/123 → Full details of my refund #123
+    """
+    from fastapi import HTTPException, status as http_status
+    
+    refund_record = await svc_get_refund(db, refund_id)
+    if getattr(refund_record, "user_id", None) != current_user.user_id:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to access this refund"
+        )
+    return RefundResponse.model_validate(refund_record)
+
+
+# ============================================================================
+# 🔹 READ - List all refunds (ADMIN only - light response)
+# ============================================================================
+@router.get("/admin/", response_model=list[RefundResponse])
+async def list_admin_refunds(
     booking_id: int | None = None,
     user_id: int | None = None,
     status: str | None = None,
@@ -170,15 +197,14 @@ async def get_admin_refunds(
     _permissions: dict = Security(check_permission, scopes=["REFUND_APPROVAL:READ", "ADMIN"]),
 ):
     """
-    Retrieve all refunds with advanced filtering. Admin-only endpoint.
+    Retrieve all refunds with advanced filtering (ADMIN only - light response for tables).
     
     **Authorization:** Requires REFUND_APPROVAL:READ permission AND ADMIN role (admin only).
     
     Admin users can query all refunds with any combination of filters including user_id.
-    Results are cached for performance.
+    Returns lightweight response for table display. Use GET /refunds/admin/{refund_id} for detailed view.
     
     Args:
-        refund_id (Optional[int]): Filter by specific refund ID.
         booking_id (Optional[int]): Filter by booking ID.
         user_id (Optional[int]): Filter by refund owner user ID (admin only).
         status (Optional[str]): Filter by refund status.
@@ -192,15 +218,16 @@ async def get_admin_refunds(
         _permissions (dict): Security token with REFUND_APPROVAL:READ permission.
     
     Returns:
-        list[RefundResponse]: List of all refunds matching criteria.
+        list[RefundResponse]: List of all refunds matching criteria (light response).
     
-    Raises:
-        HTTPException (403): If insufficient permissions.
+    Examples:
+        GET /refunds/admin/ → All refunds
+        GET /refunds/admin/?user_id=5&status=PENDING → Pending refunds for user 5
     """
     from app.core.cache import get_cached, set_cached
     
     # Build cache key for admin list query
-    cache_key = f"refunds:admin:refund_id:{refund_id}:booking_id:{booking_id}:user_id:{user_id}:status:{status}:type:{type}:from:{from_date}:to:{to_date}:limit:{limit}:offset:{offset}"
+    cache_key = f"refunds:admin:list:booking_id:{booking_id}:user_id:{user_id}:status:{status}:type:{type}:from:{from_date}:to:{to_date}:limit:{limit}:offset:{offset}"
     cached = await get_cached(cache_key)
     if cached is not None:
         return cached
@@ -208,7 +235,6 @@ async def get_admin_refunds(
     # Fetch refunds with all filters (admin has no restrictions)
     items = await svc_list_refunds(
         db,
-        refund_id=refund_id,
         booking_id=booking_id,
         user_id=user_id,  # Admin can filter by any user
         status=status,
@@ -223,3 +249,40 @@ async def get_admin_refunds(
     result = [RefundResponse.model_validate(i) for i in paginated]
     await set_cached(cache_key, result, ttl=60)
     return result
+
+
+# ============================================================================
+# 🔹 READ - Get single refund (ADMIN only - detail view)
+# ============================================================================
+@router.get("/admin/{refund_id}", response_model=RefundResponse)
+async def get_admin_refund(
+    refund_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    _permissions: dict = Security(check_permission, scopes=["REFUND_APPROVAL:READ", "ADMIN"]),
+):
+    """
+    Retrieve single refund with full details (ADMIN only - detail view).
+    
+    **Authorization:** Requires REFUND_APPROVAL:READ permission AND ADMIN role.
+    
+    Admin users can fetch any refund with all details. Returns complete refund data including
+    transaction details. Use GET /refunds/admin/ for list view.
+    
+    Args:
+        refund_id (int): The refund ID to fetch (path parameter).
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated admin user.
+        _permissions (dict): Security token with REFUND_APPROVAL:READ permission.
+    
+    Returns:
+        RefundResponse: Complete refund record with all transaction details.
+    
+    Raises:
+        HTTPException (404): If refund_id not found.
+    
+    Examples:
+        GET /refunds/admin/123 → Full details of refund #123
+    """
+    refund_record = await svc_get_refund(db, refund_id)
+    return RefundResponse.model_validate(refund_record)
