@@ -15,26 +15,7 @@ from app.models.sqlalchemy_schemas.notifications import Notifications
 # ==========================================================
 
 async def add_notification(db: AsyncSession, payload, commit: bool = True) -> Notifications:
-    """
-    Create a new notification for a recipient user.
-    
-    Validates required fields (recipient_user_id, title, message) and creates a notification
-    record with optional entity references (e.g., booking_id, room_id). Notification types
-    can be BOOKING, REFUND, OFFER, REVIEW, etc.
-    
-    Args:
-        db (AsyncSession): Database session for executing the query.
-        payload: Pydantic model containing recipient_user_id, title, message, notification_type,
-                 entity_type, entity_id.
-        commit (bool): Whether to commit changes (default True).
-    
-    Returns:
-        Notifications: The newly created notification record.
-    
-    Raises:
-        HTTPException (400): If recipient_user_id, title, or message is missing.
-        HTTPException (500): If database insert fails.
-    """
+
     notification_data = payload.model_dump() if hasattr(payload, "model_dump") else dict(payload)
 
     recipient_user_id = notification_data.get("recipient_user_id") or notification_data.get("resc_user_id")

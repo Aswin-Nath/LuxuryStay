@@ -47,8 +47,6 @@ class BookingCreate(BaseModel):
     check_in_time: Optional[time] = Field(default_factory=lambda: time(12, 0), description="Check-in time (default: 12:00)")
     check_out: date
     check_out_time: Optional[time] = Field(default_factory=lambda: time(11, 0), description="Check-out time (default: 11:00)")
-    offer_id: Optional[int] = None
-    offer_discount_percent: Optional[float] = Field(default=0.0, ge=0, le=100, description="Discount percentage (0-100)")
     primary_customer_name: Optional[str] = None
     primary_customer_phone_number: Optional[str] = None
     primary_customer_dob: Optional[date] = None
@@ -153,8 +151,6 @@ class BookingResponse(BaseModel):
     check_out: date
     check_out_time: time
     total_price: float
-    offer_id: Optional[int]
-    offer_discount_percent: float
     status: str
     is_deleted: bool
     created_at: Optional[datetime] = None
@@ -177,7 +173,6 @@ class BookingRoomMapCreate(BaseModel):
     room_type_id: int
     adults: int = Field(..., ge=1)
     children: Optional[int] = 0
-    offer_discount_percent: Optional[float] = 0.0
 
 
 class BookingRoomMapResponse(BookingRoomMapCreate):

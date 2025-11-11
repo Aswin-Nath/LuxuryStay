@@ -19,7 +19,7 @@ class Metadata(BaseModel):
 
 class ContentDoc(BaseModel):
     id: Optional[str] = Field(alias="_id", default=None)
-    type: Literal["announcement", "banner", "offer", "testimonial", "promotion"]
+    type: Literal["announcement", "banner", "testimonial", "promotion"]
     title: str
     description: str
     media: Media
@@ -29,21 +29,4 @@ class ContentDoc(BaseModel):
     createdAt: datetime = Field(default_factory=datetime.utcnow)
     updatedAt: datetime = Field(default_factory=datetime.utcnow)
 
-    model_config = {
-        "json_schema_extra": {
-            "example": {
-                "type": "offer",
-                "title": "Diwali Fest Offer",
-                "description": "Celebrate with 20% off on all premium rooms.",
-                "media": {"url": "https://cdn.hotel.com/diwali.jpg", "type": "image"},
-                "status": "used",
-                "metadata": {"CTA": "Book Now", "discount_percent": 20.0},
-                "images": [
-                    {"url": "https://cdn.hotel.com/img1.jpg"},
-                    {"url": "https://cdn.hotel.com/img2.jpg"}
-                ],
-                "createdAt": "2025-11-08T18:30:00Z",
-                "updatedAt": "2025-11-08T18:30:00Z"
-            }
-        }
-    }
+    

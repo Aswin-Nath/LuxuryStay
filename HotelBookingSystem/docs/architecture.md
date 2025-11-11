@@ -68,7 +68,7 @@ Client → Middleware → API Routes → Services → Repositories → Databases
 │       - Dependency injection                                 │
 │                                                              │
 │  [3] Service Layer                                           │
-│       - Domain logic, pricing, offers, and validation rules  │
+│       - Domain logic, pricing, and validation rules  │
 │       - Executes use-case workflows                          │
 │                                                              │
 │  [4] Data Access Layer                                       │
@@ -95,7 +95,6 @@ Client → Middleware → API Routes → Services → Repositories → Databases
 | **Payments** | Records payment status and links to bookings |
 | **Refunds** | Refund request and approval flow |
 | **Rooms** | Room CRUD, amenities, and availability management |
-| **Offers** | Discount and validity management |
 | **Reviews** | Customer reviews and admin responses |
 | **Issues** | Support ticket creation and updates |
 | **Notifications** | User alerts stored per event |
@@ -108,7 +107,7 @@ Client → Middleware → API Routes → Services → Repositories → Databases
 
 ### PostgreSQL (Relational Core)
 
-- Manages structured entities: `users`, `rooms`, `bookings`, `payments`, `refunds`, `offers`, `issues`, `roles`, and `permissions`.
+- Manages structured entities: `users`, `rooms`, `bookings`, `payments`, `refunds`, `issues`, `roles`, and `permissions`.
 - Strong foreign key relationships and 3NF schema.
 - Indexed for query performance on key fields.
 - Soft deletion via `is_deleted` and timestamp columns.

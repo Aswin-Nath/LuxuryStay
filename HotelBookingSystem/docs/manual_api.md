@@ -45,7 +45,6 @@ Resources:
 ├── ANALYTICS_VIEW (READ)
 ├── BACKUP_OPERATIONS (READ, WRITE, EXECUTE)
 ├── RESTORE_OPERATIONS (WRITE, EXECUTE)
-└── OFFER_MANAGEMENT (READ, WRITE, DELETE, MANAGE)
 ```
 
 ---
@@ -694,74 +693,6 @@ files: [image1.jpg, image2.jpg]
     "created_at": "2025-11-09T10:30:00Z"
   }
 ]
-```
-
----
-
-## Offer Endpoints (`/offers`)
-
-### 1. **Get Active Offers**
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| `GET` | `/offers/` | No | Get all active promotional offers |
-
-**Response (200 OK):**
-```json
-[
-  {
-    "offer_id": 5,
-    "code": "SAVE50",
-    "description": "50% off on bookings above $200",
-    "discount_percentage": 50,
-    "discount_amount": null,
-    "valid_from": "2025-11-01",
-    "valid_to": "2025-11-30",
-    "status": "ACTIVE",
-    "created_at": "2025-10-15T00:00:00Z"
-  },
-  {
-    "offer_id": 6,
-    "code": "FLAT100",
-    "description": "$100 flat discount",
-    "discount_percentage": null,
-    "discount_amount": 100.00,
-    "valid_from": "2025-11-01",
-    "valid_to": "2025-11-30",
-    "status": "ACTIVE",
-    "created_at": "2025-10-20T00:00:00Z"
-  }
-]
-```
-
----
-
-### 2. **Create Offer (Admin)**
-
-| Method | Endpoint | Auth | Permission |
-|--------|----------|------|------------|
-| `POST` | `/offers/` | Yes | `OFFER_MANAGEMENT:WRITE` |
-
-**Request Body:**
-```json
-{
-  "code": "SAVE30",
-  "description": "30% off on all bookings",
-  "discount_percentage": 30,
-  "valid_from": "2025-12-01",
-  "valid_to": "2025-12-31"
-}
-```
-
-**Response (201 Created):**
-```json
-{
-  "offer_id": 7,
-  "code": "SAVE30",
-  "discount_percentage": 30,
-  "status": "ACTIVE",
-  "message": "Offer created successfully"
-}
 ```
 
 ---

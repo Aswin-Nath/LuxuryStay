@@ -49,7 +49,6 @@ A FastAPI-based hotel booking platform with PostgreSQL and MongoDB, featuring ro
 4. SERVICE LAYER
    ├─ Validate business logic
    ├─ Check Room availability (Room Service)
-   ├─ Calculate price + discount (Offer Service)
    ├─ Create booking via CRUD
    ├─ Update cache
    └─ Trigger notification (async)
@@ -88,7 +87,6 @@ app/
 │  ├─ payment_management/ ............. /payments endpoints
 │  ├─ reviews_management/ ............. /reviews endpoints
 │  ├─ wishlist_management/ ............ /wishlist endpoints
-│  ├─ offer_management/ ............... /offers endpoints
 │  ├─ notifications_management/ ....... /notifications endpoints
 │  ├─ issue_management/ ............... /issues endpoints
 │  ├─ profile_management/ ............. /profile endpoints
@@ -104,7 +102,6 @@ app/
 │  ├─ booking_service/ ................ Booking orchestration
 │  ├─ payment_service/ ................ Payment processing
 │  ├─ review_service/ ................. Reviews, ratings
-│  ├─ offer_service/ .................. Discount calculation
 │  ├─ notification_service/ ........... Email/SMS sending
 │  ├─ wishlist_service/ ............... Wishlist operations
 │  ├─ issue_service/ .................. Issue tracking
@@ -235,11 +232,6 @@ python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - `PUT /reviews/{id}` - Update review
 - `DELETE /reviews/{id}` - Delete review
 
-### Offers (`/offers`)
-- `GET /offers` - List active offers
-- `POST /offers` - Create offer (Admin)
-- `PUT /offers/{id}` - Update offer (Admin)
-- `DELETE /offers/{id}` - Delete offer (Admin)
 
 ### Wishlist (`/wishlist`)
 - `GET /wishlist` - Get wishlist
@@ -334,8 +326,7 @@ python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 **Wishlist**
 - id, user_id (FK), room_id (FK), created_at
 
-**Offers**
-- id, code (UNIQUE), description, offer_type, discount_value, start_date, end_date, applicable_rooms, max_uses, current_uses, created_at, updated_at
+
 
 **Issues**
 - id, user_id (FK), booking_id (FK), title, description, status, priority, assigned_to (FK), created_at, updated_at

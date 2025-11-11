@@ -20,6 +20,7 @@ from app.models.sqlalchemy_schemas.bookings import Bookings, BookingRoomMap, Boo
 from app.models.sqlalchemy_schemas.rooms import Rooms, RoomStatus, RoomTypes
 from app.models.sqlalchemy_schemas.tax_utility import TaxUtility
 from app.models.sqlalchemy_schemas.notifications import Notifications
+from app.models.sqlalchemy_schemas.users import Users
 
 
 # ============================================================================
@@ -154,6 +155,46 @@ async def create_booking(db: AsyncSession, payload, user_id: int) -> Bookings:
     rooms_data = data.pop("rooms", []) or []
     requested_room_type_ids = [room["room_type_id"] for room in rooms_data]
 
+    # ========== FETCH USER PROFILE FOR AUTO-FILL ==========
+    # Single query to get user details (reused for auto-fill)
+    user_query = await db.execute(select(Users).where(Users.user_id == user_id))
+    current_user = user_query.scalars().first()
+    
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User profile not found"
+        )
+
+    # ========== AUTO-FILL CUSTOMER DETAILS FROM USER PROFILE ==========
+    # If not provided in request, use user profile data
+    if not data.get("primary_customer_name"):
+        if current_user.full_name:
+            data["primary_customer_name"] = current_user.full_name
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="primary_customer_name required (not provided in request and not found in user profile)"
+            )
+    
+    if not data.get("primary_customer_phone_number"):
+        if current_user.phone_number:
+            data["primary_customer_phone_number"] = current_user.phone_number
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="primary_customer_phone_number required (not provided in request and not found in user profile)"
+            )
+    
+    if not data.get("primary_customer_dob"):
+        if current_user.dob:
+            data["primary_customer_dob"] = current_user.dob
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="primary_customer_dob required (not provided in request and not found in user profile)"
+            )
+
     # ========== DATE VALIDATION ==========
     validate_booking_dates(
         check_in=data["check_in"],
@@ -161,8 +202,7 @@ async def create_booking(db: AsyncSession, payload, user_id: int) -> Bookings:
         primary_customer_dob=data.get("primary_customer_dob")
     )
 
-    if "offer_id" in data and (data.get("offer_id") == 0):
-        data["offer_id"] = None
+
 
     if not requested_room_type_ids:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No room type ids provided for booking")
@@ -175,8 +215,6 @@ async def create_booking(db: AsyncSession, payload, user_id: int) -> Bookings:
                 detail=f"Room {idx + 1} must have at least 1 adult. Got {room_data.get('adults', 0)} adult(s)"
             )
 
-    # room_count is now automatically computed from len(rooms) via Pydantic property
-    # No need to validate room_count separately - it's always len(requested_room_type_ids)
     room_count = len(requested_room_type_ids)
 
     req_counts = Counter(requested_room_type_ids)
@@ -229,12 +267,7 @@ async def create_booking(db: AsyncSession, payload, user_id: int) -> Bookings:
         price_per_night = Decimal(str(room_type.price_per_night))
         total_price += price_per_night * Decimal(num_nights)
     
-    # Apply offer discount if applicable
-    offer_discount_percent = Decimal(str(data.get("offer_discount_percent", 0) or 0))
-    if offer_discount_percent > 0:
-        discount_amount = total_price * (offer_discount_percent / Decimal("100"))
-        total_price = total_price - discount_amount
-    
+
     total_price = float(total_price.quantize(Decimal("0.01")))
     data["total_price"] = total_price
 
@@ -247,8 +280,6 @@ async def create_booking(db: AsyncSession, payload, user_id: int) -> Bookings:
         check_out=data["check_out"],
         check_out_time=data.get("check_out_time"),
         total_price=Decimal(str(data["total_price"])),
-        offer_id=data.get("offer_id"),
-        offer_discount_percent=data.get("offer_discount_percent", 0) or 0,
         primary_customer_name=data.get("primary_customer_name"),
         primary_customer_phone_number=data.get("primary_customer_phone_number"),
         primary_customer_dob=data.get("primary_customer_dob"),
@@ -273,7 +304,6 @@ async def create_booking(db: AsyncSession, payload, user_id: int) -> Bookings:
             room_type_id=allocated_room.room_type_id,
             adults=adults,
             children=children,
-            offer_discount_percent=0,
         )
         await create_booking_room_map(db, booking_room_map)
 
@@ -311,6 +341,9 @@ async def create_booking(db: AsyncSession, payload, user_id: int) -> Bookings:
 
     hydrated = await get_booking_by_id(db, booking.booking_id)
     return hydrated
+
+
+
 
 
 async def get_booking(db: AsyncSession, booking_id: int) -> Bookings:

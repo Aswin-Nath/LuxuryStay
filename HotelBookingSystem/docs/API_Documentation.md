@@ -679,117 +679,6 @@ Access control: only non-basic users (admins/managers) may access this endpoint.
 ---
 
 
-## `/api/offers/`
-
-### POST: Create Offer
-
-**Description:** Create an offer and its room mappings via the service layer.
-
-Only users with Resources.OFFER_MANAGEMENT and PermissionTypes.WRITE may perform this action.
-
-**Tags:** OFFERS
-
-
-**Request Body Example:**
-
-
-**Responses:**
-
-- `201` — Successful Response
-
-- `422` — Validation Error
-
-
----
-
-### GET: List Offers
-
-**Description:** 
-
-**Tags:** OFFERS
-
-
-**Parameters:**
-
-- `limit` (query) — 
-
-- `offset` (query) — 
-
-
-**Responses:**
-
-- `200` — Successful Response
-
-- `422` — Validation Error
-
-
----
-
-
-## `/api/offers/{offer_id}`
-
-### GET: Get Offer
-
-**Description:** 
-
-**Tags:** OFFERS
-
-
-**Parameters:**
-
-- `offer_id` (path) — 
-
-
-**Responses:**
-
-- `200` — Successful Response
-
-- `422` — Validation Error
-
-
----
-
-### PUT: Edit Offer
-
-**Description:** 
-
-**Tags:** OFFERS
-
-
-**Parameters:**
-
-- `offer_id` (path) — 
-
-
-**Request Body Example:**
-
-
-**Responses:**
-
-- `200` — Successful Response
-
-- `422` — Validation Error
-
-
----
-
-### DELETE: Delete Offer
-
-**Description:** 
-
-**Tags:** OFFERS
-
-
-**Parameters:**
-
-- `offer_id` (path) — 
-
-
-**Responses:**
-
-- `204` — Successful Response
-
-- `422` — Validation Error
 
 
 ---
@@ -939,7 +828,7 @@ Only users with Resources.OFFER_MANAGEMENT and PermissionTypes.WRITE may perform
 
 ### GET: Get Wishlist Item
 
-**Description:** Retrieve a single wishlist entry for the current user by room_type_id or offer_id.
+**Description:** Retrieve a single wishlist entry for the current user by room_type_id.
 
 **Tags:** WISHLIST
 
@@ -948,7 +837,6 @@ Only users with Resources.OFFER_MANAGEMENT and PermissionTypes.WRITE may perform
 
 - `room_type_id` (query) — 
 
-- `offer_id` (query) — 
 
 
 **Responses:**

@@ -7,7 +7,6 @@ from app.models.sqlalchemy_schemas import (
     bookings,
     images,
         reviews,
-    offers,
     permissions,
     roles,
     rooms,

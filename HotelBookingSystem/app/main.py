@@ -9,7 +9,6 @@ from app.middlewares.logging_middleware import LoggingMiddleware
 from app.routes.roles_and_permissions import roles_and_permissions_router
 from app.routes.authentication import auth_router
 from app.routes.rooms import router as room_management_router
-from app.routes.offers import router as offers_router
 from app.routes.booking import router as booking_customer_router
 from app.routes.wishlist import router as wishlist_router
 from app.routes.notifications import router as notifications_router
@@ -56,7 +55,6 @@ app.add_middleware(LoggingMiddleware)
 app.include_router(roles_and_permissions_router)
 app.include_router(auth_router)
 app.include_router(room_management_router)
-app.include_router(offers_router)
 app.include_router(booking_customer_router)
 app.include_router(wishlist_router)
 app.include_router(notifications_router)

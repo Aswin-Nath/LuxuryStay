@@ -10,25 +10,9 @@ from app.models.sqlalchemy_schemas.wishlist import Wishlist
 # ==========================================================
 
 async def create_wishlist_entry(
-    db: AsyncSession, user_id: int, room_type_id: Optional[int], offer_id: Optional[int]
-) -> Wishlist:
-    """
-    Create a new wishlist entry for a user.
-    
-    Inserts a wishlist record linking a user to either a room type or an offer. Exactly
-    one of room_type_id or offer_id should be provided (validation done in service layer).
-    Flushes and refreshes to populate database-generated fields.
-    
-    Args:
-        db (AsyncSession): Database session for executing the query.
-        user_id (int): The ID of the user who owns the wishlist item.
-        room_type_id (Optional[int]): The ID of the room type to add (None if offer-based).
-        offer_id (Optional[int]): The ID of the offer to add (None if room-type-based).
-    
-    Returns:
-        Wishlist: The newly created wishlist record with wishlist_id and timestamps populated.
-    """
-    wishlist_record = Wishlist(user_id=user_id, room_type_id=room_type_id, offer_id=offer_id)
+    db: AsyncSession, user_id: int, room_type_id: int) -> Wishlist:
+
+    wishlist_record = Wishlist(user_id=user_id, room_type_id=room_type_id)
     db.add(wishlist_record)
     await db.flush()
     await db.refresh(wishlist_record)
@@ -42,29 +26,12 @@ async def create_wishlist_entry(
 async def get_wishlist_by_user_and_item(
     db: AsyncSession,
     user_id: int,
-    room_type_id: Optional[int],
-    offer_id: Optional[int],
+    room_type_id: int,
 ) -> Optional[Wishlist]:
-    """
-    Check if a wishlist entry exists for a user and specific item.
-    
-    Queries for an existing wishlist entry matching the user and either room_type_id or
-    offer_id. Used for duplicate prevention (uniqueness check). Only returns non-deleted entries.
-    
-    Args:
-        db (AsyncSession): Database session for executing the query.
-        user_id (int): The user ID to filter by.
-        room_type_id (Optional[int]): The room type ID (if looking for room-type entry).
-        offer_id (Optional[int]): The offer ID (if looking for offer entry).
-    
-    Returns:
-        Optional[Wishlist]: The matching wishlist entry if found, None otherwise.
-    """
+
     stmt = select(Wishlist).where(Wishlist.user_id == user_id, Wishlist.is_deleted == False)
     if room_type_id:
         stmt = stmt.where(Wishlist.room_type_id == room_type_id)
-    if offer_id:
-        stmt = stmt.where(Wishlist.offer_id == offer_id)
 
     query_result = await db.execute(stmt)
     return query_result.scalars().first()
@@ -77,7 +44,6 @@ async def get_user_wishlist(
     Retrieve all wishlist entries for a user.
     
     Fetches all active (or all including soft-deleted) wishlist entries for a specific user.
-    Results include both room-type and offer-type items.
     
     Args:
         db (AsyncSession): Database session for executing the query.

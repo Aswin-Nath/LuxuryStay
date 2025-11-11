@@ -14,7 +14,6 @@ class NotificationCreate(BaseModel):
 			"PAYMENT",
 			"REFUND",
 			"ISSUE",
-			"OFFER",
 			"REVIEW",
 			"WISHLIST",
 			"USER_ACCOUNT",

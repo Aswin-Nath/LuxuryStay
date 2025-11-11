@@ -133,7 +133,6 @@ class Resources(str, PyEnum):
     ANALYTICS_VIEW = "ANALYTICS_VIEW"      # Reports & analytics
     BACKUP_OPERATIONS = "BACKUP_OPERATIONS"  # Database backups
     RESTORE_OPERATIONS = "RESTORE_OPERATIONS"  # Database restores
-    OFFER_MANAGEMENT = "OFFER_MANAGEMENT"  # Promotions
 ```
 
 ### Permission Types
