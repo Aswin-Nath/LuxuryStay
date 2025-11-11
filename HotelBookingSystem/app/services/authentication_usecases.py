@@ -1,12 +1,14 @@
 from typing import Optional
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 # CRUD Imports
 from app.crud.authentication import (
     get_user_by_email,
     get_user_by_id,
     get_session_by_access_token,
+    get_session_by_user_id,
     revoke_session_record,
 )
 
@@ -20,6 +22,7 @@ from app.utils.authentication_util import (
     create_session,
     refresh_access_token,
     _send_email,
+    revoke_session,
 )
 from app.core.exceptions import (
     NotFoundException,
@@ -31,7 +34,7 @@ from app.core.exceptions import (
 # Schemas & Models
 from app.schemas.pydantic_models.users import UserCreate, TokenResponse
 from app.models.sqlalchemy_schemas.users import Users
-from app.models.sqlalchemy_schemas.authentication import VerificationType
+from app.models.sqlalchemy_schemas.authentication import VerificationType, BlacklistedTokens
 
 # Utilities for validation
 from app.utils.authentication_util import is_valid_email, is_strong_password, is_valid_indian_phone
@@ -293,6 +296,7 @@ async def login_flow(
         expires_in=expires_in,
         token_type="Bearer",
         role_id=user.role_id,
+        message="Login successful. Use the access_token in Authorization header as Bearer token.",
     )
 
 
@@ -300,26 +304,50 @@ async def login_flow(
 # 🔹 TOKEN REFRESH
 # ==========================================================
 
-async def refresh_tokens(db: AsyncSession, access_token: str) -> TokenResponse:
+async def refresh_tokens(db: AsyncSession, current_user, access_token: str) -> TokenResponse:
     """
-    Refresh access token using current access token.
+    Refresh access token using OAuth2 scheme extracted tokens.
     
-    Validates existing access token and generates a new one with extended expiration.
-    Useful for extending user sessions without re-authentication.
+    Validates the refresh token against the blacklist by checking JTI (JWT ID).
+    If not blacklisted, rotates the access token for the user. The refresh token 
+    and access token are extracted from the OAuth2 scheme, not taken as input parameters.
+    
+    Uses current_user.user_id to fetch the most recent session instead of old access_token,
+    allowing multiple consecutive refreshes to work properly.
     
     Args:
         db (AsyncSession): Database session for executing queries.
-        access_token (str): The current/existing access token.
+        current_user (Users): The authenticated user from OAuth2 scheme.
+        access_token (str): The current access token extracted from OAuth2 Bearer scheme.
     
     Returns:
-        TokenResponse: Object with new access_token, refresh_token, expires_in, token_type, role_id.
+        TokenResponse: Object with new access_token, refresh_token, expires_in, token_type, role_id, and message.
     
     Raises:
-        UnauthorizedException: If access_token is invalid or expired.
-        NotFoundException: If user associated with token not found.
+        UnauthorizedException: If refresh token is blacklisted or invalid.
+        NotFoundException: If user or session not found.
     """
     try:
-        session = await refresh_access_token(db, access_token)
+        # Get the most recent session for this user (not by old access_token)
+        session = await get_session_by_user_id(db, current_user.user_id)
+        if not session:
+            raise UnauthorizedException("Session not found")
+        
+        # Check if session's JTI is in blacklist (more efficient than checking entire token hash)
+        result = await db.execute(
+            select(BlacklistedTokens).where(
+                BlacklistedTokens.session_id == session.session_id
+            )
+        )
+        blacklisted_token = result.scalars().first()
+        
+        if blacklisted_token:
+            raise UnauthorizedException("Refresh token has been revoked (blacklisted)")
+        
+        # Refresh the access token using the current access_token from session
+        session = await refresh_access_token(db, session.access_token)
+    except UnauthorizedException:
+        raise
     except Exception as e:
         raise UnauthorizedException(str(e))
 
@@ -339,6 +367,7 @@ async def refresh_tokens(db: AsyncSession, access_token: str) -> TokenResponse:
         expires_in=expires_in,
         token_type="Bearer",
         role_id=user.role_id,
+        message="Access token refreshed successfully. Use the new access_token in Authorization header for subsequent requests.",
     )
 
 
@@ -346,14 +375,62 @@ async def refresh_tokens(db: AsyncSession, access_token: str) -> TokenResponse:
 # 🔹 LOGOUT
 # ==========================================================
 
-async def logout_flow(db: AsyncSession, access_token: str):
-    session = await get_session_by_access_token(db, access_token)
-    if not session:
-        raise NotFoundException("Session not found")
-
-    await revoke_session_record(db, session=session, reason="user_logout")
-    await db.commit()
-    return {"message": "Logged out"}
+async def logout_flow(db: AsyncSession, user_id: int):
+    """
+    User logout flow.
+    
+    Logs out the user by:
+    1. Finding the most recent session for the user
+    2. Verifying the session's JTI is NOT already blacklisted
+    3. Checking if the session is still active
+    4. Blacklisting both the access token and refresh token
+    5. Marking the session as inactive
+    
+    This prevents token reuse and ensures the session is fully revoked.
+    Uses user_id instead of access_token for reliable lookup even after token changes.
+    
+    Args:
+        db (AsyncSession): Database session for executing queries.
+        user_id (int): The user ID of the user logging out.
+    
+    Returns:
+        dict: Confirmation message.
+    
+    Raises:
+        NotFoundException: If session not found.
+        UnauthorizedException: If session is already revoked or JTI is blacklisted.
+    """
+    try:
+        # Get the most recent session for this user
+        session = await get_session_by_user_id(db, user_id)
+        if not session:
+            raise NotFoundException("Session not found")
+        
+        # Check if session is already revoked
+        if not session.is_active:
+            raise UnauthorizedException("Session already revoked")
+        
+        # Check if session's JTI is already in blacklist
+        result = await db.execute(
+            select(BlacklistedTokens).where(
+                BlacklistedTokens.session_id == session.session_id
+            )
+        )
+        blacklisted_token = result.scalars().first()
+        
+        if blacklisted_token:
+            raise UnauthorizedException("Session has already been blacklisted")
+        
+        # Revoke the session (this blacklists both access and refresh tokens)
+        await revoke_session(db, session=session, reason="user_logout")
+        await db.commit()
+        
+    except (NotFoundException, UnauthorizedException):
+        raise
+    except Exception as e:
+        raise UnauthorizedException(f"Logout failed: {str(e)}")
+    
+    return {"message": "Logged out successfully"}
 
 
 # ==========================================================

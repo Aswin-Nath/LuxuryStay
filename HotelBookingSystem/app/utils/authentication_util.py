@@ -109,7 +109,7 @@ async def authenticate_user(db, *, email: str, password: str):
 # =====================================================
 # 🪪 SESSION CREATION (JWT-ONLY)
 # =====================================================
-async def create_session(db, user, device_info: str | None = None, ip: str | None = None):
+async def create_session(db, user, device_info: str, ip: str):
     # create a unique jti for this session and include it in both tokens
     session_jti = uuid.uuid4()
     access_token, access_exp = create_access_token({"sub": str(user.user_id)}, jti=str(session_jti))
@@ -342,21 +342,21 @@ async def revoke_session(db: AsyncSession, *, session: Sessions, reason: str | N
 
 async def refresh_access_token(db: AsyncSession, access_token_value: str):
     """
-    Overwrite-style token rotation:
+    Complete token rotation:
     - Validate refresh token
     - Verify session + expiry
-    - Overwrite existing access token (invalidate previous)
-    - Return updated session
+    - Rotate access token, refresh token, and JTI for better security
+    - Return updated session with all new tokens
     """
 
-    # Step 1: Decode refresh token and extract user
+    # Step 1: Decode access token and extract user
     try:
         payload = jwt.decode(access_token_value, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = int(payload.get("sub"))
     except JWTError:
         raise Exception("Invalid access_token")
 
-    # Step 2: Find session linked to this refresh token
+    # Step 2: Find session linked to this access token
     result = await db.execute(
         select(Sessions).where(Sessions.access_token == access_token_value)
     )
@@ -372,24 +372,27 @@ async def refresh_access_token(db: AsyncSession, access_token_value: str):
         await db.commit()
         raise Exception("Refresh token expired")
 
-    # Step 4: Rotate (overwrite) the access token
+    # Step 4: Generate new JTI for the rotated session
+    new_jti = uuid.uuid4()
+    
+    # Step 5: Rotate (overwrite) the access token with new JTI
     new_access_token, new_access_exp = create_access_token(
         {"sub": str(user_id), "scope": "access_token"},
-        jti=str(uuid.uuid4())
+        jti=str(new_jti)
     )
 
-    # Optional: also rotate the refresh token to improve security
-    # (Uncomment if you want refresh tokens to change each time)
-    # new_refresh_token, new_refresh_exp = create_refresh_token(
-    #     {"sub": str(user_id), "scope": "refresh_token"},
-    #     jti=str(uuid.uuid4())
-    # )
-    # session.refresh_token = new_refresh_token
-    # session.refresh_token_expires_at = new_refresh_exp
+    # Step 6: Also rotate the refresh token with new JTI for better security
+    new_refresh_token, new_refresh_exp = create_refresh_token(
+        {"sub": str(user_id), "scope": "refresh_token"},
+        jti=str(new_jti)
+    )
 
-    # Step 5: Update session record (overwrite = old token invalidated)
+    # Step 7: Update session record with all new tokens
     session.access_token = new_access_token
     session.access_token_expires_at = new_access_exp
+    session.refresh_token = new_refresh_token
+    session.refresh_token_expires_at = new_refresh_exp
+    session.jti = new_jti
     session.last_active = datetime.utcnow()
     db.add(session)
     await db.commit()

@@ -38,9 +38,6 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 
-class RefreshRequest(BaseModel):
-    access_token: str
-
 
 # ============================================================================
 # 🔹 CREATE - Register new user account
@@ -164,17 +161,22 @@ async def login(
 
 
 @auth_router.post("/refresh", response_model=TokenResponse)
-async def refresh_tokens(payload: RefreshRequest, db: AsyncSession = Depends(get_db)):
+async def refresh_tokens(
+    db: AsyncSession = Depends(get_db),
+    token: str = Depends(oauth2_scheme),
+    current_user=Depends(get_current_user)
+):
     """
     Refresh JWT tokens.
     
-    Rotates the current access and refresh tokens. Validates the existing refresh token and
-    issues new tokens without requiring password re-entry. Useful for maintaining long-lived
-    sessions and improving security by limiting token lifetime.
+    Uses OAuth2 Bearer scheme to extract tokens automatically. Does NOT accept 
+    tokens as input parameters. Validates the refresh token against the blacklist.
+    If not blacklisted, rotates the access token and returns new tokens.
     
     Args:
-        payload (RefreshRequest): Request containing the current access_token.
         db (AsyncSession): Database session dependency.
+        token (str): Access token extracted from OAuth2 Bearer scheme.
+        current_user (Users): Current authenticated user from OAuth2 scheme.
     
     Returns:
         TokenResponse: New access_token, refresh_token, token_type (bearer), and expires_in.
@@ -182,7 +184,7 @@ async def refresh_tokens(payload: RefreshRequest, db: AsyncSession = Depends(get
     Raises:
         HTTPException (401): If refresh token is invalid, expired, or blacklisted.
     """
-    return await svc_refresh_tokens(db, payload.access_token)
+    return await svc_refresh_tokens(db, current_user, token)
 
 
 
@@ -190,6 +192,7 @@ async def refresh_tokens(payload: RefreshRequest, db: AsyncSession = Depends(get
 async def logout(
     token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
 ):
     """
     User logout endpoint.
@@ -201,6 +204,7 @@ async def logout(
     Args:
         token (str): OAuth2 bearer token dependency extracted from Authorization header.
         db (AsyncSession): Database session dependency.
+        current_user (Users): Currently authenticated user from OAuth2 scheme.
     
     Returns:
         dict: Confirmation message for successful logout.
@@ -213,7 +217,7 @@ async def logout(
         - Invalidates user session.
         - Creates audit log entry.
     """
-    return await svc_logout_flow(db, token)
+    return await svc_logout_flow(db, current_user.user_id)
 
 
 # ==============================================================

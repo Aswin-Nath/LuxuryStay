@@ -39,7 +39,7 @@ async def create_issue(
     issue: IssueCreate = Depends(IssueCreate.as_form),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE"]),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"]),
 ):
     """
     Submit a new customer issue or complaint.
@@ -47,6 +47,8 @@ async def create_issue(
     Creates an issue for reporting problems, complaints, or support requests. Issues are assigned
     unique IDs and tracked through resolution workflow. New issues start in OPEN status. Images
     can be attached via separate endpoint. Each issue belongs to the creating user.
+    
+    **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role.
     
     Args:
         issue (IssueCreate): Form data containing title, description, and issue type.
@@ -90,13 +92,15 @@ async def add_issue_images(
     files: List[UploadFile] = File(...),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE"]),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"]),
 ):
     """
     Upload images to an issue/complaint.
     
     Allows issue creators to attach supporting images/screenshots. Multiple files supported.
     Images are stored via external provider. Only issue owner can upload images to their issues.
+    
+    **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role.
     
     Args:
         issue_id (int): The issue to attach images to (must own).
@@ -144,103 +148,182 @@ async def add_issue_images(
 
 
 # ============================================================================
-# 🔹 READ - Fetch issues (single or list)
+# 🔹 READ - Fetch issues (ADMIN: all issues, single or list)
 # ============================================================================
-@router.get("/", response_model=Union[IssueResponse, List[IssueResponse]])
-async def issues(
+@router.get("/admin/issues", response_model=Union[IssueResponse, List[IssueResponse]])
+async def issues_admin(
     issue_id: Optional[int] = Query(None, description="If provided, returns the single issue."),
     limit: int = 50,
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["BOOKING:READ"]),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:READ", "ADMIN"]),
 ):
     """
-    Unified endpoint to fetch single issue or paginated list with role-based filtering.
+    Fetch single issue or paginated list of all issues (ADMIN only).
     
-    Supports two modes:
-    - Single issue: Pass issue_id query param to retrieve a specific issue. Admin users (ISSUE_RESOLUTION:READ)
-      can fetch any issue; non-admin users can only fetch issues they created.
-    - List issues: When issue_id is None, returns paginated list. Admins see all issues; non-admins see only
-      issues they created. Supports offset-limit pagination.
+    Admin users can fetch any issue or list all issues in the system.
+    
+    **Authorization:** Requires BOOKING:READ permission AND ADMIN role.
     
     Args:
-        issue_id (Optional[int]): If provided, returns single issue record. Ownership/permission checked.
+        issue_id (Optional[int]): If provided, returns single issue record.
         limit (int): Page size for list mode (default 50).
         offset (int): Pagination offset for list mode (default 0).
         db (AsyncSession): Database session dependency.
-        current_user (Users): Authenticated user (scope determines which issues are visible).
-        token_payload (dict): Security token payload validating ISSUE_RESOLUTION:READ permission.
+        current_user (Users): Authenticated admin user.
+        token_payload (dict): Security token payload validating BOOKING:READ and ADMIN.
     
     Returns:
-        Union[IssueResponse, List[IssueResponse]]: Single issue object or list of issue objects.
+        Union[IssueResponse, List[IssueResponse]]: Single issue object or list of all issue objects.
     
     Raises:
-        HTTPException (403): If non-admin tries to access issue not owned by them.
         HTTPException (404): If issue_id provided but not found in database.
     
     Side Effects:
-        - Queries database with role-based filtering.
-        - Single issue fetch verifies user ownership if non-admin.
-        - List queries filtered by user_id for non-admin users.
+        - Queries database without user filtering.
     """
-    is_admin = True  # User has ISSUE_RESOLUTION:READ via Security
-
     if issue_id is not None:
         issue_record = await svc_get_issue(db, issue_id)
-        if not is_admin and issue_record.user_id != current_user.user_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to view this issue")
         return IssueResponse.model_validate(issue_record).model_dump()
 
-    # list
-    if is_admin:
-        items = await svc_list_issues(db, limit=limit, offset=offset)
-    else:
-        items = await svc_list_issues(db, user_id=current_user.user_id, limit=limit, offset=offset)
+    # list all issues
+    items = await svc_list_issues(db, limit=limit, offset=offset)
+    result = [IssueResponse.model_validate(i).model_dump() for i in items]
+    return result
 
+
+# ============================================================================
+# 🔹 READ - Fetch issues (CUSTOMER: own issues only)
+# ============================================================================
+@router.get("/customer/issues", response_model=Union[IssueResponse, List[IssueResponse]])
+async def issues_customer(
+    issue_id: Optional[int] = Query(None, description="If provided, returns the single issue created by you."),
+    limit: int = 50,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:READ", "CUSTOMER"]),
+):
+    """
+    Fetch single issue or paginated list of customer's own issues (CUSTOMER only).
+    
+    Customer users can only fetch their own issues.
+    
+    **Authorization:** Requires BOOKING:READ permission AND CUSTOMER role.
+    
+    Args:
+        issue_id (Optional[int]): If provided, returns single issue created by customer.
+        limit (int): Page size for list mode (default 50).
+        offset (int): Pagination offset for list mode (default 0).
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated customer user.
+        token_payload (dict): Security token payload validating BOOKING:READ and CUSTOMER.
+    
+    Returns:
+        Union[IssueResponse, List[IssueResponse]]: Single issue object or list of customer's issues.
+    
+    Raises:
+        HTTPException (404): If issue_id provided but not found or not owned by customer.
+    
+    Side Effects:
+        - Queries database filtered by current_user.user_id.
+    """
+    if issue_id is not None:
+        issue_record = await svc_get_issue(db, issue_id)
+        if issue_record.user_id != current_user.user_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found")
+        return IssueResponse.model_validate(issue_record).model_dump()
+
+    # list customer's issues only
+    items = await svc_list_issues(db, user_id=current_user.user_id, limit=limit, offset=offset)
     result = [IssueResponse.model_validate(i).model_dump() for i in items]
     return result
 
 # ============================================================================
-# 🔹 READ - Fetch all chat messages for an issue
+# 🔹 READ - Fetch all chat messages for an issue (ADMIN)
 # ============================================================================
-@router.get("/{issue_id}/chat")
-async def get_chats(
+@router.get("/admin/{issue_id}/chat")
+async def get_chats_admin(
     issue_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["BOOKING:READ"]),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:READ", "ADMIN"]),
 ):
     """
-    Fetch all chat messages posted on an issue thread.
+    Fetch all chat messages posted on an issue thread (ADMIN only).
     
-    Retrieves the full conversation history for an issue. Only the issue creator and admin users
-    (ISSUE_RESOLUTION:READ) can access chat for an issue. Useful for following issue resolution
-    discussion/updates over time.
+    Admin users can view chat history for any issue.
+    
+    **Authorization:** Requires BOOKING:READ permission AND ADMIN role.
     
     Args:
         issue_id (int): The issue to fetch chats for.
         db (AsyncSession): Database session dependency.
-        current_user (Users): Authenticated user (must be issue owner or admin).
-        user_permissions (dict): User permission dict (checked for ISSUE_RESOLUTION:WRITE).
+        current_user (Users): Authenticated admin user.
+        token_payload (dict): Security token payload validating BOOKING:READ and ADMIN.
     
     Returns:
         List[dict]: List of chat message dicts with keys: chat_id, issue_id, sender_id, message, sent_at.
     
     Raises:
-        HTTPException (403): If non-admin and current_user is not the issue owner.
         HTTPException (404): If issue_id not found in database.
     
     Side Effects:
         - Queries issue record and all associated chat messages.
-        - Access control enforced (ownership or admin permission).
     """
     issue_record = await svc_get_issue(db, issue_id)
 
-    is_admin = True  # User has ISSUE_RESOLUTION:READ via Security
+    items = await svc_list_chats(db, issue_id)
+    return [
+        {
+            "chat_id": i.chat_id,
+            "issue_id": i.issue_id,
+            "sender_id": i.sender_id,
+            "message": i.message,
+            "sent_at": i.sent_at,
+        }
+        for i in items
+    ]
 
 
-    if not is_admin and issue_record.user_id != current_user.user_id:
+# ============================================================================
+# 🔹 READ - Fetch all chat messages for an issue (CUSTOMER)
+# ============================================================================
+@router.get("/customer/{issue_id}/chat")
+async def get_chats_customer(
+    issue_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:READ", "CUSTOMER"]),
+):
+    """
+    Fetch all chat messages posted on own issue thread (CUSTOMER only).
+    
+    Customer users can only view chat history on their own issues.
+    
+    **Authorization:** Requires BOOKING:READ permission AND CUSTOMER role.
+    
+    Args:
+        issue_id (int): The customer's issue to fetch chats for.
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated customer user (must be issue owner).
+        token_payload (dict): Security token payload validating BOOKING:READ and CUSTOMER.
+    
+    Returns:
+        List[dict]: List of chat message dicts with keys: chat_id, issue_id, sender_id, message, sent_at.
+    
+    Raises:
+        HTTPException (403): If current_user is not the issue owner.
+        HTTPException (404): If issue_id not found in database.
+    
+    Side Effects:
+        - Queries issue record and all associated chat messages.
+        - Access control enforced (ownership check).
+    """
+    issue_record = await svc_get_issue(db, issue_id)
+
+    if issue_record.user_id != current_user.user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to view chats for this issue")
 
     items = await svc_list_chats(db, issue_id)
@@ -267,18 +350,20 @@ async def update_issue(
     description: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE"]),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "ADMIN"]),
 ):
     """
     Update issue details with granular permission control.
     
     Supports two types of updates with different permission requirements:
-    - Status updates (OPEN → IN_PROGRESS → RESOLVED → CLOSED): Admin only (ISSUE_RESOLUTION:WRITE).
+    - Status updates (OPEN → IN_PROGRESS → RESOLVED → CLOSED): Admin only (ADMIN role).
       Auto-sets resolved_by to current_user when status set to RESOLVED.
     - Title/Description updates: Issue owner only. Used to clarify/add details to complaint.
     
     Enforces role-based authorization: non-owners cannot change title/description;
-    non-admins cannot change status.
+    CUSTOMER users cannot change status (ADMIN only).
+    
+    **Authorization:** Requires BOOKING:WRITE permission AND ADMIN role.
     
     Args:
         issue_id (int): The issue to update.
@@ -351,6 +436,7 @@ async def post_customer_chat(
     message: str = Form(...),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"]),
 ):
     """
     Post a chat message to an issue resolution thread (customer only).
@@ -359,7 +445,7 @@ async def post_customer_chat(
     can use this endpoint. Used for providing updates, answering support questions, and
     communication with support team.
     
-    **Authorization:** No special scope required. Users can only chat on their own issues.
+    **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role. Users can only chat on their own issues.
     
     Args:
         issue_id (int): The issue to post message to (must own).
@@ -417,7 +503,7 @@ async def post_admin_chat(
     message: str = Form(...),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE"]),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "ADMIN"]),
 ):
     """
     Post a chat message to an issue resolution thread (admin only).
@@ -426,7 +512,7 @@ async def post_admin_chat(
     to customer issues, provide updates, and coordinate issue resolution. Used for support
     team communication on issue threads.
     
-    **Authorization:** Requires ISSUE_RESOLUTION:WRITE permission (admin/support only).
+    **Authorization:** Requires BOOKING:WRITE permission AND ADMIN role.
     
     Args:
         issue_id (int): The issue to post message to (any issue allowed).

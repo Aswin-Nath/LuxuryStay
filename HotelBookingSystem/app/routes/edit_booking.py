@@ -27,7 +27,7 @@ async def create_booking_edit(
     payload: BookingEditCreate,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE"]),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"]),
 ):
     """
     Create a booking edit request (customer-initiated).
@@ -35,6 +35,8 @@ async def create_booking_edit(
     Allows customers to request changes to their existing bookings (room change, date change, etc).
     Creates an edit request in PENDING status awaiting admin review. Only one active edit per booking
     allowed at a time. Prevents duplicate requests within a short time window.
+    
+    **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role.
     
     Args:
         payload (BookingEditCreate): Edit request with booking_id, new room/dates, reason, etc.
@@ -77,8 +79,10 @@ async def get_booking_edits(
     Retrieve all booking edit requests for a specific booking.
     
     Fetches all edit requests (history) for a booking. Authorization varies by user role:
-    - **Basic users:** Can only access edit requests for bookings they own.
-    - **Non-basic users:** Must have REFUND_APPROVAL:WRITE permission to access other users' edits.
+    - **CUSTOMER users:** Can only access edit requests for bookings they own.
+    - **ADMIN users:** Can access edit requests for any booking.
+    
+    **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role for own bookings.
     
     Args:
         booking_id (int): The booking ID to fetch edits for.
@@ -108,27 +112,12 @@ async def get_booking_edits(
 # 🔹 UPDATE - Admin review and suggest new rooms for booking edit
 # ============================================================================
 @router.post("/{edit_id}/review")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 async def review_booking_edit(
     edit_id: int,
     payload: ReviewPayload,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["ROOM_MANAGEMENT:WRITE"]),
+    token_payload: dict = Security(check_permission, scopes=["ROOM_MANAGEMENT:WRITE", "ADMIN"]),
 ):
     """
     Admin review and suggest room changes for a booking edit request.
@@ -137,7 +126,7 @@ async def review_booking_edit(
     Locks the suggested rooms for 30 minutes to prevent overbooking. Admin can provide multiple
     room options or reject the request. Rooms remain locked pending customer decision.
     
-    **Authorization:** Requires ROOM_MANAGEMENT:WRITE permission.
+    **Authorization:** Requires ROOM_MANAGEMENT:WRITE permission AND ADMIN role.
     
     Args:
         edit_id (int): The booking edit request ID to review.
@@ -178,6 +167,7 @@ async def decision_booking_edit(
     payload: DecisionPayload,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"]),
 ):
     """
     Customer accept or reject admin-proposed booking edit.
@@ -186,6 +176,8 @@ async def decision_booking_edit(
     finalizes the booking change and applies new dates/room. Rejecting returns edit to
     PENDING status and unlocks suggested rooms. 30-minute lock expires if customer
     doesn't respond in time.
+    
+    **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role.
     
     Args:
         edit_id (int): The booking edit request ID to decide on.
@@ -226,6 +218,7 @@ async def update_occupancy(
     payload: UpdateRoomOccupancyRequest,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"]),
 ):
     """
     Customer update room occupancy (adults and children count) for their booking.
@@ -236,7 +229,7 @@ async def update_occupancy(
     Only the booking owner (customer) can update occupancy for their bookings.
     Each room must maintain at least 1 adult - validation enforces this requirement.
     
-    **Authorization:** Only the booking owner (customer who made the booking) can update occupancy.
+    **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role. Only the booking owner can update occupancy.
     
     **Request Format:**
     ```json

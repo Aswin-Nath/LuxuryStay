@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Security
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from app.core.cache import invalidate_pattern
 from app.database.postgres_connection import get_db
 from app.schemas.pydantic_models.refunds import RefundResponse, RefundTransactionUpdate
 from app.services.refunds_service import update_refund_transaction as svc_update_refund, get_refund as svc_get_refund, list_refunds as svc_list_refunds
@@ -23,7 +23,7 @@ async def complete_refund(
     payload: RefundTransactionUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    _permissions: dict = Security(check_permission, scopes=["REFUND_APPROVAL:WRITE"]),
+    _permissions: dict = Security(check_permission, scopes=["REFUND_APPROVAL:WRITE", "ADMIN"]),
 ):
     """
     Update refund transaction and process refund status.
@@ -32,7 +32,7 @@ async def complete_refund(
     transaction number, and refund status. Automatically sets processed_at and completed_at
     timestamps based on status transitions. Invalidates refund caches and logs audit entry.
     
-    **Authorization:** Requires REFUND_APPROVAL:WRITE permission.
+    **Authorization:** Requires REFUND_APPROVAL:WRITE permission AND ADMIN role.
     
     Args:
         refund_id (int): Path parameter - The ID of the refund to update.
@@ -60,7 +60,6 @@ async def complete_refund(
     # Admin-only endpoint to update refund transaction details and status (restricted fields only)
     refund_record = await svc_update_refund(db, refund_id, payload, current_user)
     # invalidate refund caches
-    from app.core.cache import invalidate_pattern
     await invalidate_pattern("refunds:*")
     await invalidate_pattern(f"refund:{refund_id}")
     # audit refund transaction update
@@ -88,11 +87,12 @@ async def get_customer_refunds(
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
+    _permissions: dict = Security(check_permission, scopes=["BOOKING:READ", "CUSTOMER"]),
 ):
     """
     Retrieve current user's own refunds only.
     
-    **Authorization:** No special scope required. Users can only see their own refunds.
+    **Authorization:** Requires BOOKING:READ permission AND CUSTOMER role. Users can only see their own refunds.
     
     Args:
         refund_id (Optional[int]): Fetch specific refund (must belong to current user).
@@ -167,12 +167,12 @@ async def get_admin_refunds(
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    _permissions: dict = Security(check_permission, scopes=["REFUND_APPROVAL:READ"]),
+    _permissions: dict = Security(check_permission, scopes=["REFUND_APPROVAL:READ", "ADMIN"]),
 ):
     """
     Retrieve all refunds with advanced filtering. Admin-only endpoint.
     
-    **Authorization:** Requires REFUND_APPROVAL:READ permission (admin only).
+    **Authorization:** Requires REFUND_APPROVAL:READ permission AND ADMIN role (admin only).
     
     Admin users can query all refunds with any combination of filters including user_id.
     Results are cached for performance.

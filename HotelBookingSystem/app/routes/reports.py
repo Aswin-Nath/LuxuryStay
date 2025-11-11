@@ -218,6 +218,7 @@ async def customer_bookings(
 	entity_id: Optional[int] = Query(None, description="Optional booking_id to fetch a single booking"),
 	db: AsyncSession = Depends(get_db),
 	current_user: Users = Depends(get_current_user),
+	_permissions: dict = Security(check_permission, scopes=["BOOKING:READ", "CUSTOMER"]),
 ):
 	"""
 	Generate customer personal booking summary.
@@ -256,6 +257,8 @@ async def customer_payments(
 	entity_id: Optional[int] = Query(None, description="Optional payment_id to fetch a single payment"),
 	db: AsyncSession = Depends(get_db),
 	current_user: Users = Depends(get_current_user),
+	_permissions: dict = Security(check_permission, scopes=["BOOKING:READ", "CUSTOMER"]),
+
 ):
 	"""
 	Generate customer personal payment summary.
@@ -294,6 +297,7 @@ async def customer_refunds(
 	entity_id: Optional[int] = Query(None, description="Optional refund_id to fetch a single refund"),
 	db: AsyncSession = Depends(get_db),
 	current_user: Users = Depends(get_current_user),
+	_permissions: dict = Security(check_permission, scopes=["BOOKING:READ", "CUSTOMER"]),
 ):
 	"""
 	Generate customer personal refund summary.

@@ -22,16 +22,16 @@ async def add_wishlist(
     payload: WishlistCreate,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE"])
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"])
 ):
     """
     Add a room to user's wishlist.
     
-    Allows basic users (customers) to save rooms for later consideration. Each user can wishlist
+    Allows customers to save rooms for later consideration. Each user can wishlist
     multiple rooms. Duplicate wishlists for same room are prevented (upsert behavior). Useful for
     price tracking and future booking reminders.
     
-    **Authorization:** Only basic users (customers) allowed.
+    **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role.
     
     Args:
         payload (WishlistCreate): Request with room_id to add.
@@ -68,12 +68,14 @@ async def add_wishlist(
 # 🔹 READ - Fetch user's wishlist items
 # ============================================================================
 @router.get("/", response_model=List[WishlistResponse])
-async def list_wishlist(db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)):
+async def list_wishlist(db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user),    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"])):
     """
     Retrieve authenticated user's complete wishlist.
     
     Fetches all rooms saved to the user's wishlist. Results are cached for 120 seconds.
     Returns room details, prices, and wishlist timestamps. Empty list if no wishlisted rooms.
+    
+    **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role.
     
     Args:
         db (AsyncSession): Database session dependency.
@@ -102,12 +104,14 @@ async def list_wishlist(db: AsyncSession = Depends(get_db), current_user: Users 
 # 🔹 DELETE - Remove room from user's wishlist
 # ============================================================================
 @router.delete("/{wishlist_id}", status_code=status.HTTP_201_CREATED)
-async def delete_wishlist(wishlist_id: int, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)):
+async def delete_wishlist(wishlist_id: int, db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user),    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"])):
     """
     Remove a room from user's wishlist.
     
     Removes a specific wishlisted item. Only the wishlist owner can remove their own items.
     Attempting to remove another user's wishlist item returns 403.
+    
+    **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role.
     
     Args:
         wishlist_id (int): The wishlist entry ID to remove.

@@ -35,7 +35,7 @@ async def create_review(
     comment: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    _permissions: dict = Security(check_permission, scopes=["CONTENT_MANAGEMENT:WRITE"]),
+    _permissions: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"]),
 ):
     """
     Submit a new review for a completed booking.
@@ -43,6 +43,8 @@ async def create_review(
     Creates a review for a room after checkout. Users can rate (1-5 stars) and provide
     comments. Reviews are attached to bookings and can include images via separate endpoint.
     One review per booking allowed. Draft reviews can be updated before finalization.
+    
+    **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role.
     
     Args:
         booking_id (int): The completed booking to review (user must own booking).
@@ -143,7 +145,7 @@ async def respond_review(
     payload: AdminResponseCreate,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    _permissions: dict = Security(check_permission, scopes=["CONTENT_MANAGEMENT:WRITE"])
+    _permissions: dict = Security(check_permission, scopes=["BOOKING:WRITE", "ADMIN"])
 ):
     """
     Add admin response to a customer review.
@@ -152,7 +154,7 @@ async def respond_review(
     all users viewing the review. One response per review allowed. Useful for addressing
     concerns or thanking guests for feedback.
     
-    **Authorization:** Requires CONTENT_MANAGEMENT:WRITE permission.
+    **Authorization:** Requires CONTENT_MANAGEMENT:WRITE permission AND ADMIN role.
     
     Args:
         review_id (int): The review ID to respond to.
@@ -193,7 +195,7 @@ async def update_review(
     payload: ReviewUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    _permissions: dict = Security(check_permission, scopes=["CONTENT_MANAGEMENT:WRITE"]),
+    _permissions: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"]),
 ):
     """
     Update user's own review (rating and/or comment).
@@ -201,6 +203,8 @@ async def update_review(
     Allows the reviewer to modify their rating or comment after submission. Only the review
     owner can edit. Admin response (if any) remains unchanged. Changes are timestamped for
     auditing. Useful for correcting typos or adjusting ratings after reflection.
+    
+    **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role. User must own the review.
     
     Args:
         review_id (int): The review ID to update (must own).
@@ -242,7 +246,7 @@ async def add_review_image(
     captions: Optional[List[str]] = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    _permissions: dict = Security(check_permission, scopes=["CONTENT_MANAGEMENT:WRITE"]),
+    _permissions: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"]),
 ):
     """
     Upload one or more images for a review.
@@ -250,6 +254,8 @@ async def add_review_image(
     Attaches photos/screenshots to a review for visual context. Supports batch uploads with
     optional captions for each image. Images are stored via external provider and linked to
     the review. Maximum file size and format restrictions enforced by upload service.
+    
+    **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role. User must own the review.
     
     Args:
         review_id (int): The review to attach images to.
@@ -327,13 +333,15 @@ async def delete_review_images(
     image_ids: List[int],
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    _permissions: dict = Security(check_permission, scopes=["CONTENT_MANAGEMENT:DELETE"]),
+    _permissions: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"]),
 ):
     """
     Delete images from a review.
     
-    Removes specified images from a review. Only users with CONTENT_MANAGEMENT:DELETE
-    permission can delete images. Images are permanently removed from storage and database.
+    Removes specified images from a review. Only the review owner (CUSTOMER) or admins can delete images. 
+    Images are permanently removed from storage and database.
+    
+    **Authorization:** Requires CONTENT_MANAGEMENT:DELETE permission AND CUSTOMER role (or ADMIN).
     
     Args:
         review_id (int): The review containing images.

@@ -140,7 +140,7 @@ async def get_rooms(
 # 🔹 UPDATE - Modify existing room details
 # ============================================================================
 @router.put("/{room_id}", response_model=RoomResponse)
-async def update_room(room_id: int, payload: RoomUpdate, db: AsyncSession = Depends(get_db), token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "ROOM_MANAGEMENT:WRITE"])):
+async def update_room(room_id: int, payload: RoomUpdate, db: AsyncSession = Depends(get_db), token_payload: dict = Security(check_permission, scopes=["ROOM_MANAGEMENT:WRITE"])):
     """
     Update an existing room's information.
     
@@ -191,7 +191,7 @@ async def update_room(room_id: int, payload: RoomUpdate, db: AsyncSession = Depe
 # 🔹 DELETE - Remove room from system
 # ============================================================================
 @router.delete("/{room_id}")
-async def delete_room(room_id: int, db: AsyncSession = Depends(get_db), token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "ROOM_MANAGEMENT:WRITE"])):
+async def delete_room(room_id: int, db: AsyncSession = Depends(get_db), token_payload: dict = Security(check_permission, scopes=["ROOM_MANAGEMENT:WRITE"])):
     """
     Soft-delete a room from the system.
     
@@ -232,7 +232,7 @@ async def delete_room(room_id: int, db: AsyncSession = Depends(get_db), token_pa
 async def bulk_upload_rooms(
     file: UploadFile = File(..., description="Excel file with columns: room_no, room_type_id, room_status, freeze_reason"),
     db: AsyncSession = Depends(get_db),
-    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "ROOM_MANAGEMENT:WRITE"]),
+    token_payload: dict = Security(check_permission, scopes=["ROOM_MANAGEMENT:WRITE"]),
 ):
     """
     Bulk upload rooms from an Excel file (only ADMIN/MANAGER allowed).

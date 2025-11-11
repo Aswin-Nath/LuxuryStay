@@ -37,6 +37,11 @@ async def get_current_user(
 ):
     """
     Extract and validate the current user from JWT access token.
+    
+    Validates:
+    1. JWT token signature and expiration
+    2. User exists in database
+    3. Token is not blacklisted (by session_id)
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -46,10 +51,10 @@ async def get_current_user(
     
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id= payload.get("sub")
+        user_id = payload.get("sub")
         if user_id is None:
             raise credentials_exception
-        user_id=int(user_id)
+        user_id = int(user_id)
     except JWTError:    
         raise credentials_exception
 
@@ -59,15 +64,24 @@ async def get_current_user(
     if not user:
         raise credentials_exception
 
-    # Check token blacklist (protect against revoked tokens)
+    # Check if user's session is blacklisted (verify by session_id lookup)
     try:
-        token_hash = _hash_token(token)
+        from app.crud.authentication import get_session_by_user_id
+        
+        session = await get_session_by_user_id(db, user_id)
+        if not session:
+            raise credentials_exception
+        
+        # Check if this session is blacklisted
         blk_result = await db.execute(
-            select(BlacklistedTokens).where(BlacklistedTokens.token_value_hash == token_hash)
+            select(BlacklistedTokens).where(BlacklistedTokens.session_id == session.session_id)
         )
         blk = blk_result.scalars().first()
         if blk:
             raise credentials_exception
+            
+    except HTTPException:
+        raise
     except Exception:
         # Any failure in blacklist check should not leak details; if DB check fails, deny
         raise credentials_exception
@@ -87,6 +101,12 @@ async def check_permission(
     """
     Validate JWT, check blacklist, verify user's role and permissions against required scopes.
     Permissions follow "RESOURCE:PERMISSION" format.
+    
+    Validates:
+    1. JWT token signature and expiration
+    2. User exists in database
+    3. Session is not blacklisted (by session_id)
+    4. User has required permissions
     """
 
     # --- Token validation
@@ -109,11 +129,23 @@ async def check_permission(
     if not user:
         raise credentials_exception
 
-    # --- Token blacklist check
-    token_hash = _hash_token(token)
-    if (await db.execute(
-        select(BlacklistedTokens).where(BlacklistedTokens.token_value_hash == token_hash)
-    )).scalars().first():
+    # --- Session blacklist check (using session_id instead of token_hash)
+    try:
+        from app.crud.authentication import get_session_by_user_id
+        
+        session = await get_session_by_user_id(db, user_id)
+        if not session:
+            raise credentials_exception
+        
+        # Check if this session is blacklisted
+        if (await db.execute(
+            select(BlacklistedTokens).where(BlacklistedTokens.session_id == session.session_id)
+        )).scalars().first():
+            raise credentials_exception
+            
+    except HTTPException:
+        raise
+    except Exception:
         raise credentials_exception
 
     # --- Role validation
@@ -130,13 +162,37 @@ async def check_permission(
 
     # Flatten tuple results like [('X',), ('Y',)] → ['X', 'Y']
     user_permissions = [perm[0].upper() for perm in permissions_result.all()]
-    # --- Permission check
+    
+    # --- Permission and Role Scope check
     for scope in security_scopes.scopes:
-        if scope.upper() not in user_permissions:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access forbidden: insufficient privileges"
-            )
+        scope_upper = scope.upper()
+        user_role_name_upper = role.role_name.upper()
+        
+        # Check if scope is a known role type:
+        # "CUSTOMER" = exact match with "customer" role
+        # "ADMIN" = matches any role containing "admin" (super_admin, normal_admin, content_admin, BACKUP_ADMIN)
+        
+        if scope_upper == "CUSTOMER":
+            # Check if user's role_name is exactly "customer"
+            if user_role_name_upper != "CUSTOMER":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access forbidden: requires CUSTOMER role"
+                )
+        elif scope_upper == "ADMIN":
+            # Check if user's role_name contains "admin" (any admin role)
+            if "ADMIN" not in user_role_name_upper:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access forbidden: requires ADMIN role"
+                )
+        else:
+            # This is a permission check (not a role)
+            if scope_upper not in user_permissions:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access forbidden: insufficient privileges"
+                )
 
     return payload
 

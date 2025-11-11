@@ -33,7 +33,7 @@ async def create_payment(
     payload: PaymentCreate,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE"]),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"]),
 ):
     """
     Create and insert a payment record into the database.
@@ -42,7 +42,7 @@ async def create_payment(
     transaction_reference, and remarks. Creates payment with status="SUCCESS".
     User ID is automatically extracted from authenticated user.
     
-    **Authorization:** Requires PAYMENT_PROCESSING:WRITE permission.
+    **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role.
     
     Args:
         payload (PaymentCreate): Payment details with:
@@ -135,13 +135,13 @@ async def get_customer_payments(
     offset: int = Query(0, ge=0, description="Pagination offset"),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE"])
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"])
 
 ) -> List[PaymentResponse]:
     """
     Retrieve current user's own payments.
     
-    **Authorization:** No special scope required. Users can only see their own payments.
+    **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role. Users can only see their own payments.
     
     Args:
         booking_id (Optional[int]): Filter by booking ID (must be user's own booking).
@@ -215,12 +215,12 @@ async def get_all_payments(
     offset: int = Query(0, ge=0, description="Pagination offset"),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["PAYMENT_PROCESSING:READ"]),
+    token_payload: dict = Security(check_permission, scopes=["PAYMENT_PROCESSING:READ", "ADMIN"]),
 ) -> List[PaymentResponse]:
     """
     Retrieve all payments with advanced filtering. Admin-only endpoint.
     
-    **Authorization:** Requires PAYMENT_PROCESSING:READ permission (admin only).
+    **Authorization:** Requires PAYMENT_PROCESSING:READ permission AND ADMIN role (admin only).
     
     Fetches payment records with advanced filtering for admin dashboard. Results are cached for performance.
     
@@ -341,11 +341,12 @@ async def get_customer_payment(
     payment_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:READ", "CUSTOMER"]),
 ) -> PaymentResponse:
     """
     Get a specific payment belonging to current user only.
     
-    **Authorization:** No special scope required. Users can only see their own payments.
+    **Authorization:** Requires BOOKING:READ permission AND CUSTOMER role. Users can only see their own payments.
     
     Args:
         payment_id (int): ID of the payment to retrieve.
@@ -397,12 +398,12 @@ async def get_payment_by_id_admin(
     payment_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["PAYMENT_PROCESSING:READ"]),
+    token_payload: dict = Security(check_permission, scopes=["PAYMENT_PROCESSING:READ", "ADMIN"]),
 ) -> PaymentResponse:
     """
     Get a specific payment by its ID. Admin-only endpoint.
     
-    **Authorization:** Requires PAYMENT_PROCESSING:READ permission (admin only).
+    **Authorization:** Requires PAYMENT_PROCESSING:READ permission AND ADMIN role (admin only).
     
     Admin users can access any payment and view detailed information.
     
@@ -451,14 +452,14 @@ async def get_payments_by_booking(
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["PAYMENT_PROCESSING:READ"]),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:READ"]),
 ) -> List[PaymentResponse]:
     """
     Get all payments for a specific booking.
     
     Authorization:
-    - Admin users: Can access payments for any booking
-    - Regular users: Can only access payments for their own bookings
+    - ADMIN users: Can access payments for any booking
+    - CUSTOMER users: Can only access payments for their own bookings
     """
     
     # Try to get from cache

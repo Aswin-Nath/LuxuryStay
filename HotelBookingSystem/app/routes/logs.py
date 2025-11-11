@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query,Security
+from app.dependencies.authentication import check_permission
 from typing import List, Optional
 
 from app.services.logs_service import list_booking_logs
@@ -21,6 +22,9 @@ async def get_booking_logs(
     end_ts: Optional[str] = Query(None, description="ISO datetime end"),
     limit: int = Query(50, ge=1, le=1000),
     skip: int = Query(0, ge=0),
+
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:READ", "CUSTOMER"])
+
 ):
     """
     Retrieve booking activity logs with optional filters.

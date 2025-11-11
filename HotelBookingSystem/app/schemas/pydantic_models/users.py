@@ -48,5 +48,6 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: int
     refresh_token: str
-    role_id:int
+    role_id: int
+    message: str = "Token generated successfully"
     model_config = {"from_attributes": True}
