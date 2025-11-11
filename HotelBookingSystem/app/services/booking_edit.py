@@ -148,7 +148,7 @@ async def create_booking_edit_service(payload: BookingEditCreate, db: AsyncSessi
     # (don't convert from booking's Time objects to datetime, keep them as-is)
     new_edit = BookingEdits(
         booking_id=payload.booking_id,
-        user_id=getattr(current_user, "user_id", None),
+        user_id=current_user.user_id,
         primary_customer_name=payload.primary_customer_name or booking.primary_customer_name,
         primary_customer_phno=payload.primary_customer_phno or booking.primary_customer_phone_number,
         primary_customer_dob=payload.primary_customer_dob or booking.primary_customer_dob,

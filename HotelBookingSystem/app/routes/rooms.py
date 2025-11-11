@@ -252,7 +252,7 @@ async def get_rooms(
     is_freezed: Optional[bool] = Query(None),
     db: AsyncSession = Depends(get_db),
     _current_user = Depends(get_current_user),
-    _permissions: dict = Security(check_permission, scopes=["ROOM_MANAGEMENT:READ"]),
+    _permissions: dict = Security(check_permission, scopes=["BOOKING:WRITE"]),
 ):
     if room_id is not None:
         room_record = await svc_get_room(db, room_id)

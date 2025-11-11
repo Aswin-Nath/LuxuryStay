@@ -15,6 +15,7 @@ from app.models.sqlalchemy_schemas.authentication import BlacklistedTokens
 from app.utils.authentication_util import _hash_token
 from app.models.sqlalchemy_schemas.roles import Roles
 from app.core.redis_manager import redis
+from app.core.cache import get_cached, set_cached
 
 load_dotenv()
 
@@ -153,15 +154,27 @@ async def check_permission(
     if not role:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found")
 
-    # --- Permissions fetch & flatten
-    permissions_result = await db.execute(
-        select(Permissions.permission_name)
-        .join(PermissionRoleMap, PermissionRoleMap.permission_id == Permissions.permission_id)
-        .where(PermissionRoleMap.role_id == user.role_id)
-    )
+    # --- Permissions fetch & flatten with caching
+    # Check cache first using role_id as key
+    cache_key = f"user_perms:{user.role_id}"
+    cached_permissions = await get_cached(cache_key)
+    
+    if cached_permissions is not None:
+        # Use cached permissions
+        user_permissions = cached_permissions
+    else:
+        # Query permissions from database
+        permissions_result = await db.execute(
+            select(Permissions.permission_name)
+            .join(PermissionRoleMap, PermissionRoleMap.permission_id == Permissions.permission_id)
+            .where(PermissionRoleMap.role_id == user.role_id)
+        )
 
-    # Flatten tuple results like [('X',), ('Y',)] → ['X', 'Y']
-    user_permissions = [perm[0].upper() for perm in permissions_result.all()]
+        # Flatten tuple results like [('X',), ('Y',)] → ['X', 'Y']
+        user_permissions = [perm[0].upper() for perm in permissions_result.all()]
+        
+        # Cache permissions for this role with 300-second TTL
+        await set_cached(cache_key, user_permissions, ttl=300)
     
     # --- Permission and Role Scope check
     for scope in security_scopes.scopes:

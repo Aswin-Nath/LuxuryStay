@@ -15,6 +15,7 @@ from sqlalchemy import (
     Text,
     TIMESTAMP,
     func,
+    DateTime
 )
 from sqlalchemy.orm import relationship
 from app.database.postgres_connection import Base
@@ -28,7 +29,7 @@ class RoomStatus(enum.Enum):
     BOOKED = "BOOKED"
     MAINTENANCE = "MAINTENANCE"
     FROZEN = "FROZEN"
-
+    HELD = "HELD"
 class FreezeReason(enum.Enum):
     NONE = "NONE"
     CLEANING = "CLEANING"
@@ -75,7 +76,7 @@ class Rooms(Base):
     # Relationships
     room_type = relationship("RoomTypes", back_populates="rooms")
     amenities = relationship("RoomAmenityMap", back_populates="room", cascade="all, delete-orphan")
-
+    hold_expires_at = Column(DateTime(timezone=True), nullable=True)
 # ==============================================================
 # ROOM AMENITIES
 # ==============================================================

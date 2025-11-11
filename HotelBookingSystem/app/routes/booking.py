@@ -89,12 +89,11 @@ async def create_booking(
 @router.post("/{booking_id}/cancel", response_model=RefundResponse, status_code=status.HTTP_201_CREATED)
 async def cancel_booking(
     booking_id: int,
-    payload: RefundCreate,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
     token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"]),
 ):
-    refund_record = await svc_cancel_booking(db, booking_id, payload, current_user)
+    refund_record = await svc_cancel_booking(db, booking_id, current_user)
 
     try:
         new_val = RefundResponse.model_validate(refund_record).model_dump()
@@ -178,9 +177,8 @@ async def get_admin_bookings(
 # ==========================================================
 # 🧩 BOOKING EDITS SECTION
 # ==========================================================
-@router.post("/{booking_id}/edits", response_model=BookingEditResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/edits", response_model=BookingEditResponse, status_code=status.HTTP_201_CREATED)
 async def create_booking_edit(
-    booking_id: int,
     payload: BookingEditCreate,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),

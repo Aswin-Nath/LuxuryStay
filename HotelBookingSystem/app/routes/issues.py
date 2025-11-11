@@ -83,68 +83,6 @@ async def create_issue(
     return IssueResponse.model_validate(issue_record, from_attributes=True).model_dump()
 
 
-# ============================================================================
-# 🔹 CREATE - Upload images for an issue
-# ============================================================================
-@router.post("/{issue_id}/images", response_model=List[ImageResponse], status_code=status.HTTP_201_CREATED)
-async def add_issue_images(
-    issue_id: int,
-    files: List[UploadFile] = File(...),
-    db: AsyncSession = Depends(get_db),
-    current_user: Users = Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"]),
-):
-    """
-    Upload images to an issue/complaint.
-    
-    Allows issue creators to attach supporting images/screenshots. Multiple files supported.
-    Images are stored via external provider. Only issue owner can upload images to their issues.
-    
-    **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role.
-    
-    Args:
-        issue_id (int): The issue to attach images to (must own).
-        files (List[UploadFile]): Image files to upload.
-        db (AsyncSession): Database session dependency.
-        current_user (Users): Authenticated user (issue owner).
-    
-    Returns:
-        List[ImageResponse]: Created image records with URLs.
-    
-    Raises:
-        HTTPException (403): If user doesn't own the issue.
-        HTTPException (404): If issue_id not found.
-    
-    Side Effects:
-        - Uploads files to external storage.
-        - Creates image records linked to issue.
-        - Invalidates issue cache.
-        - Creates audit log entry per image.
-    """
-    issue_record = await svc_get_issue(db, issue_id)
-    if issue_record.user_id != current_user.user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to upload images for this issue")
-
-    images = []
-    for file in files:
-        url = await save_uploaded_image(file)
-        image_record = await create_image(db, entity_type="issue", entity_id=issue_id, image_url=url, caption=None, uploaded_by=current_user.user_id)
-        images.append(image_record)
-        # audit each image created
-        try:
-            new_val = ImageResponse.model_validate(image_record).model_dump()
-            entity_id = f"issue:{issue_id}:image:{getattr(image_record, 'image_id', None)}"
-            await log_audit(entity="issue_image", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
-        except Exception:
-            pass
-
-    # invalidate caches for this issue (if any)
-    try:
-        await invalidate_pattern(f"issues:*{issue_id}*")
-    except Exception:
-        pass
-
-    return [ImageResponse.model_validate(i) for i in images]
 
 
 # ============================================================================
@@ -558,6 +496,7 @@ async def post_customer_chat(
 # ============================================================================
 @router.post("/admin/{issue_id}/chat", status_code=status.HTTP_201_CREATED)
 async def post_admin_chat(
+
     issue_id: int,
     message: str = Form(...),
     db: AsyncSession = Depends(get_db),
@@ -615,3 +554,68 @@ async def post_admin_chat(
         "message": chat.message,
         "sent_at": chat.sent_at,
     }
+
+
+
+# ============================================================================
+# 🔹 CREATE - Upload images for an issue
+# ============================================================================
+@router.post("/{issue_id}/images", response_model=List[ImageResponse], status_code=status.HTTP_201_CREATED)
+async def add_issue_images(
+    issue_id: int,
+    files: List[UploadFile] = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"]),
+):
+    """
+    Upload images to an issue/complaint.
+    
+    Allows issue creators to attach supporting images/screenshots. Multiple files supported.
+    Images are stored via external provider. Only issue owner can upload images to their issues.
+    
+    **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role.
+    
+    Args:
+        issue_id (int): The issue to attach images to (must own).
+        files (List[UploadFile]): Image files to upload.
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user (issue owner).
+    
+    Returns:
+        List[ImageResponse]: Created image records with URLs.
+    
+    Raises:
+        HTTPException (403): If user doesn't own the issue.
+        HTTPException (404): If issue_id not found.
+    
+    Side Effects:
+        - Uploads files to external storage.
+        - Creates image records linked to issue.
+        - Invalidates issue cache.
+        - Creates audit log entry per image.
+    """
+    issue_record = await svc_get_issue(db, issue_id)
+    if issue_record.user_id != current_user.user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to upload images for this issue")
+
+    images = []
+    for file in files:
+        url = await save_uploaded_image(file)
+        image_record = await create_image(db, entity_type="issue", entity_id=issue_id, image_url=url, caption=None, uploaded_by=current_user.user_id)
+        images.append(image_record)
+        # audit each image created
+        try:
+            new_val = ImageResponse.model_validate(image_record).model_dump()
+            entity_id = f"issue:{issue_id}:image:{getattr(image_record, 'image_id', None)}"
+            await log_audit(entity="issue_image", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
+        except Exception:
+            pass
+
+    # invalidate caches for this issue (if any)
+    try:
+        await invalidate_pattern(f"issues:*{issue_id}*")
+    except Exception:
+        pass
+
+    return [ImageResponse.model_validate(i) for i in images]

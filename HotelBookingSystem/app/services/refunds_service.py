@@ -17,97 +17,115 @@ from app.models.sqlalchemy_schemas.rooms import RoomStatus
 from app.models.sqlalchemy_schemas.payment_method import PaymentMethodUtility
 
 
-async def cancel_booking_and_create_refund(db: AsyncSession, booking_id: int, payload, current_user):
+async def cancel_booking_and_create_refund(db: AsyncSession, booking_id: int, current_user):
     """
-    Cancel booking and create refund record with optional partial cancellation.
+    Cancel booking completely and create full refund record (INITIATED status).
     
-    Creates a refund for a booking and releases allocated rooms back to AVAILABLE status.
-    Supports full cancellation (all rooms) or partial cancellation (specific rooms).
-    Calculates refund amount based on number of nights and per-room pricing.
+    Performs a FULL immediate cancellation of the entire booking:
+    - Releases ALL allocated rooms back to AVAILABLE status
+    - Creates refund record for 100% of booking amount with INITIATED status
+    - Marks booking as CANCELLED
+    - Calculates per-room refund amounts based on number of nights and room pricing
+    
+    **Note:** Partial cancellations are handled via the Booking Edit flow, not here.
+    This function only supports complete booking cancellations and does NOT require a payload.
     
     Args:
         db (AsyncSession): Database session for executing queries.
-        booking_id (int): The ID of the booking to cancel.
-        payload: Pydantic model containing refund_rooms (list), full_cancellation (bool), remarks, transaction details.
+        booking_id (int): The ID of the booking to cancel completely.
         current_user: The authenticated user (must be booking owner for authorization).
     
     Returns:
-        dict: Refund details including refund_id, booking_id, amount, status, rooms affected.
+        Refunds: The created refund record with INITIATED status, full refund amount, and all room mappings.
     
     Raises:
         HTTPException (404): If booking not found.
         HTTPException (403): If user doesn't own the booking.
-        HTTPException (400): If partial cancellation attempted without specifying rooms.
+        HTTPException (400): If booking is already cancelled.
     """
+    # ========== FETCH & VALIDATE BOOKING ==========
     booking = await fetch_booking_by_id(db, booking_id)
     if not booking:
-        raise HTTPException(status_code=404, detail="Booking not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Booking not found"
+        )
 
     if booking.user_id != current_user.user_id:
-        raise HTTPException(status_code=403, detail="Cannot cancel a booking you do not own")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot cancel a booking you do not own"
+        )
 
-    refund_payload = payload.model_dump() if hasattr(payload, "model_dump") else dict(payload)
-    refund_rooms = refund_payload.get("refund_rooms") or []
-    full_cancel = bool(refund_payload.get("full_cancellation", False)) or (len(refund_rooms) == 0)
+    if booking.status == "Cancelled":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This booking is already cancelled"
+        )
 
-    nights = max((booking.check_out - booking.check_in).days, 1)
-    brm_items = await fetch_booking_room_maps(db, booking.booking_id)
-    brm_by_room = {b.room_id: b for b in brm_items}
+    # ========== CALCULATE REFUND AMOUNT ==========
+    # Full cancellation: refund 100% of booking total price
+    total_refund_amount = Decimal(str(booking.total_price))
+    
+    number_of_nights = max((booking.check_out - booking.check_in).days, 1)
+    booking_room_maps = await fetch_booking_room_maps(db, booking.booking_id)
 
-    async def compute_room_total(room_id: int) -> Decimal:
-        room = await fetch_room_by_id(db, room_id)
-        if not room:
-            return Decimal("0")
-        return (Decimal(str(room.price_per_night)) * Decimal(nights)).quantize(Decimal("0.01"))
+    # ========== COMPUTE PER-ROOM REFUND AMOUNTS ==========
+    per_room_refund_amounts = {}
+    for booking_room_map in booking_room_maps:
+        room = await fetch_room_by_id(db, booking_room_map.room_id)
+        if room:
+            room_refund_amount = (
+                Decimal(str(room.price_per_night)) * Decimal(number_of_nights)
+            ).quantize(Decimal("0.01"))
+            per_room_refund_amounts[booking_room_map.room_id] = room_refund_amount
 
-    per_room_refunds = {}
-    if full_cancel:
-        refund_amount = Decimal(str(booking.total_price))
-        for b in brm_items:
-            per_room_refunds[b.room_id] = await compute_room_total(b.room_id)
-    else:
-        if not refund_rooms:
-            raise HTTPException(status_code=400, detail="refund_rooms required for partial cancellations")
-        total = Decimal("0")
-        for rid in refund_rooms:
-            amt = await compute_room_total(rid)
-            per_room_refunds[rid] = amt
-            total += amt
-        refund_amount = total.quantize(Decimal("0.01"))
+    # ========== CREATE REFUND RECORD WITH INITIATED STATUS ==========
+    refund_record_data = {
+        "booking_id": booking.booking_id,
+        "user_id": current_user.user_id,
+        "type": "CANCELLATION",
+        "status": "INITIATED",
+        "refund_amount": total_refund_amount,
+        "remarks": f"Full booking cancellation initiated by user {current_user.user_id}",
+        "transaction_method_id": None,
+        "transaction_number": None,
+    }
 
-    rf_data = dict(
-        booking_id=booking.booking_id,
-        user_id=current_user.user_id,
-        type="CANCELLATION" if full_cancel else "PARTIAL_CANCEL",
-        status="INITIATED",
-        refund_amount=refund_amount,
-        remarks=refund_payload.get("remarks"),
-        transaction_method_id=None,
-        transaction_number=None,
-    )
+    refund_record = await insert_refund_record(db, refund_record_data)
 
-    rf = await insert_refund_record(db, rf_data)
-
-    # Create refund room maps
-    for rid, amt in per_room_refunds.items():
+    # ========== CREATE REFUND ROOM MAPPINGS & RELEASE ROOMS ==========
+    for room_id, refund_amount in per_room_refund_amounts.items():
+        # Create refund room map record
         await insert_refund_room_map(
             db,
-            dict(refund_id=rf.refund_id, booking_id=booking.booking_id, room_id=rid, refund_amount=amt),
+            {
+                "refund_id": refund_record.refund_id,
+                "booking_id": booking.booking_id,
+                "room_id": room_id,
+                "refund_amount": refund_amount,
+            },
         )
-        room = await fetch_room_by_id(db, rid)
+        
+        # Release room back to AVAILABLE status
+        room = await fetch_room_by_id(db, room_id)
         if room:
-            room.room_status = "AVAILABLE"
+            room.room_status = RoomStatus.AVAILABLE
 
-    if full_cancel:
-        for b in brm_items:
-            b.is_room_active = False
+    # ========== DEACTIVATE ALL BOOKING ROOM MAPPINGS ==========
+    for booking_room_map in booking_room_maps:
+        booking_room_map.is_room_active = False
 
+    # ========== UPDATE BOOKING STATUS TO CANCELLED ==========
     booking.status = "Cancelled"
     db.add(booking)
+    
+    # ========== COMMIT ALL CHANGES ATOMICALLY ==========
     await db.commit()
 
-    refund = await fetch_refund_by_id(db, rf.refund_id)
-    return refund
+    # ========== RETRIEVE & RETURN REFUND RECORD ==========
+    complete_refund_record = await fetch_refund_by_id(db, refund_record.refund_id)
+    return complete_refund_record
 
 
 async def update_refund_transaction(db: AsyncSession, refund_id: int, payload, admin_user):
@@ -132,36 +150,49 @@ async def update_refund_transaction(db: AsyncSession, refund_id: int, payload, a
     """
     refund_record = await fetch_refund_by_id(db, refund_id)
     if not refund_record:
-        raise HTTPException(status_code=404, detail="Refund not found")
-
-    refund_update_data = payload.model_dump() if hasattr(payload, "model_dump") else dict(payload)
-    status_val = refund_update_data.get("status")
-    method_id = refund_update_data.get("transaction_method_id")
-    trans_num = refund_update_data.get("transaction_number")
-
-    if method_id is not None:
-        payment_method_query = await db.execute(
-            select(PaymentMethodUtility).where(PaymentMethodUtility.method_id == method_id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Refund not found"
         )
-        payment_method = payment_method_query.scalars().first()
-        if not payment_method:
-            raise HTTPException(status_code=400, detail="Invalid transaction_method_id")
-        refund_record.transaction_method_id = method_id
 
-    if trans_num is not None:
-        refund_record.transaction_number = trans_num
+    update_payload_data = payload.model_dump() if hasattr(payload, "model_dump") else dict(payload)
+    new_status = update_payload_data.get("status")
+    payment_method_id = update_payload_data.get("transaction_method_id")
+    transaction_number = update_payload_data.get("transaction_number")
 
-    if status_val is not None:
-        refund_record.status = status_val
-        now = datetime.utcnow()
-        if status_val.upper() == "PROCESSED":
-            refund_record.processed_at = now
-        if status_val.upper() == "COMPLETED":
-            refund_record.processed_at = now
-            refund_record.completed_at = now
+    # ========== VALIDATE & UPDATE PAYMENT METHOD ==========
+    if payment_method_id is not None:
+        payment_method_query = await db.execute(
+            select(PaymentMethodUtility).where(PaymentMethodUtility.method_id == payment_method_id)
+        )
+        payment_method_exists = payment_method_query.scalars().first()
+        if not payment_method_exists:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid transaction_method_id"
+            )
+        refund_record.transaction_method_id = payment_method_id
 
+    # ========== UPDATE TRANSACTION NUMBER ==========
+    if transaction_number is not None:
+        refund_record.transaction_number = transaction_number
+
+    # ========== UPDATE STATUS & SET TIMESTAMPS ==========
+    if new_status is not None:
+        refund_record.status = new_status
+        current_timestamp = datetime.utcnow()
+        
+        if new_status.upper() == "PROCESSED":
+            refund_record.processed_at = current_timestamp
+        
+        if new_status.upper() == "COMPLETED":
+            refund_record.processed_at = current_timestamp
+            refund_record.completed_at = current_timestamp
+
+    # ========== COMMIT CHANGES ==========
     db.add(refund_record)
     await db.commit()
+    
     return refund_record
 
 

@@ -79,6 +79,13 @@ async def create_payment(
     if not booking:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
     
+    # ========== CHECK IF BOOKING IS EXPIRED ==========
+    if booking.status == "EXPIRED":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Cannot process payment for an expired booking. The booking hold has been released."
+        )
+    
     # Verify payment method exists
     from app.models.sqlalchemy_schemas.payment_method import PaymentMethodUtility
     method_query = await db.execute(
