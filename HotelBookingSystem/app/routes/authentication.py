@@ -221,7 +221,7 @@ async def logout(
 
 
 # ==============================================================
-# 🧠 ADMIN CREATION (Permission-Protected)
+# ADMIN CREATION (Permission-Protected)
 # ==============================================================
 @auth_router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register_admin(

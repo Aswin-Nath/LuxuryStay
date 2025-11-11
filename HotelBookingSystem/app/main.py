@@ -8,7 +8,7 @@ from app.middlewares.logging_middleware import LoggingMiddleware
 
 from app.routes.roles_and_permissions import roles_and_permissions_router
 from app.routes.authentication import auth_router
-from app.routes.room_management import router as room_management_router
+from app.routes.rooms import router as room_management_router
 from app.routes.offers import router as offers_router
 from app.routes.booking import router as booking_customer_router
 from app.routes.wishlist import router as wishlist_router
@@ -16,7 +16,6 @@ from app.routes.notifications import router as notifications_router
 from app.routes.issues import router as issue_router
 from app.routes.reviews import router as reviews_router
 from app.routes.refund import router as refunds_router
-from app.routes.edit_booking import router as booking_edits_router
 from app.routes.profile import router as profile_router
 from app.routes.logs import router as logs_router
 from app.routes.backups import router as backups_router
@@ -64,7 +63,7 @@ app.include_router(notifications_router)
 app.include_router(issue_router)
 app.include_router(reviews_router)
 app.include_router(refunds_router)
-app.include_router(booking_edits_router)
+# app.include_router(booking_edits_router)
 app.include_router(profile_router)
 app.include_router(backups_router)
 app.include_router(logs_router)
