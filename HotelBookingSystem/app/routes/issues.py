@@ -39,6 +39,7 @@ async def create_issue(
     issue: IssueCreate = Depends(IssueCreate.as_form),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE"]),
 ):
     """
     Submit a new customer issue or complaint.
@@ -89,6 +90,7 @@ async def add_issue_images(
     files: List[UploadFile] = File(...),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE"]),
 ):
     """
     Upload images to an issue/complaint.
@@ -151,7 +153,7 @@ async def issues(
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["ISSUE_RESOLUTION:READ"]),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:READ"]),
 ):
     """
     Unified endpoint to fetch single issue or paginated list with role-based filtering.
@@ -207,7 +209,7 @@ async def get_chats(
     issue_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["ISSUE_RESOLUTION:READ"]),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:READ"]),
 ):
     """
     Fetch all chat messages posted on an issue thread.
@@ -265,7 +267,7 @@ async def update_issue(
     description: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["ISSUE_RESOLUTION:WRITE"]),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE"]),
 ):
     """
     Update issue details with granular permission control.
@@ -415,7 +417,7 @@ async def post_admin_chat(
     message: str = Form(...),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["ISSUE_RESOLUTION:WRITE"]),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE"]),
 ):
     """
     Post a chat message to an issue resolution thread (admin only).

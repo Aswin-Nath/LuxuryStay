@@ -69,7 +69,7 @@ async def create_offer(payload: OfferCreate, db: AsyncSession = Depends(get_db),
 # 🔹 READ - Fetch single offer by ID
 # ============================================================================
 @router.get("/{offer_id}", response_model=OfferResponse)
-async def get_offer(offer_id: int, db: AsyncSession = Depends(get_db)):
+async def get_offer(offer_id: int, db: AsyncSession = Depends(get_db),token_payload: dict = Security(check_permission, scopes=["BOOKING:READ"])):
     """
     Retrieve a single offer by ID.
     

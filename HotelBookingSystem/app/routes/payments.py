@@ -135,6 +135,8 @@ async def get_customer_payments(
     offset: int = Query(0, ge=0, description="Pagination offset"),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE"])
+
 ) -> List[PaymentResponse]:
     """
     Retrieve current user's own payments.

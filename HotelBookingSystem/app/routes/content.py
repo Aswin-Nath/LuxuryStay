@@ -1,8 +1,8 @@
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, Form, File, UploadFile
+from fastapi import APIRouter, Depends, Form, File, UploadFile,Security
 from motor.motor_asyncio import AsyncIOMotorClient
 import json
-
+from app.dependencies.authentication import check_permission
 from app.services.content_service import (
     create_doc_service,
     get_all_docs_service,
@@ -36,6 +36,7 @@ async def create_content_doc(
     media: UploadFile = File(...),
     images: Optional[List[UploadFile]] = File(None),
     collection=Depends(get_collection),
+    token_payload: dict = Security(check_permission, scopes=["CONTENT_MANAGEMENT:WRITE"])
 ):
     """
     Create a new CMS content document with media attachments.
@@ -143,6 +144,7 @@ async def update_content_doc(
     new_media: Optional[UploadFile] = File(None),
     new_images: Optional[List[UploadFile]] = File(None),
     collection=Depends(get_collection),
+    token_payload: dict = Security(check_permission, scopes=["CONTENT_MANAGEMENT:WRITE"])
 ):
     """
     Update CMS content document details and media.
@@ -193,7 +195,7 @@ async def update_content_doc(
 # 🔹 DELETE - Remove CMS content document
 # ============================================================================
 @router.delete("/{id}", response_model=dict)
-async def delete_content_doc(id: str, collection=Depends(get_collection)):
+async def delete_content_doc(id: str, collection=Depends(get_collection), token_payload: dict = Security(check_permission, scopes=["CONTENT_MANAGEMENT:WRITE"])):
     """
     Delete/remove CMS content document.
     

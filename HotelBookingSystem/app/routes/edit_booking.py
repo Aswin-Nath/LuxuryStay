@@ -27,6 +27,7 @@ async def create_booking_edit(
     payload: BookingEditCreate,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE"]),
 ):
     """
     Create a booking edit request (customer-initiated).
@@ -92,15 +93,11 @@ async def get_booking_edits(
         HTTPException (403): If user lacks permission to access this booking's edits.
         HTTPException (404): If booking_id not found.
     """
-    # Authorization
-    is_basic_user = getattr(current_user, "role_id", None) == 1
-    if is_basic_user:
-        # verify ownership by loading booking
 
-        query_result = await db.execute(select(Bookings).where(Bookings.booking_id == booking_id))
-        booking = query_result.scalars().first()
-        if not booking or booking.user_id != current_user.user_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient privileges to access this booking's edits")
+    query_result = await db.execute(select(Bookings).where(Bookings.booking_id == booking_id))
+    booking = query_result.scalars().first()
+    if not booking or booking.user_id != current_user.user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient privileges to access this booking's edits")
 
     return await get_all_booking_edits_service(booking_id, db)
 
