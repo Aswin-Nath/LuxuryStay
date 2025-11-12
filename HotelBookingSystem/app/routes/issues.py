@@ -337,90 +337,161 @@ async def get_chats_customer(
 
 
 # ============================================================================
-# 🔹 UPDATE - Modify issue status/details
+# 🔹 UPDATE - Customer update issue title/description (owner only)
 # ============================================================================
 @router.put("/{issue_id}", response_model=IssueResponse)
 async def update_issue(
     issue_id: int,
-    status: Optional[str] = Form(None),
     title: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "ADMIN"]),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"]),
 ):
     """
-    Update issue details with granular permission control.
+    Update issue title/description (customer/owner only).
     
-    Supports two types of updates with different permission requirements:
-    - Status updates (OPEN → IN_PROGRESS → RESOLVED → CLOSED): Admin only (ADMIN role).
-      Auto-sets resolved_by to current_user when status set to RESOLVED.
-    - Title/Description updates: Issue owner only. Used to clarify/add details to complaint.
+    Allows issue owner to update their issue title and description. Used to clarify or add 
+    details to complaint after creation. Only the issue creator can modify these fields.
     
-    Enforces role-based authorization: non-owners cannot change title/description;
-    CUSTOMER users cannot change status (ADMIN only).
+    For admin status updates, use PUT /issues/admin/{issue_id}/status instead.
     
-    **Authorization:** Requires BOOKING:WRITE permission AND ADMIN role.
+    **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role. User must own the issue.
     
     Args:
-        issue_id (int): The issue to update.
-        status (Optional[str]): New issue status (e.g., "RESOLVED"). Admin-only.
-        title (Optional[str]): New issue title. Owner-only.
-        description (Optional[str]): New issue description. Owner-only.
+        issue_id (int): The issue to update (must own).
+        title (Optional[str]): New issue title. Omit to keep existing.
+        description (Optional[str]): New issue description. Omit to keep existing.
         db (AsyncSession): Database session dependency.
-        current_user (Users): Authenticated user (must be owner or admin depending on field).
-        token_payload (dict): Security token payload validating ISSUE_RESOLUTION:WRITE permission.
+        current_user (Users): Authenticated user (must be issue owner).
+        token_payload (dict): Security token payload validating BOOKING:WRITE and CUSTOMER.
     
     Returns:
         IssueResponse: Updated issue record.
     
     Raises:
-        HTTPException (403): If non-admin tries to update status, or non-owner tries to update title/description.
+        HTTPException (403): If user doesn't own the issue.
         HTTPException (404): If issue_id not found.
     
     Side Effects:
         - Updates issue record in database.
-        - Audit log entry created for UPDATE action with user_id and changed_by_user_id.
-        - When status → RESOLVED, sets resolved_by to current_user.user_id.
+        - Updates updated_at timestamp.
+        - Audit log entry created for UPDATE action.
     """
     issue_record = await svc_get_issue(db, issue_id)
+    if not issue_record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found")
 
-    is_admin = True  # User has ISSUE_RESOLUTION:WRITE via Security
-
+    # Verify ownership - customer can only update their own issues
     is_owner = issue_record.user_id == current_user.user_id
-
-    if not is_admin and not is_owner:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to edit this issue")
+    if not is_owner:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the issue owner can modify this issue")
 
     payload = {}
 
-    # Admin-only: status
-    if status is not None:
-        if not is_admin:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to change status")
-        payload["status"] = status
-        if str(status).upper() == "RESOLVED":
-            payload["resolved_by"] = current_user.user_id
-    # Owner-only: title/description
-    if title!="" or description!="":
-        if not is_owner:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the issue owner can modify title/description/images")
+    # Update title if provided and not empty
+    if title is not None and title.strip():
+        payload["title"] = title.strip()
+    
+    # Update description if provided and not empty
+    if description is not None and description.strip():
+        payload["description"] = description.strip()
 
-
-
-    if title!="":
-        payload["title"] = title
-    if description!="":
-        payload["description"] = description
+    # Only update if there are changes
+    if not payload:
+        return IssueResponse.model_validate(issue_record).model_dump()
 
     updated = await svc_update_issue(db, issue_id, payload)
+    
     # audit issue update
     try:
         new_val = IssueResponse.model_validate(updated).model_dump()
         entity_id = f"issue:{getattr(updated, 'issue_id', None)}"
-        await log_audit(entity="issue", entity_id=entity_id, action="UPDATE", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
+        await log_audit(
+            entity="issue",
+            entity_id=entity_id,
+            action="UPDATE",
+            new_value=new_val,
+            changed_by_user_id=current_user.user_id,
+            user_id=current_user.user_id,
+        )
     except Exception:
         pass
+    
+    return IssueResponse.model_validate(updated).model_dump()
+
+
+# ============================================================================
+# 🔹 UPDATE - Admin update issue status only
+# ============================================================================
+@router.put("/admin/{issue_id}/status", response_model=IssueResponse)
+async def update_issue_status_admin(
+    issue_id: int,
+    status: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "ADMIN"]),
+):
+    """
+    Update issue status (admin only).
+    
+    Allows admin/support staff to update issue status through workflow:
+    OPEN → IN_PROGRESS → RESOLVED → CLOSED
+    
+    When status is set to RESOLVED, automatically sets resolved_by to current admin user.
+    
+    **Authorization:** Requires BOOKING:WRITE permission AND ADMIN role.
+    
+    Args:
+        issue_id (int): The issue to update status for.
+        status (str): New issue status (required). Valid values: OPEN, IN_PROGRESS, RESOLVED, CLOSED.
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated admin user.
+        token_payload (dict): Security token payload validating BOOKING:WRITE and ADMIN.
+    
+    Returns:
+        IssueResponse: Updated issue record with new status.
+    
+    Raises:
+        HTTPException (400): If status is empty/invalid.
+        HTTPException (404): If issue_id not found.
+    
+    Side Effects:
+        - Updates issue status in database.
+        - Sets resolved_by to current_user.user_id if status is RESOLVED.
+        - Updates updated_at timestamp.
+        - Audit log entry created for UPDATE action.
+    """
+    if not status or not status.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Status is required")
+    
+    issue_record = await svc_get_issue(db, issue_id)
+    if not issue_record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found")
+
+    payload = {"status": status.strip()}
+    
+    # Auto-set resolved_by when status is RESOLVED
+    if str(status).strip().upper() == "RESOLVED":
+        payload["resolved_by"] = current_user.user_id
+
+    updated = await svc_update_issue(db, issue_id, payload)
+    
+    # audit issue status update
+    try:
+        new_val = IssueResponse.model_validate(updated).model_dump()
+        entity_id = f"issue:{getattr(updated, 'issue_id', None)}"
+        await log_audit(
+            entity="issue",
+            entity_id=entity_id,
+            action="UPDATE",
+            new_value=new_val,
+            changed_by_user_id=current_user.user_id,
+            user_id=current_user.user_id,
+        )
+    except Exception:
+        pass
+    
     return IssueResponse.model_validate(updated).model_dump()
 
 

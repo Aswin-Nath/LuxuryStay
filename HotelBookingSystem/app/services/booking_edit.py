@@ -260,11 +260,8 @@ async def decision_on_booking_edit_service(edit_id: int, payload: DecisionPayloa
             
             # Get the room details to get its price per night
             room_record = await get_room_by_id(db, room_booking_map.room_id)
-            if room_record:
-                room_price_per_night = Decimal(str(room_record.price_per_night))
-                room_refund_amount = (Decimal(days_since_booking) * room_price_per_night).quantize(Decimal("0.01"))
-            else:
-                room_refund_amount = Decimal("0.00")
+            room_price_per_night = Decimal(str(room_record.price_per_night))
+            room_refund_amount = (Decimal(days_since_booking) * room_price_per_night).quantize(Decimal("0.01"))
             
             # Store individual room refund amount
             per_room_refunds[room_booking_map.room_id] = room_refund_amount

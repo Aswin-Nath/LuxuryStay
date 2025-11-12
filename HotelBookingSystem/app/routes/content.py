@@ -34,7 +34,7 @@ async def create_content_doc(
     status: Optional[str] = Form("used"),
     metadata: Optional[str] = Form(None),
     media: UploadFile = File(...),
-    images: Optional[List[UploadFile]] = File(None),
+    images: Optional[List[UploadFile]] = File(default=[]),
     collection=Depends(get_collection),
     token_payload: dict = Security(check_permission, scopes=["CONTENT_MANAGEMENT:WRITE"])
 ):

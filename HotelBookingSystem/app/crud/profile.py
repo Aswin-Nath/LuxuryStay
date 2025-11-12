@@ -2,6 +2,7 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.sqlalchemy_schemas.users import Users
+from datetime import date
 
 
 # ==========================================================
@@ -22,7 +23,10 @@ async def get_user_by_id(db: AsyncSession, user_id: int) -> Optional[Users]:
 async def update_user_profile(db: AsyncSession, user: Users, updates: dict) -> Users:
     """Update scalar fields in user profile."""
     for k, v in updates.items():
-        if hasattr(user, k):
+        if hasattr(user, k) and v is not None:
+            # Convert string dates to date objects for dob field
+            if k == "dob" and isinstance(v, str):
+                v = date.fromisoformat(v)
             setattr(user, k, v)
     db.add(user)
     await db.flush()

@@ -75,6 +75,8 @@ async def get_audit_logs(
     end_ts: Optional[str] = Query(None, description="ISO datetime end"),
     limit: int = Query(50, ge=1, le=1000),
     skip: int = Query(0, ge=0),
+    token_payload: dict = Security(check_permission, scopes=["CONTENT_MANAGEMENT:WRITE"])
+
 ):
     """
     Retrieve system-wide audit logs with optional filters.
