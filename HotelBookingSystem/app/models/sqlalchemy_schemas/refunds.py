@@ -31,7 +31,6 @@ class Refunds(Base):
     transaction_number = Column(String(100), nullable=True)
 
 
-
 class RefundRoomMap(Base):
     __tablename__ = "refund_room_map"
 
