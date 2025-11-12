@@ -61,23 +61,7 @@ async def create_booking_edit_service(payload: BookingEditCreate, db: AsyncSessi
         )
 
     # ========== VALIDATION: Date changes not allowed, only room changes in PRE-EDIT ==========
-    # In PRE-EDIT phase, only room changes are allowed (no date changes)
-    if edit_type == "PRE":
-        if payload.check_in_date and payload.check_in_date != booking.check_in:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Date changes are not allowed. Only room changes are permitted during PRE-EDIT phase."
-            )
-        if payload.check_out_date and payload.check_out_date != booking.check_out:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Date changes are not allowed. Only room changes are permitted during PRE-EDIT phase."
-            )
-        if not payload.requested_room_changes:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="PRE-EDIT phase allows only room changes. Please provide requested_room_changes."
-            )
+
     
     # In POST-EDIT phase, no room changes or date changes allowed
     if edit_type == "POST":
