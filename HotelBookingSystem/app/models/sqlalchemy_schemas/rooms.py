@@ -76,6 +76,7 @@ class Rooms(Base):
     # Relationships
     room_type = relationship("RoomTypes", back_populates="rooms")
     amenities = relationship("RoomAmenityMap", back_populates="room", cascade="all, delete-orphan")
+    booking_room_maps = relationship("BookingRoomMap", back_populates="room", cascade="all, delete-orphan")
     hold_expires_at = Column(DateTime(timezone=True), nullable=True)
 # ==============================================================
 # ROOM AMENITIES

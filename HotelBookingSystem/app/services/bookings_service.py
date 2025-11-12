@@ -1,5 +1,5 @@
 from typing import List, Optional
-from sqlalchemy import select
+from sqlalchemy import select, or_, and_, exists
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 from decimal import Decimal
@@ -310,11 +310,40 @@ async def create_booking(db: AsyncSession, payload, user_id: int) -> Bookings:
     # Use FOR UPDATE SKIP LOCKED to prevent concurrent double-booking
     # This locks selected rows until transaction commits/rolls back
     # SKIP LOCKED ensures other transactions don't block on locked rows
+    # 
+    # Include rooms that are:
+    # 1. AVAILABLE (room_status == AVAILABLE), OR
+    # 2. HELD with expired hold_expires_at (hold has expired, room is now available again)
+    # 
+    # Also verify that rooms don't have conflicting bookings for the requested date range
+    # A booking conflicts if: existing_check_in < requested_check_out AND existing_check_out > requested_check_in
+    
     query = await db.execute(
         select(Rooms)
         .where(
             Rooms.room_type_id.in_(list(req_counts.keys())),
-            Rooms.room_status == RoomStatus.AVAILABLE
+            or_(
+                # Room is currently available
+                Rooms.room_status == RoomStatus.AVAILABLE,
+                # OR room is held but the hold has expired (make it available again)
+                (
+                    (Rooms.room_status == RoomStatus.HELD) & 
+                    (Rooms.hold_expires_at <= datetime.utcnow())
+                )
+            ),
+            # AND check that room has no conflicting bookings in the requested date range
+            # Use subquery to check for date conflicts
+            ~select(1)
+            .select_from(BookingRoomMap)
+            .join(Bookings, BookingRoomMap.booking_id == Bookings.booking_id)
+            .where(
+                BookingRoomMap.room_id == Rooms.room_id,
+                Bookings.check_in < data["check_out"],
+                Bookings.check_out > data["check_in"],
+                Bookings.status != "CANCELLED",
+                Bookings.is_deleted == False
+            )
+            .exists()
         )
         .with_for_update(skip_locked=True)
     )
@@ -341,7 +370,7 @@ async def create_booking(db: AsyncSession, payload, user_id: int) -> Bookings:
     # Lock duration formula: 5 + (2 × number_of_rooms) minutes
     # This creates a temporary hold on the rooms to prevent re-allocation
     room_count = len(requested_room_type_ids)
-    lock_duration_minutes = 5 + (2 * room_count)
+    lock_duration_minutes = 5
     
     # Calculate hold expiry time in UTC
     now_utc = datetime.utcnow()

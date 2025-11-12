@@ -63,6 +63,7 @@ class BookingRoomMap(Base):
         comment="Array of room_ids suggested by admin for this booking room during post-edit",
     )
     booking = relationship("Bookings", back_populates="rooms")
+    room = relationship("Rooms", back_populates="booking_room_maps")
 
 
 
