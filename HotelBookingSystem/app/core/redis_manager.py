@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 from redis.asyncio import from_url
 from fastapi import FastAPI
+from loguru import logger
 
 load_dotenv()
 
@@ -16,12 +17,12 @@ async def connect_redis(app: FastAPI):
     try:
         pong = await redis.ping()
         if pong:
-            print("✅ Connected to Upstash Redis")
+            logger.info("✅ Connected to Upstash Redis")
     except Exception as e:
-        print("❌ Redis connection failed:", e)
+        logger.error(f"❌ Redis connection failed: {e}")
 
 async def disconnect_redis(app: FastAPI):
     global redis
     if redis:
         await redis.close()
-        print("🛑 Redis disconnected")
+        logger.info("🛑 Redis disconnected")

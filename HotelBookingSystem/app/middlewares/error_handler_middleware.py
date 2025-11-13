@@ -1,11 +1,11 @@
 """
-Simple Global Error Handling Middleware
+Global Error Handling Middleware with environment-aware error details.
 
-Catches all exceptions and converts them to JSON responses.
+In production, sensitive error details are hidden to prevent information leakage.
+In development, full error details are shown for debugging.
 """
 
-import logging
-import traceback
+from loguru import logger
 from typing import Callable
 
 from fastapi import HTTPException, status
@@ -13,13 +13,14 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-logger = logging.getLogger(__name__)
 
 
 class ErrorHandlerMiddleware(BaseHTTPMiddleware):
     """
     Generic error handling middleware that catches all exceptions
     and returns them as JSON responses.
+    
+    Hides sensitive information in production environments.
     """
 
     async def dispatch(self, request: Request, call_next: Callable):
@@ -38,8 +39,9 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
             exc (Exception): The exception that was raised
             
         Returns:
-            JSONResponse: Error response
+            JSONResponse: Error response with environment-appropriate details
         """
+        
         # Get exception details
         exc_type = type(exc).__name__
         exc_message = str(exc)
@@ -52,27 +54,35 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
             status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             error_msg = exc_message
 
-        # Log the error
+        # Log the error with full details
         method = request.method
         path = str(request.url.path)
         client = request.client.host if request.client else "unknown"
         
-        log_message = f"[ERROR] {method} {path} | {exc_type}: {error_msg} | Client: {client}"
+        log_message = f"Exception | method={method} path={path} exception_type={exc_type} message={error_msg} client={client}"
         
         if status_code >= 500:
             logger.error(log_message)
-            logger.error(f"[TRACEBACK]\n{traceback.format_exc()}")
+            logger.error(f"Traceback: {exc}")
         else:
             logger.warning(log_message)
 
-        # Return error response
+        # Build error response based on environment
+        response_body = {
+            "success": False,
+            "error": error_msg,
+        }
+        
+        # Only include sensitive details in development/staging
+        response_body["exception_type"] = exc_type
+        response_body["path"] = path
+        response_body["method"] = method
+    
+        # In production, provide a generic message for 500 errors
+        if status_code >= 500:
+            response_body["error"] = "An internal server error occurred."
+
         return JSONResponse(
             status_code=status_code,
-            content={
-                "success": False,
-                "error": error_msg,
-                "exception": exc_type,
-                "path": path,
-                "method": method,
-            }
+            content=response_body
         )

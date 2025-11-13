@@ -28,8 +28,6 @@ from app.models.sqlalchemy_schemas.rooms import Rooms, RoomStatus, RoomTypes
 from app.schemas.pydantic_models.booking_edits import (
     BookingEditCreate,
     BookingEditResponse,
-    ReviewPayload,
-    DecisionPayload,
 )
 
 

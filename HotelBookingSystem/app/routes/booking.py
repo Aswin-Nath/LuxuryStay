@@ -29,11 +29,9 @@ from app.schemas.pydantic_models.refunds import RefundCreate, RefundResponse
 from app.schemas.pydantic_models.booking_edits import (
     BookingEditCreate,
     BookingEditResponse,
-    ReviewPayload,
-    DecisionPayload,
     UpdateRoomOccupancyRequest,
 )
-
+from app.schemas.pydantic_models.reviews import ReviewCreate
 # ==========================================================
 # ⚙️ Services
 # ==========================================================
@@ -49,8 +47,6 @@ from app.services.refunds_service import (
 from app.services.booking_edit import (
     create_booking_edit_service,
     get_all_booking_edits_service,
-    review_booking_edit_service,
-    decision_on_booking_edit_service,
     update_room_occupancy_service,
 )
 
@@ -211,41 +207,6 @@ async def get_booking_edits(
 
     return await get_all_booking_edits_service(booking_id, db)
 
-
-@router.post("/{edit_id}/review")
-async def review_booking_edit(
-    edit_id: int,
-    payload: ReviewPayload,
-    db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["ROOM_MANAGEMENT:WRITE", "ADMIN"]),
-):
-    booking_edit_record = await review_booking_edit_service(edit_id, payload, db, current_user)
-    try:
-        new_val = BookingEditResponse.model_validate(booking_edit_record).model_dump()
-        entity_id = f"booking_edit:{booking_edit_record.edit_id}"
-        await log_audit(entity="booking_edit", entity_id=entity_id, action="UPDATE", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
-    except Exception:
-        pass
-    return booking_edit_record
-
-
-@router.post("/{edit_id}/decision")
-async def decision_booking_edit(
-    edit_id: int,
-    payload: DecisionPayload,
-    db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"]),
-):
-    booking_edit_record = await decision_on_booking_edit_service(edit_id, payload, db, current_user)
-    try:
-        new_val = BookingEditResponse.model_validate(booking_edit_record).model_dump()
-        entity_id = f"booking_edit:{booking_edit_record.edit_id}"
-        await log_audit(entity="booking_edit", entity_id=entity_id, action="UPDATE", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
-    except Exception:
-        pass
-    return booking_edit_record
 
 
 # ==========================================================

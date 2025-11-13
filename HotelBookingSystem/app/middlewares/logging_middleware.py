@@ -1,5 +1,6 @@
 from time import time
 from typing import Callable
+from loguru import logger
 
 from starlette.requests import Request
 from starlette.responses import Response
@@ -22,15 +23,15 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 			response = await call_next(request)
 		except Exception as exc:
 			duration_ms = int((time() - start) * 1000)
-			print(f"[REQUEST ERROR] method={method} path={path} query={query} client={client} duration_ms={duration_ms} exception={exc}")
+			logger.error(f"Request error | method={method} path={path} query={query} client={client} duration_ms={duration_ms} exception={exc}")
 			raise
 
 		duration_ms = int((time() - start) * 1000)
 		status = response.status_code
 		content_length = response.headers.get("content-length", "-")
 
-		print(
-			f"[API] method={method} path={path} query={query} client={client} status={status} content_length={content_length} duration_ms={duration_ms}"
+		logger.info(
+			f"API request | method={method} path={path} query={query} client={client} status={status} content_length={content_length} duration_ms={duration_ms}"
 		)
 
 		return response
