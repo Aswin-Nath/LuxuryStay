@@ -44,7 +44,7 @@ async def create_booking_edit(db: AsyncSession, edit_obj: BookingEdits) -> Booki
 
 async def get_booking_edit_by_id(db: AsyncSession, edit_id: int) -> Optional[BookingEdits]:
     """Retrieve a booking edit by ID."""
-    stmt = select(BookingEdits).where(BookingEdits.edit_id == edit_id, BookingEdits.is_deleted == False)
+    stmt = select(BookingEdits).where(BookingEdits.edit_id == edit_id)
     query_result = await db.execute(stmt)
     return query_result.scalars().first()
 
@@ -53,34 +53,12 @@ async def list_booking_edits_for_booking(db: AsyncSession, booking_id: int) -> L
     """Return all edits for a specific booking."""
     stmt = (
         select(BookingEdits)
-        .where(BookingEdits.booking_id == booking_id, BookingEdits.is_deleted == False)
-        .order_by(BookingEdits.requested_at.desc())
+        .where(BookingEdits.booking_id == booking_id)
     )
     query_result = await db.execute(stmt)
     return query_result.scalars().all()
 
 
-async def update_booking_edit_status(
-    db: AsyncSession,
-    edit_id: int,
-    status_value: str,
-    reviewed_by: Optional[int] = None,
-    lock_expires_at: Optional[datetime] = None,
-):
-    """Update the status and metadata of a booking edit."""
-    stmt = (
-        update(BookingEdits)
-        .where(BookingEdits.edit_id == edit_id)
-        .values(
-            edit_status=status_value,
-            reviewed_by=reviewed_by,
-            lock_expires_at=lock_expires_at,
-            processed_at=datetime.utcnow() if status_value in ["APPROVED", "REJECTED", "PARTIALLY_APPROVED"] else None,
-        )
-        .execution_options(synchronize_session="fetch")
-    )
-    await db.execute(stmt)
-    await db.flush()
 
 
 # ===================================================

@@ -95,29 +95,14 @@ class BookingEdits(Base):
     # Allow nullable total_price to match the API model which permits omission; callers may enforce non-null on DB level if needed
     total_price = Column(Numeric(12, 2), nullable=True)
 
-    # optional status reference (project has a status_utility table)
-    status_id = Column(Integer, ForeignKey("status_utility.status_id"), nullable=True)
-
     # edit type: PRE or POST
     edit_type = Column(String(10), nullable=False, index=True)
-    edit_status = Column(String(50), server_default="PENDING", index=True)
 
-    requested_by = Column(Integer, ForeignKey("users.user_id"), nullable=True)
-    reviewed_by = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
 
-    requested_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), index=True)
     processed_at = Column(TIMESTAMP(timezone=True), nullable=True)
     # When admin suggests rooms, locks expire at this timestamp (UTC)
-    lock_expires_at = Column(TIMESTAMP(timezone=True), nullable=True)
     requested_room_changes = Column(
         JSONB,
         nullable=True,
         comment="Map of room_id -> requested new room_type_id by customer",
     )
-    chosen_room_type = Column(
-        Integer,
-        ForeignKey("room_types.room_type_id", ondelete="SET NULL"),
-        nullable=True,
-        comment="Final chosen room type after edit approval",
-    )
-    is_deleted = Column(Boolean, server_default="false", index=True)

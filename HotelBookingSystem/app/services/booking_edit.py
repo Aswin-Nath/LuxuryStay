@@ -10,7 +10,6 @@ from app.crud.edit_bookings import (
     create_booking_edit,
     get_booking_edit_by_id,
     list_booking_edits_for_booking,
-    update_booking_edit_status,
     get_booking_room_maps,
     insert_booking_room_map,
     delete_booking_room_map,
@@ -46,12 +45,7 @@ async def create_booking_edit_service(payload: BookingEditCreate, db: AsyncSessi
 
     # ========== VALIDATION: Check for existing pending edits ==========
     existing_edits = await list_booking_edits_for_booking(db, payload.booking_id)
-    pending_edits = [e for e in existing_edits if getattr(e, "edit_status", None) == "PENDING"]
-    if pending_edits:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This booking already has a pending edit. Please wait for it to be reviewed before making another edit."
-        )
+
 
     # ========== VALIDATION: Room changes only allowed during PRE-EDIT ==========
     if payload.requested_room_changes and edit_type == "POST":
@@ -145,8 +139,6 @@ async def create_booking_edit_service(payload: BookingEditCreate, db: AsyncSessi
         check_out_time=payload.check_out_time,
         total_price=calculated_total_price,
         edit_type=edit_type,
-        edit_status="PENDING",
-        requested_by=payload.requested_by or getattr(current_user, "user_id", None),
         requested_room_changes=payload.requested_room_changes if edit_type == "PRE" else None,
     )
 
@@ -161,187 +153,6 @@ async def get_all_booking_edits_service(booking_id: int, db: AsyncSession):
     return [BookingEditResponse.model_validate(e) for e in edits]
 
 
-# ✅ Admin: Review Booking Edit & Lock
-async def review_booking_edit_service(edit_id: int, payload: ReviewPayload, db: AsyncSession, current_user):
-    edit = await get_booking_edit_by_id(db, edit_id)
-    if not edit:
-        raise HTTPException(status_code=404, detail="Edit not found")
-
-    lock_expires_at = datetime.utcnow() + timedelta(minutes=30)
-    suggested = payload.suggested_rooms or {}
-
-    room_maps = await get_booking_room_maps(db, edit.booking_id)
-    for key_str, room_ids in suggested.items():
-        key = int(key_str)
-        for room_booking_map in room_maps:
-            if getattr(room_booking_map, "room_id") == key:
-                room_booking_map.edit_suggested_rooms = room_ids
-                db.add(room_booking_map)
-
-    await update_booking_edit_status(
-        db,
-        edit_id,
-        status_value="AWAITING_CUSTOMER_RESPONSE",
-        reviewed_by=current_user.user_id,
-        lock_expires_at=lock_expires_at,
-    )
-
-    await db.commit()
-    return {"ok": True, "edit_id": edit_id, "lock_expires_at": lock_expires_at.isoformat()}
-
-
-# ✅ Customer Decision on Booking Edit
-async def decision_on_booking_edit_service(edit_id: int, payload: DecisionPayload, db: AsyncSession, current_user):
-    edit = await get_booking_edit_by_id(db, edit_id)
-    if not edit:
-        raise HTTPException(status_code=404, detail="Edit not found")
-
-    if current_user.user_id != edit.user_id:
-        raise HTTPException(status_code=403, detail="Unauthorized to act on this edit")
-
-    booking = await get_booking_by_id(db, edit.booking_id)
-    if not booking:
-        raise HTTPException(status_code=404, detail="Booking not found")
-
-    room_maps = await get_booking_room_maps(db, edit.booking_id)
-    if not room_maps:
-        raise HTTPException(status_code=404, detail="No room mappings found")
-
-    room_decisions = payload.room_decisions or {}
-    affected_room_map_ids = set(map(int, room_decisions.keys()))
-
-    accepted_rooms, kept_rooms, refund_rooms = [], [], []
-    is_pre_edit = edit.edit_type == "PRE"
-    is_post_edit = edit.edit_type == "POST"
-    
-    # Accumulate refund amounts for all rooms being refunded
-    total_refund_amount = Decimal("0")
-    per_room_refunds = {}  # Store individual room refund amounts
-
-    for room_booking_map in room_maps:
-        if room_booking_map.room_id not in affected_room_map_ids:
-            continue
-
-        decision, decision_room_id = room_decisions[room_booking_map.room_id]
-
-        # --- ACCEPT CASE ---
-        if decision == "ACCEPT":
-            accepted_rooms.append((room_booking_map.room_id, decision_room_id))
-            await delete_booking_room_map(db, booking.booking_id, room_booking_map.room_id)
-
-            # Fetch new room details
-            room_record = await get_room_by_id(db, decision_room_id)
-            room_type_id = getattr(room_record, "room_type_id", getattr(room_booking_map, "room_type_id", None))
-
-            new_map = BookingRoomMap(
-                booking_id=booking.booking_id,
-                room_type_id=room_type_id,
-                room_id=decision_room_id,
-                is_pre_edited_room=is_pre_edit,
-                is_post_edited_room=is_post_edit,
-            )
-            await insert_booking_room_map(db, new_map)
-
-        # --- KEEP CASE ---
-        elif decision == "KEEP":
-            kept_rooms.append(room_booking_map.room_id)
-            continue
-
-        # --- REFUND CASE ---
-        elif decision == "REFUND":
-            # Only refunds allowed in PRE-EDIT phase
-            if not is_pre_edit:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Refunds are only allowed during PRE-EDIT phase (before check-in)"
-                )
-            
-            refund_rooms.append(room_booking_map.room_id)
-            
-            # Calculate refund for this individual room: (CURRENT_DATE - BOOKING_DATE) × ROOM_PRICE_PER_NIGHT
-            days_since_booking = max((datetime.utcnow().date() - booking.created_at.date()).days, 0)
-            
-            # Get the room's room type to fetch its price per night
-            room_record = await get_room_by_id(db, room_booking_map.room_id)
-            room_type_record = await db.get(RoomTypes, room_record.room_type_id)
-            if room_type_record:
-                room_price_per_night = Decimal(str(room_type_record.price_per_night))
-                room_refund_amount = (Decimal(days_since_booking) * room_price_per_night).quantize(Decimal("0.01"))
-            
-            # Store individual room refund amount
-            per_room_refunds[room_booking_map.room_id] = room_refund_amount
-            # Accumulate total refund
-            total_refund_amount += room_refund_amount
-            
-            # Delete room from booking
-            await delete_booking_room_map(db, booking.booking_id, room_booking_map.room_id)
-
-    # Create single Refund record with total amount (only if there are refunds)
-    if refund_rooms:
-        refund = Refunds(
-            booking_id=booking.booking_id,
-            user_id=current_user.user_id,
-            type="PARTIAL",
-            refund_amount=total_refund_amount,
-        )
-        refund = await create_refund(db, refund)
-        
-        # Create individual RefundRoomMap entries for each refunded room
-        for room_id, refund_amount in per_room_refunds.items():
-            refund_room_map = RefundRoomMap(
-                refund_id=refund.refund_id,
-                booking_id=booking.booking_id,
-                room_id=room_id,
-                refund_amount=refund_amount,
-            )
-            await create_refund_room_map(db, refund_room_map)
-
-    # Determine edit status
-    if accepted_rooms or refund_rooms:
-        edit_status = "APPROVED"
-    elif kept_rooms:
-        edit_status = "NO_CHANGE"
-    else:
-        edit_status = "REJECTED"
-
-    edit.edit_status = edit_status
-    edit.processed_at = datetime.utcnow()
-    db.add(edit)
-
-    if (accepted_rooms or refund_rooms) and booking:
-        await update_booking_flags(db, booking, is_pre_edit=is_pre_edit, is_post_edit=is_post_edit)
-
-    await db.commit()
-
-    # Calculate new rooms amount (for accepted rooms)
-    new_rooms_amount = Decimal("0")
-    if accepted_rooms:
-        # Recalculate total price based on new rooms if any were accepted
-        # For now, we'll use the edit's calculated total_price if it was updated
-        new_rooms_amount = Decimal(str(edit.total_price or booking.total_price))
-
-    # Calculate new total amount after refunds and room changes
-    original_booking_amount = Decimal(str(booking.total_price))
-    refunded_amount = total_refund_amount
-    new_total_amount = original_booking_amount - refunded_amount + (new_rooms_amount - original_booking_amount if accepted_rooms else Decimal("0"))
-
-    return {
-        "ok": True,
-        "edit_id": edit_id,
-        "status": edit_status,
-        "financial_breakdown": {
-            "original_booking_amount": float(original_booking_amount),
-            "refunded_amount": float(refunded_amount),
-            "new_rooms_amount": float(new_rooms_amount) if accepted_rooms else float(original_booking_amount),
-            "new_total_amount": float(new_total_amount.quantize(Decimal("0.01"))),
-        },
-        "room_decisions": {
-            "accepted_rooms": accepted_rooms,
-            "kept_rooms": kept_rooms,
-            "refund_rooms": refund_rooms,
-        },
-        "message": f"Processed room-level decisions for edit #{edit_id}",
-    }
 
 
 # ✅ Room Lock/Unlock Wrappers
