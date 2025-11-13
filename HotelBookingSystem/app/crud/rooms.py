@@ -1,5 +1,6 @@
 from typing import List, Optional
 from sqlalchemy import select, update
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # ==========================================================
@@ -70,16 +71,20 @@ async def insert_room(db: AsyncSession, data: dict) -> Rooms:
 
 
 async def fetch_room_by_id(db: AsyncSession, room_id: int) -> Optional[Rooms]:
-    res = await db.execute(select(Rooms).where(Rooms.room_id == room_id))
-    return res.scalars().first()
+	res = await db.execute(
+		select(Rooms)
+		.options(selectinload(Rooms.room_type))
+		.where(Rooms.room_id == room_id)
+	)
+	return res.scalars().first()
 
 
 async def fetch_room_by_number(db: AsyncSession, room_no: str, include_deleted: bool = False) -> Optional[Rooms]:
-    stmt = select(Rooms).where(Rooms.room_no == room_no)
-    if not include_deleted:
-        stmt = stmt.where(Rooms.is_deleted.is_(False))
-    res = await db.execute(stmt)
-    return res.scalars().first()
+	stmt = select(Rooms).options(selectinload(Rooms.room_type)).where(Rooms.room_no == room_no)
+	if not include_deleted:
+		stmt = stmt.where(Rooms.is_deleted.is_(False))
+	res = await db.execute(stmt)
+	return res.scalars().first()
 
 
 async def fetch_rooms_filtered(
@@ -88,19 +93,19 @@ async def fetch_rooms_filtered(
     status_filter: Optional[str] = None,
     is_freezed: Optional[bool] = None,
 ) -> List[Rooms]:
-    stmt = select(Rooms)
-    if room_type_id is not None:
-        stmt = stmt.where(Rooms.room_type_id == room_type_id)
-    if status_filter is not None:
-        stmt = stmt.where(Rooms.room_status == status_filter)
-    if is_freezed is not None:
-        if is_freezed:
-            stmt = stmt.where(Rooms.freeze_reason.isnot(None))
-        else:
-            stmt = stmt.where(Rooms.freeze_reason.is_(None))
+	stmt = select(Rooms).options(selectinload(Rooms.room_type))
+	if room_type_id is not None:
+		stmt = stmt.where(Rooms.room_type_id == room_type_id)
+	if status_filter is not None:
+		stmt = stmt.where(Rooms.room_status == status_filter)
+	if is_freezed is not None:
+		if is_freezed:
+			stmt = stmt.where(Rooms.freeze_reason.isnot(None))
+		else:
+			stmt = stmt.where(Rooms.freeze_reason.is_(None))
 
-    res = await db.execute(stmt)
-    return res.scalars().all()
+	res = await db.execute(stmt)
+	return res.scalars().all()
 
 
 async def update_room_by_id(db: AsyncSession, room_id: int, updates: dict) -> None:

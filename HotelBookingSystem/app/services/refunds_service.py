@@ -12,6 +12,7 @@ from app.crud.refunds import (
     insert_refund_room_map,
     fetch_refunds_filtered,
 )
+from app.crud.rooms import fetch_room_type_by_id
 from app.models.sqlalchemy_schemas.refunds import Refunds
 from app.models.sqlalchemy_schemas.rooms import RoomStatus
 from app.models.sqlalchemy_schemas.payment_method import PaymentMethodUtility
@@ -75,10 +76,13 @@ async def cancel_booking_and_create_refund(db: AsyncSession, booking_id: int, cu
     for booking_room_map in booking_room_maps:
         room = await fetch_room_by_id(db, booking_room_map.room_id)
         if room:
-            room_refund_amount = (
-                Decimal(str(room.price_per_night)) * Decimal(number_of_nights)
-            ).quantize(Decimal("0.01"))
-            per_room_refund_amounts[booking_room_map.room_id] = room_refund_amount
+            # Get price from the room's type
+            room_type = await fetch_room_type_by_id(db, room.room_type_id)
+            if room_type:
+                room_refund_amount = (
+                    Decimal(str(room_type.price_per_night)) * Decimal(number_of_nights)
+                ).quantize(Decimal("0.01"))
+                per_room_refund_amounts[booking_room_map.room_id] = room_refund_amount
 
     # ========== CREATE REFUND RECORD WITH INITIATED STATUS ==========
     refund_record_data = {

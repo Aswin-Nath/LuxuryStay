@@ -23,9 +23,8 @@ from app.routes.restores import router as restores_router
 from app.routes.reports import router as reports_router
 from app.routes.content import router as content_router
 from app.routes.payments import router as payment_router
-from app.workers.unlock_worker import start_unlock_worker
+from app.workers.edit_assigned_rooms_unlock_worker import start_unlock_worker
 from app.workers.release_room_holds_worker import run_hold_release_scheduler
-from app.workers.revoke_expired_sessions_worker import run_session_revoke_scheduler
 
 # -------------------------------------------------
 # ✅ FastAPI App Configuration
@@ -94,4 +93,3 @@ async def startup_event():
     """
     asyncio.create_task(start_unlock_worker())
     asyncio.create_task(run_hold_release_scheduler(interval_seconds=60))
-    asyncio.create_task(run_session_revoke_scheduler(interval_seconds=60))

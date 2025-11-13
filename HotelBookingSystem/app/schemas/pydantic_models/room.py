@@ -76,10 +76,7 @@ class RoomResponse(BaseModel):
     room_id: int
     room_no: str
     room_type_id: int
-    # these are returned (populated from DB / room type)
-    price_per_night: float
-    max_adult_count: int
-    max_child_count: int
+    room_type: RoomType  # Include room type details
     room_status: RoomStatus
     freeze_reason: Optional[FreezeReason]
     created_at: datetime
@@ -92,11 +89,9 @@ class Room(BaseModel):
     room_id: int
     room_no: str
     room_type_id: int
-    price_per_night: float
+    room_type: RoomType  # Include room type details
     room_status: RoomStatus
     freeze_reason: Optional[FreezeReason]
-    max_adult_count: int
-    max_child_count: int
 
     model_config = {"from_attributes": True}
 

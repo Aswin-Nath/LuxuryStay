@@ -136,9 +136,6 @@ async def create_room(db: AsyncSession, payload) -> Rooms:
 		raise HTTPException(status_code=404, detail="Room type not found")
 
 	room_data = payload.model_dump()
-	room_data["price_per_night"] = room_type.price_per_night
-	room_data["max_adult_count"] = room_type.max_adult_count
-	room_data["max_child_count"] = room_type.max_child_count
 
 	room_record = await insert_room(db, room_data)
 	await db.commit()
@@ -343,9 +340,6 @@ async def bulk_upload_rooms(db: AsyncSession, file_content: bytes) -> Dict[str, 
 				"room_type_id": room_type_id,
 				"room_status": room_status,
 				"freeze_reason": freeze_reason,
-				"price_per_night": room_type.price_per_night,
-				"max_adult_count": room_type.max_adult_count,
-				"max_child_count": room_type.max_child_count,
 			}
 
 			new_room = await insert_room(db, room_data)

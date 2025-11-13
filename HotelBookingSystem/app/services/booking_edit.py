@@ -109,18 +109,21 @@ async def create_booking_edit_service(payload: BookingEditCreate, db: AsyncSessi
         total_cost_difference = Decimal("0")
         
         for current_room_id, new_room_type_id in payload.requested_room_changes.items():
-            # Get old room price and new room type price
+            # Get old room and new room type
             old_room = current_rooms.get(current_room_id)
             new_room_type = new_room_types.get(new_room_type_id)
             
             if old_room and new_room_type:
-                # Old room cost = room.price_per_night * num_nights
-                old_cost = Decimal(str(old_room.price_per_night)) * Decimal(num_nights)
-                # New room cost = room_type.price_per_night * num_nights
-                new_cost = Decimal(str(new_room_type.price_per_night)) * Decimal(num_nights)
-                # Difference = new_cost - old_cost
-                difference = new_cost - old_cost
-                total_cost_difference += difference
+                # Get old room type to get its price
+                old_room_type = await db.get(RoomTypes, old_room.room_type_id)
+                if old_room_type:
+                    # Old room cost = old_room_type.price_per_night * num_nights
+                    old_cost = Decimal(str(old_room_type.price_per_night)) * Decimal(num_nights)
+                    # New room cost = room_type.price_per_night * num_nights
+                    new_cost = Decimal(str(new_room_type.price_per_night)) * Decimal(num_nights)
+                    # Difference = new_cost - old_cost
+                    difference = new_cost - old_cost
+                    total_cost_difference += difference
         
         # Final total_price = original_total_price + difference
         calculated_total_price = calculated_total_price + total_cost_difference
@@ -258,10 +261,12 @@ async def decision_on_booking_edit_service(edit_id: int, payload: DecisionPayloa
             # Calculate refund for this individual room: (CURRENT_DATE - BOOKING_DATE) × ROOM_PRICE_PER_NIGHT
             days_since_booking = max((datetime.utcnow().date() - booking.created_at.date()).days, 0)
             
-            # Get the room details to get its price per night
+            # Get the room's room type to fetch its price per night
             room_record = await get_room_by_id(db, room_booking_map.room_id)
-            room_price_per_night = Decimal(str(room_record.price_per_night))
-            room_refund_amount = (Decimal(days_since_booking) * room_price_per_night).quantize(Decimal("0.01"))
+            room_type_record = await db.get(RoomTypes, room_record.room_type_id)
+            if room_type_record:
+                room_price_per_night = Decimal(str(room_type_record.price_per_night))
+                room_refund_amount = (Decimal(days_since_booking) * room_price_per_night).quantize(Decimal("0.01"))
             
             # Store individual room refund amount
             per_room_refunds[room_booking_map.room_id] = room_refund_amount
