@@ -25,13 +25,7 @@ from app.utils.audit_util import log_audit
 # 🧱 Schemas
 # ==========================================================
 from app.schemas.pydantic_models.booking import BookingCreate, BookingResponse
-from app.schemas.pydantic_models.refunds import RefundCreate, RefundResponse
-from app.schemas.pydantic_models.booking_edits import (
-    BookingEditCreate,
-    BookingEditResponse,
-    UpdateRoomOccupancyRequest,
-)
-from app.schemas.pydantic_models.reviews import ReviewCreate
+from app.schemas.pydantic_models.refunds import RefundResponse
 # ==========================================================
 # ⚙️ Services
 # ==========================================================
@@ -44,11 +38,7 @@ from app.services.bookings_service import (
 from app.services.refunds_service import (
     cancel_booking_and_create_refund as svc_cancel_booking,
 )
-from app.services.booking_edit import (
-    create_booking_edit_service,
-    get_all_booking_edits_service,
-    update_room_occupancy_service,
-)
+
 
 # ==========================================================
 # 📦 Router Definition
@@ -168,100 +158,3 @@ async def get_admin_bookings(
         items = await svc_list_bookings(db, limit=limit, offset=offset)
 
     return [BookingResponse.model_validate(i).model_dump(exclude={"created_at"}) for i in items]
-
-
-# ==========================================================
-# 🧩 BOOKING EDITS SECTION
-# ==========================================================
-@router.post("/edits", response_model=BookingEditResponse, status_code=status.HTTP_201_CREATED)
-async def create_booking_edit(
-    payload: BookingEditCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"]),
-):
-    booking_edit_record = await create_booking_edit_service(payload, db, current_user)
-
-    try:
-        new_val = BookingEditResponse.model_validate(booking_edit_record).model_dump()
-        entity_id = f"booking_edit:{booking_edit_record.edit_id}"
-        await log_audit(entity="booking_edit", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
-    except Exception:
-        pass
-
-    return booking_edit_record
-
-
-@router.get("/{booking_id}/edits", response_model=List[BookingEditResponse])
-async def get_booking_edits(
-    booking_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE"]),
-):
-    query_result = await db.execute(select(Bookings).where(Bookings.booking_id == booking_id))
-    booking = query_result.scalars().first()
-
-    if not booking or booking.user_id != current_user.user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient privileges to access this booking's edits")
-
-    return await get_all_booking_edits_service(booking_id, db)
-
-
-
-# ==========================================================
-# 🔹 PATCH - Update room occupancy (adults/children)
-# ==========================================================
-@router.patch("/{booking_id}/occupancy", status_code=status.HTTP_200_OK)
-async def update_occupancy(
-    booking_id: int,
-    payload: UpdateRoomOccupancyRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"]),
-):
-    updated_rooms = await update_room_occupancy_service(
-        booking_id=booking_id,
-        room_occupancy_updates=payload.model_dump(),
-        db=db,
-        current_user=current_user,
-    )
-
-    try:
-        entity_id = f"booking_room_maps:{booking_id}"
-        new_val = {
-            "booking_id": booking_id,
-            "rooms": [
-                {
-                    "room_id": room.room_id,
-                    "room_type_id": room.room_type_id,
-                    "adults": room.adults,
-                    "children": room.children,
-                }
-                for room in updated_rooms
-            ],
-        }
-        await log_audit(
-            entity="booking_occupancy",
-            entity_id=entity_id,
-            action="UPDATE",
-            new_value=new_val,
-            changed_by_user_id=current_user.user_id,
-            user_id=current_user.user_id,
-        )
-    except Exception:
-        pass
-
-    return {
-        "booking_id": booking_id,
-        "rooms": [
-            {
-                "room_id": room.room_id,
-                "room_type_id": room.room_type_id,
-                "adults": room.adults,
-                "children": room.children,
-                "is_room_active": room.is_room_active,
-            }
-            for room in updated_rooms
-        ],
-    }

@@ -28,7 +28,6 @@ async def cancel_booking_and_create_refund(db: AsyncSession, booking_id: int, cu
     - Marks booking as CANCELLED
     - Calculates per-room refund amounts based on number of nights and room pricing
     
-    **Note:** Partial cancellations are handled via the Booking Edit flow, not here.
     This function only supports complete booking cancellations and does NOT require a payload.
     
     Args:
