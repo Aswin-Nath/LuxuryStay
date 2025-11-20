@@ -1,12 +1,14 @@
-import { Component, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
+import { Component, ElementRef, ViewChild, AfterViewInit, Inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
-import { CommonModule } from '@angular/common';
+import { Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { CommonModule, DOCUMENT } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
+import { AuthenticationService, TokenResponse } from '../../core/services/authentication/authentication.service';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [FormsModule, RouterLink,CommonModule],
+  imports: [FormsModule, RouterLink,CommonModule,RouterLinkActive],
   templateUrl: './login.html',
   styleUrls: ['./login.css'] // optional if you want extra styles
 })
@@ -15,7 +17,6 @@ export class Login implements AfterViewInit {
   togglePassword() {
     this.showPassword = !this.showPassword;
   }
-  enablePassword = false;
   userInput: string = '';
   password: string = '';
   showPassword = false;
@@ -29,22 +30,18 @@ export class Login implements AfterViewInit {
   private emailRegex = /^[^\s@]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   private phoneRegex = /^\+?\d{10,15}$/;
 
-  // Hardcoded credentials (same as your JS)
-  private readonly STORED_CUSTOMER_EMAIL = 'aswinnathte125@gmail.com';
-  private readonly STORED_ADMIN_EMAIL = 'admin@gmail.com';
-  private readonly STORED_PHONE = '8610476491';
-  private readonly STORED_PASSWORD = 'Aswinnath@123';
+  constructor(
+    private authService: AuthenticationService,
+    private router: Router,
+    @Inject(DOCUMENT) private document: Document
+  ) {}
 
   ngAfterViewInit() {
     // Initialize toast hidden
     this.hideToast();
   }
 
-  togglePasswordVisibility() {
-    this.showPassword = !this.showPassword;
-  }
-
-  validateUser() {
+  validateIdentifierFormatOnInput() {
     const value = this.userInput.trim();
 
     if (!value) {
@@ -55,21 +52,9 @@ export class Login implements AfterViewInit {
 
     const isValidEmail = this.emailRegex.test(value);
     const isValidPhone = this.phoneRegex.test(value.replace(/\s/g, ''));
-    const isKnownUser =
-      value === this.STORED_CUSTOMER_EMAIL ||
-      value === this.STORED_ADMIN_EMAIL ||
-      value === this.STORED_PHONE ||
-      value === `+91${this.STORED_PHONE}` ||
-      value === this.STORED_PHONE.replace(/^0+/, '');
 
     if (!isValidEmail && !isValidPhone) {
       this.userError = 'Please enter a valid email or phone number.';
-      this.passwordDisabled = true;
-      return false;
-    }
-
-    if (!isKnownUser) {
-      this.userError = 'User not found. Please check your credentials.';
       this.passwordDisabled = true;
       return false;
     }
@@ -89,44 +74,13 @@ export class Login implements AfterViewInit {
   }
 
   onSubmit() {
-    const userValid = this.validateUser();
-    const passValid = this.validatePassword();
+    if (!this.validateIdentifierFormatOnInput()) return;
+    if (!this.validatePassword()) return;
 
-    if (!userValid || !passValid) return;
+    const payload = this.getLoginPayload();
+    if (!payload) return;
 
-    const input = this.userInput.trim();
-    const pwd = this.password;
-
-    // Customer Login
-    if (
-      (input === this.STORED_CUSTOMER_EMAIL ||
-       input === this.STORED_PHONE ||
-       input === `+91${this.STORED_PHONE}`) &&
-      pwd === this.STORED_PASSWORD
-    ) {
-      localStorage.setItem('is_customer_logged_in', 'true');
-      localStorage.setItem('is_admin_logged_in', 'false');
-      this.showToast('Customer login successful!', 'success');
-      setTimeout(() => {
-        window.location.href = '/Features/LandingPages/Customer/index.html';
-      }, 800);
-      return;
-    }
-
-    // Admin Login
-    if (input === this.STORED_ADMIN_EMAIL && pwd === this.STORED_PASSWORD) {
-      localStorage.setItem('is_admin_logged_in', 'true');
-      localStorage.setItem('is_customer_logged_in', 'false');
-      this.showToast('Welcome Admin!', 'success');
-      setTimeout(() => {
-        window.location.href = '/Features/Dashboard/Admin/index.html';
-      }, 800);
-      return;
-    }
-
-    // Invalid credentials
-    this.passwordError = 'Invalid credentials. Please try again.';
-    this.showToast('Login failed. Wrong email/phone or password.', 'error');
+    this.sendLoginRequest(payload);
   }
 
   onReset() {
@@ -158,13 +112,51 @@ export class Login implements AfterViewInit {
       toastEl.classList.add('bg-blue-500', 'text-white');
       iconEl.textContent = 'info';
     }
-
     toastEl.classList.remove('translate-x-full', 'opacity-0');
-
     setTimeout(() => this.hideToast(), 3000);
   }
 
   private hideToast() {
     this.toast.nativeElement.classList.add('translate-x-full', 'opacity-0');
   }
+
+
+
+  private sendLoginRequest(payload: LoginRequest) {
+    this.authService.login(payload.identifier, payload.password).subscribe({
+      next: (res) => this.handleLoginSuccess(res),
+      error: (err: HttpErrorResponse) => this.handleLoginError(err),
+    });
+  }
+
+  private getLoginPayload(): LoginRequest | null {
+    if (!this.userInput.trim() || !this.password) return null;
+    return {
+      identifier: this.userInput.trim(),
+      password: this.password
+    };
+  }
+
+private handleLoginSuccess(response: TokenResponse) {
+  // Store access token in localStorage
+  localStorage.setItem('access_token', response.access_token);
+  // Store role in localStorage (optional)
+  localStorage.setItem('auth_role_id', String(response.role_id));
+  this.passwordError = '';
+  this.showToast('Login successful!', 'success');
+  setTimeout(() => this.router.navigate(['/home_page']), 800);
+}
+
+
+  private handleLoginError(err: HttpErrorResponse) {
+    const message = err.error?.detail?.error ?? err.error?.message ?? 'Invalid credentials. Please try again.';
+    this.passwordError = message;
+    this.showToast('Login failed. Wrong email/phone or password.', 'error');
+  }
+
+}
+
+interface LoginRequest {
+  identifier: string;
+  password: string;
 }

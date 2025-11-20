@@ -1,14 +1,59 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr, field_validator
 from typing import Optional
 from datetime import date
 from fastapi import Form
+import re
+
+ALLOWED_GENDERS = {"male", "female", "other"}
+
+# simple length check only; complex rules handled in validators
+PHONE_REGEX = r'^\+?\d{10,15}$'
 
 
 class UserCreate(BaseModel):
-    full_name: str
-    email: str
-    password: str
-    phone_number: Optional[str] = None
+    full_name: str = Field(..., min_length=3, max_length=100)
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    phone_number: str = Field(..., pattern=PHONE_REGEX)
+    dob: date
+    gender: str
+
+    # --- DOB VALIDATION ---
+    @field_validator('dob')
+    def dob_must_be_in_past(cls, value: date) -> date:
+        if value >= date.today():
+            raise ValueError('Date of birth must be in the past.')
+        return value
+
+    # --- PASSWORD VALIDATION ---
+    @field_validator('password')
+    def password_strength(cls, value: str) -> str:
+        if len(value) < 8:
+            raise ValueError('Password must be at least 8 characters long.')
+        if not any(c.islower() for c in value):
+            raise ValueError('Password must contain at least one lowercase letter.')
+        if not any(c.isupper() for c in value):
+            raise ValueError('Password must contain at least one uppercase letter.')
+        if not any(c.isdigit() for c in value):
+            raise ValueError('Password must contain at least one digit.')
+        if not any(not c.isalnum() for c in value):
+            raise ValueError('Password must contain at least one special character.')
+        return value
+
+    # --- GENDER VALIDATION ---
+    @field_validator('gender')
+    def gender_must_be_valid(cls, value: str) -> str:
+        if not value or not value.strip():
+            raise ValueError('Gender is required.')
+        normalized = value.strip().lower()
+        if normalized not in ALLOWED_GENDERS:
+            raise ValueError('Gender must be Male, Female, or Other.')
+        return normalized.title()
+
+    model_config = {
+        "str_strip_whitespace": True,
+        "validate_assignment": True,
+    }
 
 
 class LoginRequest(BaseModel):
@@ -47,7 +92,6 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int
-    refresh_token: str
     role_id: int
-    message: str = "Token generated successfully"
+
     model_config = {"from_attributes": True}

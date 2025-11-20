@@ -23,6 +23,12 @@ async def get_user_by_id(db: AsyncSession, user_id: int) -> Optional[Users]:
     return result.scalars().first()
 
 
+async def get_user_by_phone(db: AsyncSession, phone_number: str) -> Optional[Users]:
+    """Fetch a user by phone number."""
+    result = await db.execute(select(Users).where(Users.phone_number == phone_number))
+    return result.scalars().first()
+
+
 async def create_user_record(
     db: AsyncSession,
     full_name: str,

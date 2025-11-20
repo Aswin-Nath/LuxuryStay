@@ -1,13 +1,16 @@
 from typing import Optional
+from dataclasses import dataclass
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from jose import jwt, JWTError
 
 # CRUD Imports
 from app.crud.authentication import (
     get_user_by_email,
     get_user_by_id,
-    get_session_by_access_token,
+    get_user_by_phone,
     get_session_by_user_id,
     revoke_session_record,
 )
@@ -21,6 +24,9 @@ from app.utils.authentication_util import (
     authenticate_user,
     create_session,
     refresh_access_token,
+    SECRET_KEY,
+    ALGORITHM,
+    _hash_token,
     _send_email,
     revoke_session,
 )
@@ -34,10 +40,16 @@ from app.core.exceptions import (
 # Schemas & Models
 from app.schemas.pydantic_models.users import UserCreate, TokenResponse
 from app.models.sqlalchemy_schemas.users import Users
-from app.models.sqlalchemy_schemas.authentication import VerificationType, BlacklistedTokens
+from app.models.sqlalchemy_schemas.authentication import Sessions, VerificationType, BlacklistedTokens, TokenType
 
 # Utilities for validation
 from app.utils.authentication_util import is_valid_email, is_strong_password, is_valid_indian_phone
+
+@dataclass
+class AuthResult:
+    token_response: TokenResponse
+    refresh_token: str
+    refresh_token_expires_at: datetime | None
 
 
 # ==========================================================
@@ -91,16 +103,33 @@ async def signup(db: AsyncSession, payload: UserCreate, created_by: Optional[int
     if existing_user:
         raise ConflictException("Email already registered")
 
-    user_record = await create_user(
-        db=db,
-        full_name=payload.full_name,
-        email=payload.email,
-        password=payload.password,
-        phone_number=payload.phone_number,
-        role_id=1,
-        status_id=1,
-        created_by=created_by,
-    )
+    if payload.phone_number:
+        existing_phone = await get_user_by_phone(db, payload.phone_number)
+        if existing_phone:
+            raise ConflictException("Phone number already registered")
+
+    try:
+        user_record = await create_user(
+            db=db,
+            full_name=payload.full_name,
+            email=payload.email,
+            password=payload.password,
+            phone_number=payload.phone_number,
+            dob=payload.dob,
+            gender=payload.gender,
+            
+            role_id=1,
+            status_id=1,
+            created_by=created_by,
+        )
+    except IntegrityError as exc:
+        await db.rollback()
+        constraint = getattr(getattr(exc, "orig", None), "constraint_name", None)
+        if constraint == "users_phone_number_key":
+            raise ConflictException("Phone number already registered")
+        if constraint == "users_email_key":
+            raise ConflictException("Email already registered")
+        raise ConflictException("User already exists")
     return user_record
 
 
@@ -256,7 +285,7 @@ async def login_flow(
     password: str,
     device_info: Optional[str] = None,
     client_host: Optional[str] = None,
-) -> TokenResponse:
+) -> AuthResult:
     """
     Authenticate user and create login session.
     
@@ -290,13 +319,17 @@ async def login_flow(
         else 3600
     )
 
-    return TokenResponse(
+    token_response = TokenResponse(
         access_token=session.access_token,
-        refresh_token=session.refresh_token,
         expires_in=expires_in,
         token_type="Bearer",
         role_id=user.role_id,
-        message="Login successful. Use the access_token in Authorization header as Bearer token.",
+    )
+
+    return AuthResult(
+        token_response=token_response,
+        refresh_token=session.refresh_token,
+        refresh_token_expires_at=session.refresh_token_expires_at,
     )
 
 
@@ -304,7 +337,7 @@ async def login_flow(
 # 🔹 TOKEN REFRESH
 # ==========================================================
 
-async def refresh_tokens(db: AsyncSession, current_user, access_token: str) -> TokenResponse:
+async def refresh_tokens(db: AsyncSession, refresh_token: str) -> AuthResult:
     """
     Refresh access token using OAuth2 scheme extracted tokens.
     
@@ -329,37 +362,50 @@ async def refresh_tokens(db: AsyncSession, current_user, access_token: str) -> T
         UnauthorizedException: If refresh token is blacklisted, session invalid, or token expired.
         NotFoundException: If user or session not found.
     """
+    if not refresh_token:
+        raise UnauthorizedException("Refresh token missing")
+
     try:
-        # Step 1: Get the most recent session for this user
-        session = await get_session_by_user_id(db, current_user.user_id)
-        if not session:
-            raise UnauthorizedException("Session not found")
-        
-        # Step 2: Check if session is active (not already revoked)
-        if not session.is_active:
-            raise UnauthorizedException("Session has been revoked")
-        
-        # Step 3: Check if refresh token has been blacklisted (revoked during logout/security event)
-        # This checks the session_id which covers both access and refresh tokens
-        result = await db.execute(
-            select(BlacklistedTokens).where(
-                BlacklistedTokens.session_id == session.session_id
-            )
+        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = int(payload.get("sub"))
+    except JWTError:
+        raise UnauthorizedException("Invalid refresh token")
+
+    result = await db.execute(
+        select(Sessions).where(Sessions.refresh_token == refresh_token)
+    )
+    session = result.scalars().first()
+    if not session:
+        raise UnauthorizedException("Session not found")
+
+    if not session.is_active:
+        raise UnauthorizedException("Session has been revoked")
+
+    if session.refresh_token_expires_at and datetime.utcnow() > session.refresh_token_expires_at:
+        session.is_active = False
+        session.revoked_at = datetime.utcnow()
+        db.add(session)
+        await db.commit()
+        raise UnauthorizedException("Refresh token expired")
+
+    hashed_refresh_token = _hash_token(refresh_token)
+    blacklist_result = await db.execute(
+        select(BlacklistedTokens).where(
+            BlacklistedTokens.token_value_hash == hashed_refresh_token,
+            BlacklistedTokens.token_type == TokenType.REFRESH,
         )
-        blacklisted_token = result.scalars().first()
-        
-        if blacklisted_token:
-            raise UnauthorizedException("Refresh token has been revoked (blacklisted). Please login again.")
-        
-        # Step 4: Refresh the access token (keeps same refresh_token & jti for 7 days)
+    )
+    if blacklist_result.scalars().first():
+        raise UnauthorizedException("Refresh token has been revoked")
+
+    try:
         session = await refresh_access_token(db, session.access_token)
     except UnauthorizedException:
         raise
-    except Exception as e:
-        raise UnauthorizedException(str(e))
+    except Exception as exc:
+        raise UnauthorizedException(str(exc))
 
-    # Step 5: Fetch user details for response
-    user = await get_user_by_id(db, session.user_id)
+    user = await get_user_by_id(db, user_id)
     if not user:
         raise NotFoundException("User not found")
 
@@ -369,13 +415,17 @@ async def refresh_tokens(db: AsyncSession, current_user, access_token: str) -> T
         else 3600
     )
 
-    return TokenResponse(
+    token_response = TokenResponse(
         access_token=session.access_token,
-        refresh_token=session.refresh_token,  # ← Same refresh_token (valid for 7 days)
         expires_in=expires_in,
         token_type="Bearer",
         role_id=user.role_id,
-        message="Access token refreshed successfully. Use the new access_token in Authorization header for subsequent requests.",
+    )
+
+    return AuthResult(
+        token_response=token_response,
+        refresh_token=session.refresh_token,
+        refresh_token_expires_at=session.refresh_token_expires_at,
     )
 
 
@@ -480,14 +530,30 @@ async def register_admin(
     if existing_user:
         raise ConflictException("Email already registered")
 
-    user_record = await create_user(
-        db=db,
-        full_name=payload.full_name,
-        email=payload.email,
-        password=payload.password,
-        phone_number=payload.phone_number,
-        role_id=payload.role_id,
-        status_id=1,
-        created_by=current_user_id,
-    )
+    if payload.phone_number:
+        existing_phone = await get_user_by_phone(db, payload.phone_number)
+        if existing_phone:
+            raise ConflictException("Phone number already registered")
+
+    try:
+        user_record = await create_user(
+            db=db,
+            full_name=payload.full_name,
+            email=payload.email,
+            password=payload.password,
+            phone_number=payload.phone_number,
+            dob=payload.dob,
+            gender=payload.gender,
+            role_id=payload.role_id,
+            status_id=1,
+            created_by=current_user_id,
+        )
+    except IntegrityError as exc:
+        await db.rollback()
+        constraint = getattr(getattr(exc, "orig", None), "constraint_name", None)
+        if constraint == "users_phone_number_key":
+            raise ConflictException("Phone number already registered")
+        if constraint == "users_email_key":
+            raise ConflictException("Email already registered")
+        raise ConflictException("User already exists")
     return user_record

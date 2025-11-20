@@ -1,9 +1,9 @@
 import hashlib
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from jose import jwt
 import uuid
-from app.models.sqlalchemy_schemas.users import Users
+from app.models.sqlalchemy_schemas.users import Users, GenderTypes
 from app.models.sqlalchemy_schemas.authentication import Sessions
 from app.models.sqlalchemy_schemas.authentication import Verifications, VerificationType
 from app.models.sqlalchemy_schemas.authentication import BlacklistedTokens, TokenType, RevokedType
@@ -36,6 +36,18 @@ def _hash_password(plain: str) -> str:
     salt = secrets.token_hex(16)
     dk = hashlib.pbkdf2_hmac("sha256", plain.encode(), salt.encode(), 100_000)
     return f"{salt}${dk.hex()}"
+
+
+def _normalize_gender(value: str | GenderTypes | None) -> GenderTypes:
+    if isinstance(value, GenderTypes):
+        return value
+    if not value:
+        return GenderTypes.Other
+    normalized = value.strip().lower()
+    for gender in GenderTypes:
+        if gender.name.lower() == normalized or gender.value.lower() == normalized:
+            return gender
+    raise ValueError("Unsupported gender value")
 
 
 def _verify_password(stored: str, plain: str) -> bool:
@@ -75,13 +87,27 @@ def create_refresh_token(data: dict, expires_delta: timedelta | None = None, jti
 # =====================================================
 # 👤 USER CREATION
 # =====================================================
-async def create_user(db, *, full_name: str, email: str, password: str, phone_number: str | None, role_id: int, status_id: int,created_by:int):
+async def create_user(
+    db,
+    *,
+    full_name: str,
+    email: str,
+    password: str,
+    phone_number: str | None,
+    dob: date | None,
+    gender: str | GenderTypes | None,
+    role_id: int,
+    status_id: int,
+    created_by: int | None,
+):
     hashed = _hash_password(password)
     user_record = Users(
         full_name=full_name,
         email=email,
         hashed_password=hashed,
         phone_number=phone_number,
+        dob=dob,
+        gender=_normalize_gender(gender),
         role_id=role_id,
         status_id=status_id,
         created_by=created_by
@@ -464,8 +490,6 @@ def is_valid_indian_phone(phone: str) -> Tuple[bool, Optional[str]]:
     # Handle +91 country code
     if cleaned.startswith("+91"):
         cleaned = cleaned[3:]
-    elif cleaned.startswith("91"):
-        cleaned = cleaned[2:]
     
     # Validate: must be exactly 10 digits
     if not cleaned.isdigit():

@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, status, Request, Security
+import os
+from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, status, Request, Security, Response, Cookie, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.postgres_connection import get_db
 from app.models.sqlalchemy_schemas.users import Users
@@ -16,6 +18,9 @@ from app.services.authentication_usecases import (
 from fastapi.security import OAuth2PasswordRequestForm
 from app.dependencies.authentication import get_current_user, check_permission
 auth_router = APIRouter(prefix="/auth", tags=["AUTH"])
+SECURE_REFRESH_COOKIE = os.getenv("SECURE_REFRESH_COOKIE", "true").lower() in ("1", "true", "yes")
+REFRESH_COOKIE_NAME = "refresh_token"
+REFRESH_COOKIE_PATH = "/auth/refresh"
 from pydantic import BaseModel
 from typing import Optional
 from app.core.security import oauth2_scheme
@@ -38,32 +43,76 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 
+def _set_refresh_cookie(response: Response, token: str, expires_at: Optional[datetime]):
+    """Store the refresh token securely via HttpOnly cookie."""
+    max_age = None
+    expires_value = None
+    if expires_at:
+        expires_utc = expires_at if expires_at.tzinfo is not None else expires_at.replace(tzinfo=timezone.utc)
+        expires_utc = expires_utc.astimezone(timezone.utc)
+        time_left = int((expires_utc - datetime.now(tz=timezone.utc)).total_seconds())
+        if time_left > 0:
+            max_age = time_left
+        expires_value = expires_utc
+
+    response.set_cookie(
+        key=REFRESH_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=SECURE_REFRESH_COOKIE,
+        samesite="strict",
+        path=REFRESH_COOKIE_PATH,
+        max_age=max_age,
+        expires=expires_value,
+    )
+
+
 
 # ============================================================================
-# 🔹 CREATE - Register new user account
+# 🔹 CREATE - Register new user account (Token-Based Signup)
 # ============================================================================
-@auth_router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def signup(payload: UserCreate, db: AsyncSession = Depends(get_db)):
+@auth_router.post(
+    "/signup",
+    response_model=TokenResponse,
+    status_code=status.HTTP_201_CREATED
+)
+async def signup(
+    payload: UserCreate,
+    response: Response,
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
     """
-    Register a new user account.
+    Register a new user and automatically issue access + refresh tokens.
     
-    Creates a new user in the system with provided email, password, and profile information.
-    New users start as BASIC_USER role by default. Email must be unique. Password is hashed
-    before storage using industry-standard algorithms.
-    
-    Args:
-        payload (UserCreate): User creation request containing email, password, first_name, last_name, etc.
-        db (AsyncSession): Database session dependency.
-    
-    Returns:
-        UserResponse: Newly created user record with user_id, email, profile info, and timestamps.
-    
-    Raises:
-        HTTPException (400): If email format is invalid or password doesn't meet requirements.
-        HTTPException (409): If email already exists in the system.
+    Behavior mirrors the login flow:
+    - Creates new user.
+    - Generates access + refresh tokens.
+    - Sends refresh token via HttpOnly cookie.
+    - Returns access token payload in body.
     """
+
+    # 1️⃣ Create user
     user_obj = await svc_signup(db, payload)
-    return UserResponse.model_validate(user_obj)
+
+    # 2️⃣ Generate tokens (reuse same service used by login)
+    auth_result = await svc_login_flow(
+        db=db,
+        email=user_obj.email,         # or username
+        password=payload.password,         # raw password user sent
+        device_info=request.headers.get("user-agent"),
+        client_host=request.client.host if request.client else None,
+    )
+
+    # 3️⃣ Set refresh token cookie
+    _set_refresh_cookie(
+        response,
+        auth_result.refresh_token,
+        auth_result.refresh_token_expires_at
+    )
+
+    # 4️⃣ Return the same TokenResponse used by login
+    return auth_result.token_response
 
 
 # ==================================================
@@ -128,6 +177,7 @@ async def verify_otp_endpoint(payload: OTPVerify, db: AsyncSession = Depends(get
 
 @auth_router.post("/login", response_model=TokenResponse)
 async def login(
+    response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
     request: Request = None,
     db: AsyncSession = Depends(get_db),
@@ -145,7 +195,7 @@ async def login(
         db (AsyncSession): Database session dependency.
     
     Returns:
-        TokenResponse: Contains access_token, refresh_token, token_type (bearer), and expires_in.
+        TokenResponse: Contains access_token metadata (token_type, expires_in, role_id) while the refresh token is delivered via HttpOnly cookie.
     
     Raises:
         HTTPException (401): If credentials are invalid.
@@ -155,36 +205,46 @@ async def login(
         - Creates audit log entry for login attempt.
         - Tracks device and IP for fraud detection.
     """
-    token_resp = await svc_login_flow(db, form_data.username, form_data.password, device_info=request.headers.get("user-agent"), client_host=request.client.host if request.client else None)
-    return token_resp
+    auth_result = await svc_login_flow(
+        db,
+        form_data.username,
+        form_data.password,
+        device_info=request.headers.get("user-agent"),
+        client_host=request.client.host if request.client else None,
+    )
+    _set_refresh_cookie(response, auth_result.refresh_token, auth_result.refresh_token_expires_at)
+    return auth_result.token_response
 
 
 
 @auth_router.post("/refresh", response_model=TokenResponse)
 async def refresh_tokens(
+    response: Response,
     db: AsyncSession = Depends(get_db),
-    token: str = Depends(oauth2_scheme),
-    current_user=Depends(get_current_user)
+    refresh_token: Optional[str] = Cookie(None),
 ):
     """
-    Refresh JWT tokens.
+    Refresh JWT tokens using the HttpOnly refresh cookie.
     
-    Uses OAuth2 Bearer scheme to extract tokens automatically. Does NOT accept 
-    tokens as input parameters. Validates the refresh token against the blacklist.
-    If not blacklisted, rotates the access token and returns new tokens.
+    Reads the refresh token from the secure cookie. Validates it, rotates the
+    access token, and refreshes the cookie with the same refresh token value.
     
     Args:
+        response (Response): FastAPI response to set the refresh token cookie.
         db (AsyncSession): Database session dependency.
-        token (str): Access token extracted from OAuth2 Bearer scheme.
-        current_user (Users): Current authenticated user from OAuth2 scheme.
+        refresh_token (str | None): Refresh token from HttpOnly cookie.
     
     Returns:
-        TokenResponse: New access_token, refresh_token, token_type (bearer), and expires_in.
+        TokenResponse: Updated access_token metadata (token_type, expires_in, role_id).
     
     Raises:
-        HTTPException (401): If refresh token is invalid, expired, or blacklisted.
+        HTTPException (401): If refresh token is missing, invalid, or revoked.
     """
-    return await svc_refresh_tokens(db, current_user, token)
+    if not refresh_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing refresh token")
+    auth_result = await svc_refresh_tokens(db, refresh_token)
+    _set_refresh_cookie(response, auth_result.refresh_token, auth_result.refresh_token_expires_at)
+    return auth_result.token_response
 
 
 
