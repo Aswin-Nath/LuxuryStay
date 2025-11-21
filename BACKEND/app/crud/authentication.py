@@ -101,6 +101,12 @@ async def get_session_by_access_token(db: AsyncSession, access_token: str) -> Op
     return result.scalars().first()
 
 
+async def get_session_by_jti(db: AsyncSession, jti: str) -> Optional[Sessions]:
+    """Fetch a session using the jti value (UUID stored in session.jti)."""
+    result = await db.execute(select(Sessions).where(Sessions.jti == jti))
+    return result.scalars().first()
+
+
 async def get_session_by_user_id(db: AsyncSession, user_id: int) -> Optional[Sessions]:
     """Fetch the most recent session for a user."""
     result = await db.execute(

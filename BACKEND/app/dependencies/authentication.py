@@ -65,12 +65,28 @@ async def get_current_user(
     if not user:
         raise credentials_exception
 
-    # Check if user's session is blacklisted (verify by session_id lookup)
+    # Find the session for the current access token or jti to ensure we are checking
+    # the correct session (multi-session safe).
     try:
-        from app.crud.authentication import get_session_by_user_id
-        
-        session = await get_session_by_user_id(db, user_id)
+        from app.crud.authentication import get_session_by_access_token, get_session_by_jti
+
+        # Prefer finding session by current access token, then fall back to jti
+        session = await get_session_by_access_token(db, token)
         if not session:
+            # Try to find session by jti claim if present
+            jti_claim = payload.get("jti")
+            if jti_claim:
+                session = await get_session_by_jti(db, jti_claim)
+        
+        if not session:
+            raise credentials_exception
+        # Ensure that the session corresponds to this user
+        if int(session.user_id) != user_id:
+            raise credentials_exception
+        if not session:
+            raise credentials_exception
+        # Ensure that the session corresponds to this user
+        if int(session.user_id) != user_id:
             raise credentials_exception
         
         # Check if this session is blacklisted
@@ -130,11 +146,16 @@ async def check_permission(
     if not user:
         raise credentials_exception
 
-    # --- Session blacklist check (using session_id instead of token_hash)
+    # --- Session blacklist check (resolve session using the current access token or jti)
     try:
-        from app.crud.authentication import get_session_by_user_id
-        
-        session = await get_session_by_user_id(db, user_id)
+        from app.crud.authentication import get_session_by_access_token, get_session_by_jti
+
+        session = await get_session_by_access_token(db, token)
+        if not session:
+            jti_claim = payload.get("jti")
+            if jti_claim:
+                session = await get_session_by_jti(db, jti_claim)
+
         if not session:
             raise credentials_exception
         

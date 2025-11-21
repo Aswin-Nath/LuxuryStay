@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { tap } from 'rxjs/operators';
 
 export interface TokenResponse {
   access_token: string;
@@ -52,6 +53,19 @@ export class AuthenticationService {
 
   logout() {
     // Ask server to invalidate refresh cookie (return void), include credentials for cookie
-    return this.http.post(`${this.baseUrl}/logout`, {}, { withCredentials: true });
+    return this.http.post(`${this.baseUrl}/logout`, {}, { withCredentials: true }).pipe(
+      tap(() => this.clearLocalAuthState())
+    );
+  }
+
+  clearLocalAuthState() {
+    try {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('expires_in');
+      localStorage.removeItem('auth_role_id');
+      localStorage.removeItem('permissions');
+    } catch (err) {
+      // ignore errors for read-only/private environments
+    }
   }
 }

@@ -342,15 +342,32 @@ async def revoke_session(db: AsyncSession, *, session: Sessions, reason: str | N
 
     This will create BlacklistedTokens entries for both tokens and update the session row.
     """
-    await blacklist_token(
-        db,
-        user_id=session.user_id,
-        session_id=session.session_id,
-        token_value=session.refresh_token,
-        token_type=TokenType.REFRESH,
-        reason=reason,
-        revoked_type=RevokedType.MANUAL_REVOKED,
-    )
+    # Blacklist both refresh and access tokens to ensure immediate invalidation
+    try:
+        await blacklist_token(
+            db,
+            user_id=session.user_id,
+            session_id=session.session_id,
+            token_value=session.refresh_token,
+            token_type=TokenType.REFRESH,
+            reason=reason,
+            revoked_type=RevokedType.MANUAL_REVOKED,
+        )
+    except Exception:
+        # Do not fail the revoke if blacklist storage fails; still proceed to mark session revoked
+        pass
+    try:
+        await blacklist_token(
+            db,
+            user_id=session.user_id,
+            session_id=session.session_id,
+            token_value=session.access_token,
+            token_type=TokenType.ACCESS,
+            reason=reason,
+            revoked_type=RevokedType.MANUAL_REVOKED,
+        )
+    except Exception:
+        pass
     # mark session as inactive
     session.is_active = False
     session.revoked_at = datetime.utcnow()

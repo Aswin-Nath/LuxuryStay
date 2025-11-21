@@ -250,6 +250,7 @@ async def refresh_tokens(
 
 @auth_router.post("/logout")
 async def logout(
+    response: Response,
     token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
@@ -277,7 +278,14 @@ async def logout(
         - Invalidates user session.
         - Creates audit log entry.
     """
-    return await svc_logout_flow(db, current_user.user_id)
+    result = await svc_logout_flow(db, current_user.user_id)
+    try:
+        # remove refresh cookie from client to avoid leftover cookie
+        response.delete_cookie(key=REFRESH_COOKIE_NAME, path=REFRESH_COOKIE_PATH)
+    except Exception:
+        # Not fatal; additional cleanup handled by client
+        pass
+    return result
 
 
 # ==============================================================

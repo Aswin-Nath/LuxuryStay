@@ -78,10 +78,6 @@ export class TokenInterceptor implements HttpInterceptor {
   }
 
   private logoutAndRedirect() {
-    try {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('auth_role_id');
-    } catch (e) {}
     // attempt a server-side logout to remove refresh cookie, then navigate to login
     this.authService.logout().subscribe({
       next: () => this.router.navigate(['/login']),
