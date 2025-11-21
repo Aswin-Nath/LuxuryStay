@@ -29,8 +29,29 @@ export class AuthenticationService {
     });
 
     return this.http.post<TokenResponse>(`${this.baseUrl}/login`, body.toString(), {
-      headers
-    //   withCredentials: true,
+      headers,
+      withCredentials: true,
     });
+  }
+
+  requestOtp(email: string, verificationType: string = 'PASSWORD_RESET') {
+    const payload = { email, verification_type: verificationType };
+    return this.http.post<any>(`${this.baseUrl}/otp/request`, payload, {});
+  }
+
+  verifyOtp(email: string, otp: string, verificationType: string = 'PASSWORD_RESET', newPassword?: string) {
+    const payload: any = { email, otp, verification_type: verificationType };
+    if (newPassword) payload.new_password = newPassword;
+    return this.http.post<any>(`${this.baseUrl}/otp/verify`, payload);
+  }
+
+  refreshToken() {
+    // NOTE: refresh token is stored in HttpOnly cookie by server, send credentials so cookie is included
+    return this.http.post<TokenResponse>(`${this.baseUrl}/refresh`, {}, { withCredentials: true });
+  }
+
+  logout() {
+    // Ask server to invalidate refresh cookie (return void), include credentials for cookie
+    return this.http.post(`${this.baseUrl}/logout`, {}, { withCredentials: true });
   }
 }

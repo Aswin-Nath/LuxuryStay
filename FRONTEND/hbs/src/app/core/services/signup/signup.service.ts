@@ -11,6 +11,6 @@ export class SignupService {
   constructor(private http: HttpClient) {}
 
   signup(payload: any): Observable<any> {
-    return this.http.post(`${this.baseUrl}/signup`, payload);
+    return this.http.post(`${this.baseUrl}/signup`, payload, { withCredentials: true });
   }
 }

@@ -7,7 +7,7 @@ from app.models.sqlalchemy_schemas.users import Users, GenderTypes
 from app.models.sqlalchemy_schemas.authentication import Sessions
 from app.models.sqlalchemy_schemas.authentication import Verifications, VerificationType
 from app.models.sqlalchemy_schemas.authentication import BlacklistedTokens, TokenType, RevokedType
-from sqlalchemy import select, update
+from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 import smtplib
 from email.message import EmailMessage
@@ -178,6 +178,15 @@ async def create_verification(db: AsyncSession, user_id: int, verification_type:
     """
     otp = _generate_otp(6)
     expires = datetime.utcnow() + timedelta(minutes=expires_minutes)
+    # Delete any previous verification entries for this user and verification type to ensure only latest OTP is valid
+    await db.execute(
+        delete(Verifications).where(
+            Verifications.user_id == user_id,
+            Verifications.verification_type == verification_type,
+        )
+    )
+    await db.commit()
+
     v = Verifications(
         user_id=user_id,
         verification_type=verification_type,
@@ -219,7 +228,7 @@ async def verify_otp(db: AsyncSession, user_id: int, otp: str, verification_type
             .values(attempt_count=Verifications.attempt_count + 1)
         )
         await db.commit()
-        return False, "Invalid OTP"
+        return False, "OTP not matching with the latest OTP"
 
     # success: mark verified
     await db.execute(

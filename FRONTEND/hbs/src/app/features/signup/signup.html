@@ -7,8 +7,17 @@
   </a>
 </header>
 
+<!-- FULLSCREEN LOADER -->
+<div *ngIf="loading"
+  class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-99999 animate-fadeIn">
+  <div class="bg-white px-7 py-6 rounded-2xl shadow-2xl flex flex-col items-center">
+    <div class="loader mb-3"></div>
+    <p class="text-gray-700 font-semibold text-sm tracking-wide">Creating your account…</p>
+  </div>
+</div>
+
 <!-- MAIN -->
-<div class="flex min-h-[calc(100vh-72px)]">
+<div class="flex min-h-[calc(100vh-72px)] animate-fadeStart">
 
 <!-- LEFT IMAGE -->
 <div 
@@ -36,10 +45,10 @@
 
   <!-- RIGHT FORM -->
   <div class="flex justify-center items-center w-full lg:w-1/2 p-1">
-    <div class="relative w-full max-w-xl bg-white rounded-3xl overflow-hidden border-4 border-amber-400 shadow-xl">
+    <div class="relative w-full max-w-xl bg-white rounded-3xl overflow-hidden border-4 border-amber-400 shadow-xl hover:shadow-amber-300/30 hover:shadow-2xl transition-all duration-500 animate-cardFloat">
 
       <!-- Back Icon -->
-      <a routerLink="/" class="absolute top-3 left-3 text-gray-700 hover:text-gray-900">
+      <a routerLink="/" class="absolute top-3 left-3 text-gray-700 hover:text-gray-900 transition-all active:scale-95">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
              viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
@@ -55,7 +64,7 @@
       <!-- FORM -->
       <form (ngSubmit)="onSubmit()" (reset)="onReset()" class="px-6 py-4 space-y-4" novalidate>
 
-        <div>
+        <div class="animate-slideUpSmall">
           <label class="block text-sm font-medium text-gray-700">
             Name <span class="text-red-500">*</span>
             <span class="text-xs text-gray-500">(required for identification)</span>
@@ -76,7 +85,7 @@
           </div>
         </div>
 
-        <div>
+        <div class="animate-slideUpSmall delay-100">
           <label class="block text-sm font-medium text-gray-700">
             Gender <span class="text-red-500">*</span>
             <span class="text-xs text-gray-500">(required for identification)</span>
@@ -100,7 +109,7 @@
           </div>
         </div>
 
-        <div>
+        <div class="animate-slideUpSmall delay-150">
           <label class="block text-sm font-medium text-gray-700">
             Date of Birth <span class="text-red-500">*</span>
             <span class="text-xs text-gray-500">(for age verification)</span>
@@ -121,7 +130,7 @@
           </div>
         </div>
 
-        <div>
+        <div class="animate-slideUpSmall delay-200">
           <label class="block text-sm font-medium text-gray-700">
             Email <span class="text-red-500">*</span>
             <span class="text-xs text-gray-500">(for booking confirmations)</span>
@@ -143,7 +152,7 @@
           </div>
         </div>
 
-        <div>
+        <div class="animate-slideUpSmall delay-250">
           <label class="block text-sm font-medium text-gray-700">
             Phone Number <span class="text-red-500">*</span>
             <span class="text-xs text-gray-500">(for important updates)</span>
@@ -165,7 +174,7 @@
           </div>
         </div>
 
-          <div>
+          <div class="animate-slideUpSmall delay-300">
             <label class="block text-sm font-medium text-gray-700">
               Password <span class="text-red-500">*</span>
               <span class="text-xs text-gray-500">(to secure your account)</span>
@@ -230,7 +239,7 @@
             </div>
           </div>
 
-        <div class="flex gap-3">
+        <div class="flex gap-3 pt-2 animate-slideUpSmall delay-400">
           <button type="reset"
             class="flex-1 bg-gray-600 text-white py-2 rounded-lg hover:bg-gray-700">
             Reset
@@ -244,9 +253,9 @@
         </div>
 
         <!-- Login Link -->
-        <p class="text-center text-sm text-gray-600">
+        <p class="text-center text-sm text-gray-600 pt-2 animate-slideUpSmall delay-500">
           Already have an account?
-          <a type="button" routerLink="/login" routerLinkActive="text-amber-700 font-semibold"
+          <a type="button" routerLink="/login" routerLinkActive
              class="text-amber-600 font-semibold hover:underline">Login</a>
         </p>
 

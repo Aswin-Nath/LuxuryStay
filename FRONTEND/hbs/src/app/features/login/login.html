@@ -18,14 +18,22 @@
   </a>
 </header>
 
-<div class="flex min-h-[calc(100vh-64px)]">
+<!-- FULLSCREEN LOADER -->
+<div *ngIf="loading" class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-99999 animate-fadeIn">
+  <div class="bg-white px-7 py-6 rounded-2xl shadow-2xl flex flex-col items-center">
+    <div class="loader mb-3"></div>
+    <p class="text-gray-700 font-semibold text-sm tracking-wide">Signing you in…</p>
+  </div>
+</div>
+
+<div class="flex min-h-[calc(100vh-64px)] animate-fadeStart">
   <!-- Left Image -->
   <div class="hidden md:flex w-1/2 bg-cover bg-center relative"
        style="background-image: url('/assets/images/hotel_luxury.jpg');">
     <div class="absolute inset-0 bg-linear-to-t from-black/80 via-black/40 to-transparent"></div>
     <div class="relative z-10 flex flex-col justify-center items-center text-center px-8 text-white">
-      <h2 class="text-4xl font-extrabold mb-4">Experience Luxury</h2>
-      <p class="text-lg text-gray-200 leading-relaxed">
+      <h2 class="text-4xl font-extrabold mb-4 animate-slideUp">Experience Luxury</h2>
+      <p class="text-lg text-gray-200 leading-relaxed animate-slideUpDelay">
         Discover elegance, comfort, and premium hospitality at LuxuryStay.<br>
         Enjoy exclusive offers, world-class amenities, and an unforgettable stay.
       </p>
@@ -36,18 +44,18 @@
 
   <!-- Right Form -->
   <div class="flex justify-center items-center w-full md:w-1/2 p-6">
-    <div class="relative w-full max-w-xl bg-white rounded-2xl overflow-hidden border-4 border-amber-400">
+    <div class="relative w-full max-w-xl bg-white rounded-2xl overflow-hidden border-4 border-amber-400 shadow-xl hover:shadow-amber-300/30 hover:shadow-2xl transition-all duration-500 animate-cardFloat">
 
       <!-- Back Arrow -->
       <a routerLink="/Features/LandingPages/Customer/index.html"
-        class="absolute top-3 left-3 text-gray-700 hover:text-gray-900 transition cursor-pointer hover:-translate-y-0.5">
+        class="absolute top-3 left-3 text-gray-700 hover:text-gray-900 transition cursor-pointer hover:-translate-y-0.5 animate-cardFloat active:scale-95">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
         </svg>
       </a>
 
       <!-- Top Banner -->
-      <div class="bg-linear-to-r from-amber-600 to-yellow-500 text-white text-center py-6">
+      <div class="bg-linear-to-r from-amber-600 to-yellow-500 text-white text-center py-6 animate-slideUpSmall">
         <h2 class="text-2xl font-bold">Welcome Back</h2>
         <p class="text-sm opacity-90">Log in to continue your LuxuryStay journey</p>
       </div>
@@ -56,7 +64,7 @@
       <form (ngSubmit)="onSubmit()" (reset)="onReset()" class="px-8 py-6 space-y-5" novalidate>
 
         <!-- Email or Mobile -->
-        <div>
+        <div class="animate-slideUpSmall">
           <label class="block text-sm font-medium text-gray-700">
             Email or Mobile <span class="text-red-500">*</span>
           </label>
@@ -73,7 +81,7 @@
         </div>
 
                 <!-- Password -->
-<div>
+<div class="animate-slideUpSmall delay-150">
   <label class="block text-sm font-medium text-gray-700">
     Password <span class="text-red-500">*</span>
   </label>
@@ -136,14 +144,17 @@
       </svg>
     </button>
   </div>
-</div>
 
         <!-- Buttons -->
-        <div class="flex gap-3">
-          <button type="reset"
-                  class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2.5 rounded-lg shadow-md transition">
-            Reset
-          </button>
+</div>
+
+        <!-- Forgot password link right below password field -->
+        <div class="mt-2 text-right animate-slideUpSmall delay-250">
+          <a routerLink="/forgot-password" class="text-amber-600 text-sm hover:underline">Forgot password?</a>
+        </div>
+
+        <!-- Buttons -->
+        <div class="flex gap-3 animate-slideUpSmall delay-300">
           <button type="submit"
                   class="flex-1 bg-linear-to-r from-amber-600 to-yellow-500 text-white py-2.5 rounded-lg
                          hover:from-amber-700 hover:to-yellow-600 shadow-md transition">
@@ -151,7 +162,9 @@
           </button>
         </div>
 
-        <p class="text-sm text-center text-gray-600">
+        
+
+        <p class="text-sm text-center text-gray-600 animate-slideUpSmall delay-350">
           Don't have an account?
           <a type="button" routerLink="/signup" routerLinkActive="text-amber-700 font-semibold"
              class="text-amber-600 font-medium hover:underline">Sign up</a>

@@ -98,7 +98,7 @@ async def signup(
     # 2️⃣ Generate tokens (reuse same service used by login)
     auth_result = await svc_login_flow(
         db=db,
-        email=user_obj.email,         # or username
+        identifier=user_obj.email,         # or username
         password=payload.password,         # raw password user sent
         device_info=request.headers.get("user-agent"),
         client_host=request.client.host if request.client else None,

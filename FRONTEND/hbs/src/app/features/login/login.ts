@@ -1,19 +1,20 @@
 import { Component, ElementRef, ViewChild, AfterViewInit, Inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
-import { CommonModule, DOCUMENT } from '@angular/common';
+import { CommonModule, DOCUMENT, NgIf } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { AuthenticationService, TokenResponse } from '../../core/services/authentication/authentication.service';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [FormsModule, RouterLink,CommonModule,RouterLinkActive],
+  imports: [FormsModule, RouterLink, CommonModule, RouterLinkActive, NgIf],
   templateUrl: './login.html',
   styleUrls: ['./login.css'] // optional if you want extra styles
 })
 export class Login implements AfterViewInit {
   @ViewChild('toast') toast!: ElementRef<HTMLDivElement>;
+  loading = false; // full screen loader toggle
   togglePassword() {
     this.showPassword = !this.showPassword;
   }
@@ -87,6 +88,8 @@ export class Login implements AfterViewInit {
     const payload = this.getLoginPayload();
     if (!payload) return;
 
+    // start loading UX
+    this.loading = true;
     this.sendLoginRequest(payload);
   }
 
@@ -162,7 +165,10 @@ export class Login implements AfterViewInit {
   private sendLoginRequest(payload: LoginRequest) {
     this.authService.login(payload.identifier, payload.password).subscribe({
       next: (res) => this.handleLoginSuccess(res),
-      error: (err: HttpErrorResponse) => this.handleLoginError(err),
+      error: (err: HttpErrorResponse) => {
+        this.loading = false;
+        this.handleLoginError(err);
+      },
     });
   }
 
@@ -181,7 +187,12 @@ export class Login implements AfterViewInit {
   localStorage.setItem('auth_role_id', String(response.role_id));
   this.passwordError = '';
   this.showToast('Login successful!', 'success', 'top-right');
-  setTimeout(() => this.router.navigate(['/home_page']), 800);
+  // fade out page for a smoother redirect
+  setTimeout(() => document.body.classList.add('fade-page'), 300);
+  setTimeout(() => {
+    this.loading = false;
+    this.router.navigate(['/home_page']);
+  }, 900);
 }
 
 

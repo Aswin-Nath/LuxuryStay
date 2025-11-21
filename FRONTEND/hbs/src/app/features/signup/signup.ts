@@ -13,6 +13,7 @@ import { SignupService } from "../../core/services/signup/signup.service"
 })
 export class Signup implements AfterViewInit {
   @ViewChild('toast') toast!: ElementRef<HTMLDivElement>;
+  loading = false; // fullscreen loader toggle
   name = '';
   gender = '';
   dob = '';
@@ -85,7 +86,10 @@ export class Signup implements AfterViewInit {
 
     const payload = this.getSignupPayload();
     if (!payload) return;
-    console.log(payload,"this is payload")
+    console.log(payload, "this is payload");
+
+    // Enable the full screen loading UX
+    this.loading = true;
     this.sendSignupRequest(payload);
   }
 
@@ -283,11 +287,25 @@ export class Signup implements AfterViewInit {
     this.signupService.signup(payload).subscribe({
       next: (res) => {
         console.log('Signup success:', res);
+        if (res?.access_token) {
+          localStorage.setItem('access_token', res.access_token);
+        }
+        if (res?.role_id !== undefined) {
+          localStorage.setItem('auth_role_id', String(res.role_id));
+        }
+        // show success toast
         this.showToast('Signup successful!', 'success', 'top-right');
-        setTimeout(() => this.router.navigate(['/home_page']), 800);
+
+        // Fade-out page then redirect
+        setTimeout(() => document.body.classList.add('fade-page'), 300);
+        setTimeout(() => {
+          this.loading = false;
+          this.router.navigate(['/home_page']);
+        }, 900);
       },
       error: (err: HttpErrorResponse) => {
         console.error('Signup failed:', err);
+        this.loading = false;
         this.handleSignupError(err);
       }
     });
