@@ -68,6 +68,7 @@
               (ngModelChange)="onPersonalInfoChange()"
               placeholder="Enter your name"
               class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-amber-500 focus:border-amber-500"
+              [ngClass]="{ 'border-red-500 ring-1 ring-red-400': nameError }"
             />
             <span *ngIf="nameError" class="absolute right-2 top-2 text-[10px] text-red-500 bg-white px-1 rounded">
               {{ nameError }}
@@ -86,6 +87,7 @@
               [(ngModel)]="gender"
               (ngModelChange)="onPersonalInfoChange()"
               class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-amber-500 focus:border-amber-500"
+              [ngClass]="{ 'border-red-500 ring-1 ring-red-400': genderError }"
             >
               <option value="">Choose your gender</option>
               <option>Male</option>
@@ -111,6 +113,7 @@
               (ngModelChange)="onPersonalInfoChange()"
               [max]="maxDob"
               class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-amber-500 focus:border-amber-500"
+              [ngClass]="{ 'border-red-500 ring-1 ring-red-400': dobError }"
             >
             <span *ngIf="dobError" class="absolute right-2 top-2 text-[10px] text-red-500 bg-white px-1 rounded">
               {{ dobError }}
@@ -132,7 +135,7 @@
               [disabled]="!emailPhoneEnabled"
               placeholder="Enter your email"
               class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-amber-500 focus:border-amber-500 transition"
-              [ngClass]="{ 'bg-gray-100 cursor-not-allowed': !emailPhoneEnabled }"
+                [ngClass]="{ 'bg-gray-100 cursor-not-allowed': !emailPhoneEnabled, 'border-red-500 ring-1 ring-red-400': emailError }"
             />
             <span *ngIf="emailError" class="absolute right-2 top-2 text-[10px] text-red-500 bg-white px-1 rounded">
               {{ emailError }}
@@ -154,7 +157,7 @@
               [disabled]="!emailPhoneEnabled"
               placeholder="10-digit number"
               class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-amber-500 focus:border-amber-500 transition"
-              [ngClass]="{ 'bg-gray-100 cursor-not-allowed': !emailPhoneEnabled }"
+                [ngClass]="{ 'bg-gray-100 cursor-not-allowed': !emailPhoneEnabled, 'border-red-500 ring-1 ring-red-400': phoneError }"
             />
             <span *ngIf="phoneError" class="absolute right-2 top-2 text-[10px] text-red-500 bg-white px-1 rounded">
               {{ phoneError }}
@@ -172,11 +175,12 @@
               <input
                 [type]="showPassword ? 'text' : 'password'"
                 [(ngModel)]="password"
+                (ngModelChange)="validatePassword()"
                 name="signupPassword"
                 [disabled]="!passwordEnabled"
                 placeholder="••••••••"
                 class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition"
-                [ngClass]="{ 'bg-gray-100 cursor-not-allowed': !passwordEnabled }"
+                [ngClass]="{ 'bg-gray-100 cursor-not-allowed': !passwordEnabled, 'border-red-500 ring-1 ring-red-400': passwordError }"
               />
               <span *ngIf="passwordError" class="absolute right-2 top-2 text-[10px] text-red-500 bg-white px-1 rounded">
                 {{ passwordError }}
@@ -228,12 +232,13 @@
 
         <div class="flex gap-3">
           <button type="reset"
-                  class="flex-1 bg-gray-600 text-white py-2 rounded-lg hover:bg-gray-700">
+            class="flex-1 bg-gray-600 text-white py-2 rounded-lg hover:bg-gray-700">
             Reset
           </button>
+          <!-- Make Create Account clickable always. If the data is invalid, onSubmit validates and highlights invalid fields. -->
           <button type="submit"
-                  class="flex-1 bg-linear-to-r from-amber-600 to-yellow-500 text-white py-2 rounded-lg hover:from-amber-700 hover:to-yellow-600"
-                  [disabled]="!passwordEnabled">
+            class="flex-1 bg-linear-to-r from-amber-600 to-yellow-500 text-white py-2 rounded-lg hover:from-amber-700 hover:to-yellow-600 transition"
+            [class.opacity-60]="!passwordEnabled">
             Create Account
           </button>
         </div>
@@ -251,3 +256,11 @@
   </div>
 
 </div>
+
+    <!-- Toast Notification -->
+    <div #toast class="fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg transform translate-x-full opacity-0 transition-all duration-300 z-50">
+      <div class="flex items-center gap-2 text-white">
+        <span id="toastIcon" class="material-icons text-sm">check_circle</span>
+        <span id="toastMessage">Action completed!</span>
+      </div>
+    </div>

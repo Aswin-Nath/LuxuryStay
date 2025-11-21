@@ -1,5 +1,5 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, ElementRef, ViewChild, AfterViewInit, Inject } from '@angular/core';
+import { CommonModule, DOCUMENT } from '@angular/common';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -11,7 +11,8 @@ import { SignupService } from "../../core/services/signup/signup.service"
   imports: [CommonModule, RouterLink, RouterLinkActive, FormsModule],
   standalone: true
 })
-export class Signup {
+export class Signup implements AfterViewInit {
+  @ViewChild('toast') toast!: ElementRef<HTMLDivElement>;
   name = '';
   gender = '';
   dob = '';
@@ -56,7 +57,7 @@ export class Signup {
     if (!ready) {
       this.email = '';
       this.phone = '';
-      this.password = '';
+      // do not clear the password on minor input changes or validation errors
       this.passwordEnabled = false;
       this.emailError = '';
       this.phoneError = '';
@@ -75,7 +76,12 @@ export class Signup {
     const personalValid = this.validatePersonalInfo();
     const contactValid = this.validateContactInfo();
     const passwordValid = this.validatePassword();
-    if (!personalValid || !contactValid || !passwordValid) return;
+    if (!personalValid || !contactValid || !passwordValid) {
+      // show center red message on any validation failure (better for mobile spacing)
+      this.showToast('This is required field', 'error', 'center');
+      this.focusFirstInvalid();
+      return;
+    }
 
     const payload = this.getSignupPayload();
     if (!payload) return;
@@ -98,23 +104,20 @@ export class Signup {
     this.emailError = '';
     this.phoneError = '';
     this.passwordError = '';
+    this.showToast('Form has been reset', 'info', 'top-right');
   }
 
   private updateEmailFormatError() {
     const value = this.email.trim();
-    if (!value) {
-      this.emailError = '';
-      return;
-    }
+    // If no value, do not clear existing errors (eg. 'Email is required.') so highlight remains.
+    if (!value) return;
     this.emailError = this.emailRegex.test(value) ? '' : 'Invalid email format.';
   }
 
   private updatePhoneFormatError() {
     const value = this.phone.trim();
-    if (!value) {
-      this.phoneError = '';
-      return;
-    }
+    // If no value, do not clear existing errors (eg. 'Phone number is required.') so highlight remains.
+    if (!value) return;
     this.phoneError = this.phoneRegex.test(value) ? '' : 'Invalid phone number.';
   }
 
@@ -159,7 +162,7 @@ export class Signup {
     return valid;
   }
 
-  private validatePassword() {
+  public validatePassword() {
     if (!this.password) {
       this.passwordError = 'Password is required.';
       return false;
@@ -181,7 +184,7 @@ export class Signup {
       !this.phoneError;
     this.passwordEnabled = ready;
     if (!ready) {
-      this.password = '';
+      // keep the password value so users don't lose what they typed accidentally
       this.passwordError = '';
     }
   }
@@ -198,12 +201,89 @@ export class Signup {
       password: this.password
     };
   }
-  constructor(private signupService: SignupService, private router: Router) {}
+  constructor(private signupService: SignupService, private router: Router, @Inject(DOCUMENT) private document: Document) {}
+
+  ngAfterViewInit() {
+    this.hideToast();
+  }
+
+  private showToast(message: string, type: 'success' | 'error' | 'info', position: 'top-right' | 'top-left' | 'center' = 'center') {
+    const toastEl = this.toast.nativeElement;
+    const msgEl = toastEl.querySelector('#toastMessage') as HTMLElement;
+    const iconEl = toastEl.querySelector('#toastIcon') as HTMLElement;
+
+    msgEl.textContent = message;
+    // Reset position and set left/right/center depending on param
+    let baseClass = `fixed top-4 px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300 z-50 flex items-center gap-2 pointer-events-none`;
+    if (position === 'top-left') {
+      toastEl.style.left = '';
+      toastEl.style.right = '';
+      toastEl.style.transform = '';
+      toastEl.className = `${baseClass} left-4`;
+    } else if (position === 'top-right') {
+      toastEl.style.left = '';
+      toastEl.style.right = '';
+      toastEl.style.transform = '';
+      toastEl.className = `${baseClass} right-4`;
+    } else {
+      // center
+      toastEl.style.left = '50%';
+      toastEl.style.right = '';
+      // ensure transform includes translateX(-50%) for centering
+      toastEl.style.transform = 'translateX(-50%)';
+      toastEl.className = `${baseClass}`;
+    }
+    // Keep track of position for hide animation
+    toastEl.setAttribute('data-position', position);
+    // Keep track of position for hide animation
+    toastEl.setAttribute('data-position', position);
+
+    if (type === 'success') {
+      toastEl.classList.add('bg-green-500', 'text-white');
+      iconEl.textContent = 'check_circle';
+    } else if (type === 'error') {
+      toastEl.classList.add('bg-red-500', 'text-white');
+      iconEl.textContent = 'error';
+    } else {
+      toastEl.classList.add('bg-blue-500', 'text-white');
+      iconEl.textContent = 'info';
+    }
+    toastEl.classList.remove('translate-x-full', 'opacity-0');
+    setTimeout(() => this.hideToast(), 3000);
+  }
+
+  private hideToast() {
+    const toastEl = this.toast.nativeElement;
+    const pos = toastEl.getAttribute('data-position') as 'top-left' | 'top-right' | 'center' | null;
+    if (pos === 'top-left') {
+      toastEl.classList.add('translate-x-neg-full', 'opacity-0');
+    } else if (pos === 'top-right') {
+      toastEl.classList.add('translate-x-full', 'opacity-0');
+    } else {
+      // center - fade out with opacity to not disrupt layout on mobile
+      toastEl.classList.add('opacity-0');
+    }
+  }
+
+  private focusFirstInvalid() {
+    try {
+      const el = this.document.querySelector('.border-red-500') as HTMLElement | null;
+      if (el) {
+        if (typeof (el as any).focus === 'function') {
+          (el as any).focus();
+        }
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    } catch (e) {
+      // no-op
+    }
+  }
 
   private sendSignupRequest(payload: SignupRequest) {
     this.signupService.signup(payload).subscribe({
       next: (res) => {
         console.log('Signup success:', res);
+        this.showToast('Signup successful!', 'success', 'top-right');
         setTimeout(() => this.router.navigate(['/home_page']), 800);
       },
       error: (err: HttpErrorResponse) => {

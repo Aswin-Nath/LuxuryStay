@@ -121,11 +121,18 @@ async def create_user(
 # =====================================================
 # 🧾 AUTHENTICATION (LOGIN)
 # =====================================================
-async def authenticate_user(db, *, email: str, password: str):
+async def authenticate_user(db, *, identifier: str, password: str):
     from sqlalchemy import select
-    query_result = await db.execute(select(Users).where(Users.email == email))
-    user = query_result.scalars().first()
-    if not user:
+    user = None
+    if "@" in identifier:
+        result = await db.execute(select(Users).where(Users.email == identifier))
+    else:
+        result = await db.execute(select(Users).where(Users.phone_number==identifier))
+    user = result.scalars().first()
+    if user!=None:
+        print(user)
+        print(_verify_password(user.hashed_password, password))
+    if user==None:
         return None
     if not _verify_password(user.hashed_password, password):
         return None

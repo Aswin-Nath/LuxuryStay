@@ -281,7 +281,7 @@ async def change_password(
 
 async def login_flow(
     db: AsyncSession,
-    email: str,
+    identifier: str,
     password: str,
     device_info: Optional[str] = None,
     client_host: Optional[str] = None,
@@ -305,7 +305,7 @@ async def login_flow(
     Raises:
         UnauthorizedException: If email/password combination is invalid.
     """
-    user = await authenticate_user(db, email=email, password=password)
+    user = await authenticate_user(db, identifier=identifier, password=password)
     if not user:
         raise UnauthorizedException("Invalid credentials")
 

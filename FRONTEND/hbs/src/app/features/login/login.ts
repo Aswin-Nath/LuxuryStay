@@ -74,8 +74,15 @@ export class Login implements AfterViewInit {
   }
 
   onSubmit() {
-    if (!this.validateIdentifierFormatOnInput()) return;
-    if (!this.validatePassword()) return;
+    if (!this.validateIdentifierFormatOnInput()) {
+      // Show a center red message when required fields are missing
+      this.showToast('This is required field', 'error', 'center');
+      return;
+    }
+    if (!this.validatePassword()) {
+      this.showToast('This is required field', 'error', 'center');
+      return;
+    }
 
     const payload = this.getLoginPayload();
     if (!payload) return;
@@ -89,18 +96,39 @@ export class Login implements AfterViewInit {
     this.userError = '';
     this.passwordError = '';
     this.passwordDisabled = true;
-    this.showToast('Form has been reset', 'info');
+    this.showToast('Form has been reset', 'info', 'top-right');
   }
 
   // Toast Helpers
-  private showToast(message: string, type: 'success' | 'error' | 'info') {
+  private showToast(message: string, type: 'success' | 'error' | 'info', position: 'top-right' | 'top-left' | 'center' = 'center') {
     const toastEl = this.toast.nativeElement;
     const msgEl = toastEl.querySelector('#toastMessage') as HTMLElement;
     const iconEl = toastEl.querySelector('#toastIcon') as HTMLElement;
 
     msgEl.textContent = message;
 
-    toastEl.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300 z-50 flex items-center gap-2`;
+    // Reset position and set left/right/center depending on param
+    let baseClass = `fixed top-4 px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300 z-50 flex items-center gap-2 pointer-events-none`;
+    if (position === 'top-left') {
+      toastEl.style.left = '';
+      toastEl.style.right = '';
+      toastEl.style.transform = '';
+      toastEl.className = `${baseClass} left-4`;
+    } else if (position === 'top-right') {
+      toastEl.style.left = '';
+      toastEl.style.right = '';
+      toastEl.style.transform = '';
+      toastEl.className = `${baseClass} right-4`;
+    } else {
+      // center
+      toastEl.style.left = '50%';
+      toastEl.style.right = '';
+      // ensure transform includes translateX(-50%) for centering
+      toastEl.style.transform = 'translateX(-50%)';
+      toastEl.className = `${baseClass}`;
+    }
+    // Keep track of position for hide animation
+    toastEl.setAttribute('data-position', position);
 
     if (type === 'success') {
       toastEl.classList.add('bg-green-500', 'text-white');
@@ -117,7 +145,16 @@ export class Login implements AfterViewInit {
   }
 
   private hideToast() {
-    this.toast.nativeElement.classList.add('translate-x-full', 'opacity-0');
+    const toastEl = this.toast.nativeElement;
+    const pos = toastEl.getAttribute('data-position') as 'top-left' | 'top-right' | 'center' | null;
+    if (pos === 'top-left') {
+      toastEl.classList.add('translate-x-neg-full', 'opacity-0');
+    } else if (pos === 'top-right') {
+      toastEl.classList.add('translate-x-full', 'opacity-0');
+    } else {
+      // center - fade out with opacity to not disrupt layout on mobile
+      toastEl.classList.add('opacity-0');
+    }
   }
 
 
@@ -137,13 +174,13 @@ export class Login implements AfterViewInit {
     };
   }
 
-private handleLoginSuccess(response: TokenResponse) {
+  private handleLoginSuccess(response: TokenResponse) {
   // Store access token in localStorage
   localStorage.setItem('access_token', response.access_token);
   // Store role in localStorage (optional)
   localStorage.setItem('auth_role_id', String(response.role_id));
   this.passwordError = '';
-  this.showToast('Login successful!', 'success');
+  this.showToast('Login successful!', 'success', 'top-right');
   setTimeout(() => this.router.navigate(['/home_page']), 800);
 }
 
