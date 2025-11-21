@@ -183,6 +183,10 @@ export class Login implements AfterViewInit {
   private handleLoginSuccess(response: TokenResponse) {
   // Store access token in localStorage
   localStorage.setItem('access_token', response.access_token);
+  // Store expiry duration if available
+  if (response.expires_in !== undefined) {
+    localStorage.setItem('expires_in', String(response.expires_in));
+  }
   // Store role in localStorage (optional)
   localStorage.setItem('auth_role_id', String(response.role_id));
   this.passwordError = '';

@@ -56,6 +56,9 @@ export class TokenInterceptor implements HttpInterceptor {
         const newToken = res?.access_token;
         if (newToken) {
           localStorage.setItem('access_token', newToken);
+          if (res?.expires_in !== undefined) {
+            localStorage.setItem('expires_in', String(res.expires_in));
+          }
           if (res?.role_id !== undefined) {
             localStorage.setItem('auth_role_id', String(res.role_id));
           }
@@ -79,6 +82,12 @@ export class TokenInterceptor implements HttpInterceptor {
 
   private logoutAndRedirect() {
     // attempt a server-side logout to remove refresh cookie, then navigate to login
+    // proactively tell authService to mark user as unauthenticated
+    try {
+      this.authService.setAuthenticated(false);
+    } catch (e) {
+      // ignore if method not present
+    }
     this.authService.logout().subscribe({
       next: () => this.router.navigate(['/login']),
       error: () => this.router.navigate(['/login'])

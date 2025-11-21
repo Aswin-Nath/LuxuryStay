@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { AuthenticationService } from '../../services/authentication/authentication.service';
+import { Observable } from 'rxjs';
 
 @Component({
   selector: 'app-navbar',
@@ -11,10 +12,10 @@ import { AuthenticationService } from '../../services/authentication/authenticat
   styleUrls: ['./navbar.component.css']
 })
 export class NavbarComponent {
-  constructor(private authService: AuthenticationService, private router: Router) {}
+  public isLoggedIn$: Observable<boolean>;
 
-  isLoggedIn(): boolean {
-    return !!localStorage.getItem('access_token');
+  constructor(private authService: AuthenticationService, private router: Router) {
+    this.isLoggedIn$ = this.authService.authState$;
   }
 
   logout() {

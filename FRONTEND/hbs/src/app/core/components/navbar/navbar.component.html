@@ -3,8 +3,8 @@
     <a class="font-bold text-lg" routerLink="/">LuxuryStay</a>
   </div>
   <div class="flex items-center gap-3">
-    <a *ngIf="!isLoggedIn()" routerLink="/login" class="text-blue-600">Login</a>
-    <a *ngIf="!isLoggedIn()" routerLink="/signup" class="text-blue-600">Sign up</a>
-    <button *ngIf="isLoggedIn()" (click)="logout()" class="btn btn-ghost">Logout</button>
+    <a *ngIf="!(isLoggedIn$ | async)" routerLink="/login" class="text-blue-600">Login</a>
+    <a *ngIf="!(isLoggedIn$ | async)" routerLink="/signup" class="text-blue-600">Sign up</a>
+    <button *ngIf="isLoggedIn$ | async" (click)="logout()" class="btn btn-ghost">Logout</button>
   </div>
 </header>
