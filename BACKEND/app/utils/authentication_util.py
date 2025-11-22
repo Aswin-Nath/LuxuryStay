@@ -62,10 +62,10 @@ def _verify_password(stored: str, plain: str) -> bool:
 # =====================================================
 # 🔐 JWT TOKEN GENERATION
 # =====================================================
-def create_access_token(data: dict, expires_delta: timedelta | None = None, jti: str | None = None):
+def create_access_token(data: dict, jti: str):
     """Create an access JWT. Optionally include a `jti` claim."""
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.utcnow() + (timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     if jti:
         to_encode.update({"jti": str(jti)})
@@ -156,6 +156,7 @@ async def create_session(db, user, device_info: str, ip: str):
         refresh_token=refresh_token,
         access_token_expires_at=access_exp,
         refresh_token_expires_at=refresh_exp,
+        login_time=datetime.utcnow(),
         device_info=device_info,
         ip_address=ip,
     )

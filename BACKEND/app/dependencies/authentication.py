@@ -4,6 +4,8 @@ from jose import jwt, JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from dotenv import load_dotenv
+import logging
+_logger = logging.getLogger(__name__)
 import os
 import json
 
@@ -56,8 +58,18 @@ async def get_current_user(
         if user_id is None:
             raise credentials_exception
         user_id = int(user_id)
-    except JWTError:    
+    except JWTError as e:
+        _logger.debug("get_current_user: JWT decode failed: %s", str(e))
         raise credentials_exception
+    # For debugging: show token expiry vs current utc time
+    try:
+        exp = payload.get('exp')
+        if exp:
+            import datetime as _dt
+            expiry_dt = _dt.datetime.fromtimestamp(int(exp), tz=_dt.timezone.utc)
+            _logger.debug("get_current_user: token exp %s current %s", expiry_dt.isoformat(), _dt.datetime.now(tz=_dt.timezone.utc).isoformat())
+    except Exception:
+        pass
 
     # Fetch user by ID
     result = await db.execute(select(Users).where(Users.user_id == user_id))

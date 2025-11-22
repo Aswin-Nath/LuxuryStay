@@ -1,1 +1,29 @@
-<p>home-page works!</p>
+<div class="p-4">
+	<h1 class="text-2xl font-bold">Home</h1>
+	<div class="mt-4">
+		<button class="btn btn-primary" (click)="fetchRoomTypes()" [disabled]="loading">{{ loading ? 'Loading...' : 'Get Room Types' }}</button>
+		<span *ngIf="error" class="text-red-600 ml-4">{{ error }}</span>
+	</div>
+
+	<div *ngIf="roomTypes.length" class="mt-4">
+		<h2 class="text-xl font-semibold">Room Types</h2>
+		<ul class="mt-2 list-disc pl-6">
+			<li *ngFor="let r of roomTypes">
+				<strong>{{ r.room_type_name }}</strong>
+				<div *ngIf="r.description">{{ r.description }}</div>
+				<div *ngIf="r.message" class="text-sm text-gray-500">{{ r.message }}</div>
+			</li>
+		</ul>
+	</div>
+	<div class="mt-6">
+		<button class="btn btn-secondary" (click)="fetchRooms()" [disabled]="loading">{{ loading ? 'Loading...' : 'Get Rooms' }}</button>
+	</div>
+	<div *ngIf="rooms.length" class="mt-4">
+		<h2 class="text-xl font-semibold">Rooms</h2>
+		<ul class="mt-2 list-disc pl-6">
+			<li *ngFor="let r of rooms">
+				<strong>ID: {{r.room_id}}</strong> - {{r.room_name || (r.room_type_name || r.room_id)}}
+			</li>
+		</ul>
+	</div>
+</div>

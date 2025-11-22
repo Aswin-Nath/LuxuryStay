@@ -19,6 +19,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from app.dependencies.authentication import get_current_user, check_permission
 auth_router = APIRouter(prefix="/auth", tags=["AUTH"])
 SECURE_REFRESH_COOKIE = os.getenv("SECURE_REFRESH_COOKIE", "true").lower() in ("1", "true", "yes")
+REFRESH_COOKIE_SAMESITE = os.getenv("REFRESH_COOKIE_SAMESITE", "lax")
 REFRESH_COOKIE_NAME = "refresh_token"
 REFRESH_COOKIE_PATH = "/auth/refresh"
 from pydantic import BaseModel
@@ -60,7 +61,7 @@ def _set_refresh_cookie(response: Response, token: str, expires_at: Optional[dat
         value=token,
         httponly=True,
         secure=SECURE_REFRESH_COOKIE,
-        samesite="strict",
+        samesite=REFRESH_COOKIE_SAMESITE,
         path=REFRESH_COOKIE_PATH,
         max_age=max_age,
         expires=expires_value,
@@ -217,7 +218,7 @@ async def login(
 
 
 
-@auth_router.post("/refresh", response_model=TokenResponse)
+@auth_router.post("/refresh", response_model=TokenResponse,dependencies=[Security(lambda: None)])
 async def refresh_tokens(
     response: Response,
     db: AsyncSession = Depends(get_db),
@@ -251,9 +252,8 @@ async def refresh_tokens(
 @auth_router.post("/logout")
 async def logout(
     response: Response,
-    token: str = Depends(oauth2_scheme),
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: Users = Depends(get_current_user),
 ):
     """
     User logout endpoint.
@@ -278,12 +278,71 @@ async def logout(
         - Invalidates user session.
         - Creates audit log entry.
     """
-    result = await svc_logout_flow(db, current_user.user_id)
+    # We support logout via either the Authorization Bearer token or the HttpOnly refresh cookie.
+    # This avoids returning 401 when the access token is expired; client can still logout using refresh cookie.
+    from app.crud.authentication import get_session_by_access_token, get_session_by_refresh_token, revoke_session_record
+    from app.utils.authentication_util import revoke_session, blacklist_token
+    from app.models.sqlalchemy_schemas.authentication import TokenType
+
+    # Try access token first
+    auth_header = request.headers.get('authorization')
+    session = None
     try:
-        # remove refresh cookie from client to avoid leftover cookie
+        if auth_header and auth_header.lower().startswith('bearer '):
+            access_token = auth_header.split()[1]
+            session = await get_session_by_access_token(db, access_token)
+
+        # If no session yet, try refresh cookie
+        if not session:
+            refresh_token_cookie = request.cookies.get(REFRESH_COOKIE_NAME)
+            if refresh_token_cookie:
+                session = await get_session_by_refresh_token(db, refresh_token_cookie)
+
+        if session:
+            # Use revoke_session which blacklists both tokens and marks session inactive
+            try:
+                await revoke_session(db, session=session, reason='user_logout')
+            except Exception:
+                # fallback to only mark session as revoked
+                await revoke_session_record(db, session, reason='user_logout')
+            await db.commit()
+            result = {"message": "Logged out successfully"}
+        else:
+            # no session found, but still clear cookie and return success (idempotent logout)
+            # If access token present, blacklist it by decoding user_id and storing a hash
+            try:
+                if auth_header and auth_header.lower().startswith('bearer '):
+                    access_token = auth_header.split()[1]
+                    try:
+                        from app.utils.authentication_util import SECRET_KEY, ALGORITHM
+                        from jose import jwt, JWTError
+                        payload = jwt.decode(access_token, SECRET_KEY, algorithms=[ALGORITHM])
+                        user_id = int(payload.get('sub'))
+                        await blacklist_token(db, user_id=user_id, session_id=None, token_value=access_token, token_type=TokenType.ACCESS, reason='user_logout')
+                    except Exception:
+                        # ignore decode or blacklist errors; continue to return success
+                        pass
+                # If refresh cookie present and no session, blacklist refresh token if possible
+                refresh_token_cookie = request.cookies.get(REFRESH_COOKIE_NAME)
+                if refresh_token_cookie:
+                    try:
+                        from app.utils.authentication_util import SECRET_KEY, ALGORITHM
+                        from jose import jwt, JWTError
+                        payload = jwt.decode(refresh_token_cookie, SECRET_KEY, algorithms=[ALGORITHM])
+                        user_id = int(payload.get('sub'))
+                        await blacklist_token(db, user_id=user_id, session_id=None, token_value=refresh_token_cookie, token_type=TokenType.REFRESH, reason='user_logout')
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            result = {"message": "Logged out successfully"}
+    except Exception:
+        # For safety, do not leak failure details; still attempt cookie delete then return success.
+        result = {"message": "Logged out successfully"}
+    # remove refresh cookie from client to avoid leftover cookie
+    try:
         response.delete_cookie(key=REFRESH_COOKIE_NAME, path=REFRESH_COOKIE_PATH)
     except Exception:
-        # Not fatal; additional cleanup handled by client
         pass
     return result
 

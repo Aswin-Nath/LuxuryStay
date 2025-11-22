@@ -1,6 +1,13 @@
 import { Injectable } from '@angular/core';
-import { HttpEvent, HttpHandler, HttpInterceptor, HttpRequest, HttpErrorResponse, HttpResponse } from '@angular/common/http';
-import { Observable, BehaviorSubject, throwError, of } from 'rxjs';
+import {
+  HttpEvent,
+  HttpHandler,
+  HttpInterceptor,
+  HttpRequest,
+  HttpErrorResponse
+} from '@angular/common/http';
+
+import { Observable, BehaviorSubject, throwError } from 'rxjs';
 import { catchError, filter, switchMap, take, finalize } from 'rxjs/operators';
 import { AuthenticationService } from '../services/authentication/authentication.service';
 import { Router } from '@angular/router';
@@ -8,39 +15,53 @@ import { Router } from '@angular/router';
 @Injectable({ providedIn: 'root' })
 export class TokenInterceptor implements HttpInterceptor {
   private refreshInProgress = false;
-  private refreshSubject: BehaviorSubject<string | null> = new BehaviorSubject<string | null>(null);
+  private refreshSubject = new BehaviorSubject<string | null>(null);
 
-  constructor(private authService: AuthenticationService, private router: Router) {}
+  constructor(
+    private authService: AuthenticationService,
+    private router: Router
+  ) {}
 
   intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-    // Do not attach auth header for auth endpoints or if there is no access token
-    const isAuthRequest = req.url.includes('/auth/login') || req.url.includes('/auth/signup') || req.url.includes('/auth/refresh') || req.url.includes('/auth/otp');
+    const isAuthRequest =
+      req.url.includes('/auth/login') ||
+      req.url.includes('/auth/signup') ||
+      req.url.includes('/auth/otp') ||
+      req.url.includes('/auth/refresh') ||
+      
+      req.url.includes('/auth/logout');
+    const accessToken = localStorage.getItem('access_token');
 
     let authReq = req;
-    const accessToken = localStorage.getItem('access_token');
     if (!isAuthRequest && accessToken) {
-      authReq = req.clone({ setHeaders: { Authorization: `Bearer ${accessToken}` } });
+      authReq = req.clone({
+        setHeaders: {
+          Authorization: `Bearer ${accessToken}`
+        }
+      });
     }
 
     return next.handle(authReq).pipe(
-      catchError((error: any) => {
-        if (error instanceof HttpErrorResponse && error.status === 401 && !isAuthRequest) {
-          // Access token might be expired. Attempt refresh and retry.
-          return this.handle401Error(authReq, next);
+      catchError(err => {
+        if (err instanceof HttpErrorResponse && err.status === 401 && !isAuthRequest) {
+          console.debug('TokenInterceptor: 401 received; attempting refresh', { url: req.url });
+          return this.handle401(authReq, next);
         }
-        return throwError(() => error);
+        return throwError(() => err);
       })
     );
   }
 
-  private handle401Error(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+  private handle401(req: HttpRequest<any>, next: HttpHandler): Observable<any> {
     if (this.refreshInProgress) {
-      // If refresh is already in progress, queue request until it's refreshed
       return this.refreshSubject.pipe(
         filter(token => token !== null),
         take(1),
         switchMap(token => {
-          const cloned = req.clone({ setHeaders: { Authorization: `Bearer ${token}` } });
+          const cloned = req.clone({
+            setHeaders: { Authorization: `Bearer ${token}` },
+            withCredentials: true
+          });
           return next.handle(cloned);
         })
       );
@@ -49,45 +70,49 @@ export class TokenInterceptor implements HttpInterceptor {
     this.refreshInProgress = true;
     this.refreshSubject.next(null);
 
-    // Call the refresh endpoint (server expects refresh cookie in HttpOnly cookie)
     return this.authService.refreshToken().pipe(
       switchMap((res: any) => {
-        // The backend returns new access token as response.access_token
         const newToken = res?.access_token;
-        if (newToken) {
-          localStorage.setItem('access_token', newToken);
-          if (res?.expires_in !== undefined) {
-            localStorage.setItem('expires_in', String(res.expires_in));
-          }
-          if (res?.role_id !== undefined) {
-            localStorage.setItem('auth_role_id', String(res.role_id));
-          }
-          this.refreshSubject.next(newToken);
-          const cloned = req.clone({ setHeaders: { Authorization: `Bearer ${newToken}` } });
-          return next.handle(cloned);
+
+        if (!newToken) {
+          return throwError(() => new Error('No access token in refresh response'));
         }
-        // If no token in response, treat as failure
-        return throwError(() => new Error('No access token in refresh response'));
+
+        // Persist new token
+        localStorage.setItem('access_token', newToken);
+        if (res?.expires_in !== undefined) {
+          const ttl = Math.max(0, Number(res.expires_in));
+          localStorage.setItem('expires_in', String(ttl));
+        }
+        if (res?.role_id !== undefined) {
+          localStorage.setItem('auth_role_id', String(res.role_id));
+        }
+
+        // notify queued requests
+        this.refreshSubject.next(newToken);
+
+        const cloned = req.clone({
+          setHeaders: { Authorization: `Bearer ${newToken}` }
+        });
+
+        return next.handle(cloned);
       }),
-      catchError(err => {
-        // Refresh failed, route to login and clear storage
-        this.logoutAndRedirect();
-        return throwError(() => err);
+
+      catchError(error => {
+        this.forceLogout();
+        return throwError(() => error);
       }),
+
       finalize(() => {
         this.refreshInProgress = false;
       })
     );
   }
 
-  private logoutAndRedirect() {
-    // attempt a server-side logout to remove refresh cookie, then navigate to login
-    // proactively tell authService to mark user as unauthenticated
-    try {
-      this.authService.setAuthenticated(false);
-    } catch (e) {
-      // ignore if method not present
-    }
+  private forceLogout() {
+    // stop UI state immediately
+    this.authService.setAuthenticated(false);
+
     this.authService.logout().subscribe({
       next: () => this.router.navigate(['/login']),
       error: () => this.router.navigate(['/login'])

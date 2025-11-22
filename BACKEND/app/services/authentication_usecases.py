@@ -5,7 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from jose import jwt, JWTError
-
+from dotenv import load_dotenv
+from fastapi import Depends,Cookie
+from app.database.postgres_connection import get_db
+load_dotenv()
 # CRUD Imports
 from app.crud.authentication import (
     get_user_by_email,
@@ -313,11 +316,9 @@ async def login_flow(
         db, user, device_info=device_info, ip=client_host
     )
 
-    expires_in = (
-        int((session.access_token_expires_at - session.login_time).total_seconds())
-        if session.access_token_expires_at and session.login_time
-        else 3600
-    )
+    # Calculate TTL using UTC now to avoid DB/server timezone mismatch.
+    # Clamp to >= 0 to avoid returning negative expires_in values.
+    expires_in = max(0, int((session.access_token_expires_at - datetime.utcnow()).total_seconds())) if session.access_token_expires_at else 0
 
     token_response = TokenResponse(
         access_token=session.access_token,
@@ -369,6 +370,10 @@ async def refresh_tokens(db: AsyncSession, refresh_token: str) -> AuthResult:
         payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = int(payload.get("sub"))
     except JWTError:
+        # Log for debugging
+        import logging
+        _logger = logging.getLogger(__name__)
+        _logger.debug("refresh_tokens: invalid refresh token provided")
         raise UnauthorizedException("Invalid refresh token")
 
     result = await db.execute(
@@ -403,17 +408,17 @@ async def refresh_tokens(db: AsyncSession, refresh_token: str) -> AuthResult:
     except UnauthorizedException:
         raise
     except Exception as exc:
+        import logging
+        _logger = logging.getLogger(__name__)
+        _logger.debug("refresh_tokens: refresh_access_token failed: %s", str(exc))
         raise UnauthorizedException(str(exc))
 
     user = await get_user_by_id(db, user_id)
     if not user:
         raise NotFoundException("User not found")
 
-    expires_in = (
-        int((session.access_token_expires_at - datetime.utcnow()).total_seconds())
-        if session.access_token_expires_at
-        else 3600
-    )
+    expires_in = max(0, int((session.access_token_expires_at - datetime.utcnow()).total_seconds())) if session.access_token_expires_at else 0
+    
 
     token_response = TokenResponse(
         access_token=session.access_token,

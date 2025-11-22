@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { environment } from '../../../../environments/environment';
 import { Observable, BehaviorSubject } from 'rxjs';
 import { tap, finalize } from 'rxjs/operators';
 
@@ -16,7 +17,7 @@ export interface TokenResponse {
   providedIn: 'root',
 })
 export class AuthenticationService {
-  private readonly baseUrl = 'http://localhost:8000/auth';
+  private readonly baseUrl = `${environment.apiUrl}/auth`;
   private authStateSubject = new BehaviorSubject<boolean>(!!localStorage.getItem('access_token'));
   public authState$ = this.authStateSubject.asObservable();
 
@@ -55,20 +56,23 @@ export class AuthenticationService {
   refreshToken() {
     // NOTE: refresh token is stored in HttpOnly cookie by server, send credentials so cookie is included
     return this.http.post<TokenResponse>(`${this.baseUrl}/refresh`, {}, { withCredentials: true }).pipe(
-      tap(() => this.authStateSubject.next(true))
-    );
-  }
-
-  logout() {
-    // Ask server to invalidate refresh cookie (return void), include credentials for cookie
-    // Use finalize to ensure local state is cleared even if the request errors
-    return this.http.post(`${this.baseUrl}/logout`, {}, { withCredentials: true }).pipe(
-      finalize(() => {
-        this.clearLocalAuthState();
-        this.authStateSubject.next(false);
+      tap((res) => {
+        console.debug('AuthenticationService: refreshToken response', res);
+        this.authStateSubject.next(true);
       })
     );
   }
+
+    logout() {
+      // Ask server to invalidate refresh cookie (return void), include credentials for cookie
+      // Use finalize to ensure local state is cleared even if the request errors
+      return this.http.post(`${this.baseUrl}/logout`, {}, { withCredentials: true }).pipe(
+        finalize(() => {
+          this.clearLocalAuthState();
+          this.authStateSubject.next(false);
+        })
+      );
+    }
 
   clearLocalAuthState() {
     try {

@@ -117,6 +117,12 @@ async def get_session_by_user_id(db: AsyncSession, user_id: int) -> Optional[Ses
     return result.scalars().first()
 
 
+async def get_session_by_refresh_token(db: AsyncSession, refresh_token: str) -> Optional[Sessions]:
+    """Fetch a session using the refresh token."""
+    result = await db.execute(select(Sessions).where(Sessions.refresh_token == refresh_token))
+    return result.scalars().first()
+
+
 async def update_session_tokens(
     db: AsyncSession,
     session: Sessions,
@@ -138,7 +144,7 @@ async def update_session_tokens(
 async def revoke_session_record(db: AsyncSession, session: Sessions, reason: Optional[str] = None):
     """Soft-delete or revoke a session (invalidate token)."""
     session.revoked_at = datetime.utcnow()
-    session.revocation_reason = reason or "manual_revoke"
+    session.revoked_reason = reason or "manual_revoke"
     db.add(session)
     await db.flush()
     return session

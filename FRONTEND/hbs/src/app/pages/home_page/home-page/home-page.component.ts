@@ -1,11 +1,49 @@
 import { Component } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { RoomsService, RoomType } from '../../../core/services/rooms/rooms.service';
 
 @Component({
   selector: 'app-home-page',
-  imports: [],
+  standalone: true,
+  imports: [CommonModule],
   templateUrl: './home-page.component.html',
-  styleUrl: './home-page.component.css',
+  styleUrls: ['./home-page.component.css'],
 })
 export class HomePageComponent {
+  roomTypes: RoomType[] = [];
+  rooms: any[] = [];
+  loading = false;
+  error = '';
 
+  constructor(private roomsService: RoomsService) {}
+
+  fetchRoomTypes() {
+    this.loading = true;
+    this.error = '';
+    this.roomsService.getRoomTypes(false).subscribe({
+      next: (res) => {
+        this.roomTypes = res;
+        this.loading = false;
+      },
+      error: (err) => {
+        this.error = err?.error?.detail || err?.message || 'Failed to load room types';
+        this.loading = false;
+      }
+    });
+  }
+
+  fetchRooms() {
+    this.loading = true;
+    this.error = '';
+    this.roomsService.getRooms().subscribe({
+      next: (res) => {
+        this.rooms = res;
+        this.loading = false;
+      },
+      error: (err) => {
+        this.error = err?.error?.detail || err?.message || 'Failed to load rooms';
+        this.loading = false;
+      }
+    });
+  }
 }

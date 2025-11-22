@@ -467,6 +467,27 @@ Solution:
   • Check permission_role_map table
   • Debug: print user_perms in route
   • Verify seed_data.py ran successfully
+
+### 2. Token refresh failing (401 + client logs out)
+
+```
+Problem: Client receives 401 on protected endpoints after access token expires and the Token refresh flow fails / returns 401, causing the client to force logout.
+
+Common causes:
+    • HttpOnly refresh cookie is not sent by the browser due to SameSite policy (e.g. cookie set as `samesite=strict`).
+    • Cross-origin requests without `withCredentials: true` from the client (CORS cookie isn't sent).
+    • Server `secure` flag set for refresh cookie while running on plain HTTP (cookie rejected).
+    • CORS not configured to allow credentials.
+
+Solutions:
+    • Ensure frontend sends credentials on cross-origin requests: set `withCredentials: true` or use a client-side interceptor that adds it for API calls.
+    • Configure the refresh cookie for the environment:
+        - For local dev (HTTP): use `REFRESH_COOKIE_SAMESITE=lax` and `SECURE_REFRESH_COOKIE=false` or run the frontend through a dev proxy so cookies are same-origin.
+        - For production (HTTPS): use `REFRESH_COOKIE_SAMESITE=none` and `SECURE_REFRESH_COOKIE=true` (modern browsers require `Secure` when `SameSite=None`).
+    • Ensure backend CORS allows credentials and the frontend origin (FastAPI `allow_origins` and `allow_credentials=True`).
+    • Optionally proxy API calls through the dev server to avoid cross-origin cookie issues:
+        - Add a `proxy.conf.json` to the frontend dev server or configure a reverse proxy.
+``` 
 ```
 
 ---

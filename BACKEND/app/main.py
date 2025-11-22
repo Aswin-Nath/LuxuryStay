@@ -24,6 +24,9 @@ from app.routes.reports import router as reports_router
 from app.routes.content import router as content_router
 from app.routes.payments import router as payment_router
 from app.workers.release_room_holds_worker import run_hold_release_scheduler
+import os
+import logging
+_logger = logging.getLogger(__name__)
 
 # -------------------------------------------------
 # ✅ FastAPI App Configuration
@@ -90,3 +93,8 @@ async def startup_event():
     - Revoke expired sessions worker
     """
     asyncio.create_task(run_hold_release_scheduler(interval_seconds=60))
+    # Print out auth config (debug)
+    try:
+        _logger.info('Auth config - ACCESS_TOKEN_EXPIRE_MINUTES=%s REFRESH_TOKEN_EXPIRE_DAYS=%s', os.getenv('ACCESS_TOKEN_EXPIRE_MINUTES'), os.getenv('REFRESH_TOKEN_EXPIRE_DAYS'))
+    except Exception:
+        pass
