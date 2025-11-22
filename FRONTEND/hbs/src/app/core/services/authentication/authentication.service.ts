@@ -20,8 +20,15 @@ export class AuthenticationService {
   private readonly baseUrl = `${environment.apiUrl}/auth`;
   private authStateSubject = new BehaviorSubject<boolean>(!!localStorage.getItem('access_token'));
   public authState$ = this.authStateSubject.asObservable();
+  private tokenRefreshTimer: any;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) {
+    this.initializeTokenRefresh();
+  }
+
+  ngOnDestroy() {
+    if (this.tokenRefreshTimer) clearTimeout(this.tokenRefreshTimer);
+  }
 
   login(identifier: string, password: string): Observable<TokenResponse> {
     const body = new URLSearchParams();
@@ -36,7 +43,12 @@ export class AuthenticationService {
       headers,
       withCredentials: true,
     }).pipe(
-      tap(() => this.authStateSubject.next(true))
+      tap((res) => {
+        this.authStateSubject.next(true);
+        if (res?.expires_in !== undefined) {
+          this.setTokenRefreshTimer(res.expires_in);
+        }
+      })
     );
   }
 
@@ -59,6 +71,10 @@ export class AuthenticationService {
       tap((res) => {
         console.debug('AuthenticationService: refreshToken response', res);
         this.authStateSubject.next(true);
+        // Reset timer with new expiration time
+        if (res?.expires_in !== undefined) {
+          this.setTokenRefreshTimer(res.expires_in);
+        }
       })
     );
   }
@@ -88,5 +104,52 @@ export class AuthenticationService {
   // Helper to set auth state programmatically if needed
   setAuthenticated(value: boolean) {
     this.authStateSubject.next(value);
+  }
+
+  /**
+   * Initialize token refresh timer on app startup.
+   * Checks localStorage for existing expiration time and sets timer.
+   */
+  private initializeTokenRefresh(): void {
+    const expiresIn = localStorage.getItem('expires_in');
+    if (expiresIn && Number(expiresIn) > 0) {
+      console.debug('AuthenticationService: Initializing token refresh timer', { expiresIn });
+      this.setTokenRefreshTimer(Number(expiresIn));
+    }
+  }
+
+  /**
+   * Set a timer to proactively refresh token before expiration.
+   * Refreshes 30 seconds before token expires to prevent 401 errors.
+   * 
+   * @param expiresIn Token expiration time in seconds
+   */
+  private setTokenRefreshTimer(expiresIn: number): void {
+    // Clear existing timer if any
+    if (this.tokenRefreshTimer) {
+      clearTimeout(this.tokenRefreshTimer);
+    }
+
+    // Refresh 30 seconds before expiration 
+    const refreshTime = (expiresIn - 30) * 1000;
+
+    if (refreshTime > 0) {
+      console.debug('AuthenticationService: Token refresh scheduled in', {
+        seconds: Math.round(refreshTime / 1000),
+        totalExpiresIn: expiresIn
+      });
+      this.tokenRefreshTimer = setTimeout(() => {
+        console.debug('AuthenticationService: Proactively refreshing token');
+        this.refreshToken().subscribe({
+          next: () => {
+            console.debug('AuthenticationService: Token proactively refreshed successfully');
+          },
+          error: (error) => {
+            console.error('AuthenticationService: Proactive token refresh failed', error);
+            this.logout().subscribe();
+          }
+        });
+      }, refreshTime);
+    }
   }
 }

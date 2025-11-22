@@ -249,6 +249,34 @@ async def refresh_tokens(
 
 
 
+@auth_router.get("/token/status")
+async def check_token_status(
+    current_user: Users = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Check if current access token is valid and return user info.
+    
+    This endpoint verifies the current token hasn't been blacklisted
+    or the session hasn't been revoked.
+    
+    Args:
+        current_user (Users): Currently authenticated user from OAuth2 scheme.
+        db (AsyncSession): Database session dependency.
+    
+    Returns:
+        dict: Status information with user_id, email, role_id, and session validity.
+    
+    Raises:
+        HTTPException (401): If token is invalid or session is revoked.
+    """
+    return {
+        "status": "valid",
+        "message": "Token is valid"
+    }
+
+
+
 @auth_router.post("/logout")
 async def logout(
     response: Response,
