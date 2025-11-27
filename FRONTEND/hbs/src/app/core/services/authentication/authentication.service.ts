@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { Observable, BehaviorSubject } from 'rxjs';
-import { tap, finalize } from 'rxjs/operators';
+import { tap, finalize,map } from 'rxjs/operators';
 
 export interface TokenResponse {
   access_token: string;
@@ -29,6 +29,16 @@ export class AuthenticationService {
   ngOnDestroy() {
     if (this.tokenRefreshTimer) clearTimeout(this.tokenRefreshTimer);
   }
+  fetchUserPermissions(): Observable<string[]> {
+  return this.http.get<any>(`${environment.apiUrl}/roles/me`, {
+    withCredentials: true
+  }).pipe(
+    tap(res => {
+      console.debug("Fetched user permissions:", res.permissions);
+    }),
+    map(res => res.permissions)
+  );
+}
 
   login(identifier: string, password: string): Observable<TokenResponse> {
     const body = new URLSearchParams();

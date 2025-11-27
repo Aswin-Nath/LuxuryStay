@@ -1,10 +1,13 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Security
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from typing import List
 
 from app.database.postgres_connection import get_db
 from app.schemas.pydantic_models.permissions import PermissionResponse, RolePermissionAssign, RolePermissionResponse
 from app.schemas.pydantic_models.roles import RoleCreate, RoleResponse
+from app.models.sqlalchemy_schemas.permissions import Permissions, PermissionRoleMap
+from app.models.sqlalchemy_schemas.roles import Roles
 from app.services.roles_and_permissions_service import (
     assign_permissions_to_role as svc_assign_permissions_to_role,
     get_permissions_by_role as svc_get_permissions_by_role,
@@ -12,14 +15,103 @@ from app.services.roles_and_permissions_service import (
     get_roles_for_permission as svc_get_roles_for_permission,
     create_role as svc_create_role, list_roles as svc_list_roles
 )
-from app.dependencies.authentication import check_permission
+from app.dependencies.authentication import check_permission, get_current_user
 from app.utils.authentication_util import invalidate_permissions_cache
 from app.core.cache import get_cached, set_cached, invalidate_pattern
 from app.utils.audit_util import log_audit
+from app.models.sqlalchemy_schemas.users import Users
 
 
 # Single combined router
 roles_and_permissions_router = APIRouter(prefix="/roles", tags=["ROLES"])
+
+
+# ==============================================================
+# 🔹 READ - Get current user's role and permissions
+# ==============================================================
+@roles_and_permissions_router.get("/me")
+async def get_current_user_permissions(
+    current_user: Users = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Retrieve current user's role and all assigned permissions.
+    
+    Endpoint to fetch the currently authenticated user's role information and all permissions
+    assigned to their role. This is useful for UI to determine which features/actions the user
+    can access. Results are cached based on the user's role_id for 300 seconds.
+    
+    **Authorization:** Requires valid authentication token (any authenticated user).
+    
+    Args:
+        current_user (Users): Currently authenticated user from get_current_user dependency.
+        db (AsyncSession): Database session dependency.
+    
+    Returns:
+        dict: Contains user_id, role info (role_id, role_name), and list of permission names.
+            Example:
+            {
+                "user_id": 1,
+                "role_id": 2,
+                "role_name": "super_admin",
+                "permissions": [
+                    "ADMIN_CREATION:READ",
+                    "ADMIN_CREATION:WRITE",
+                    "ROOM_MANAGEMENT:WRITE"
+                ],
+                "message": "User permissions fetched successfully"
+            }
+    
+    Raises:
+        HTTPException (401): If token is invalid or user not found.
+        HTTPException (404): If user's role not found (data integrity issue).
+    """
+    try:
+        # Fetch user's role
+        role_result = await db.execute(
+            select(Roles).where(Roles.role_id == current_user.role_id)
+        )
+        role = role_result.scalars().first()
+        
+        if not role:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User's role not found"
+            )
+        
+        # Try to get permissions from cache
+        cache_key = f"user_perms:{current_user.role_id}"
+        cached_permissions = await get_cached(cache_key)
+        
+        if cached_permissions is not None:
+            permissions = cached_permissions
+        else:
+            # Query permissions from database
+            perms_result = await db.execute(
+                select(Permissions.permission_name)
+                .join(PermissionRoleMap, PermissionRoleMap.permission_id == Permissions.permission_id)
+                .where(PermissionRoleMap.role_id == current_user.role_id)
+            )
+            
+            # Flatten tuple results like [('X',), ('Y',)] → ['X', 'Y']
+            permissions = [perm[0] for perm in perms_result.all()]
+            
+            # Cache permissions for this role with 300-second TTL
+            await set_cached(cache_key, permissions, ttl=300)
+        
+        return {
+            "role_id": current_user.role_id,
+            "permissions": permissions,
+            "message": "User permissions fetched successfully"
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error fetching user permissions"
+        )
 
 
 # ==============================================================

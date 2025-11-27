@@ -541,6 +541,7 @@ async def register_admin(
             raise ConflictException("Phone number already registered")
 
     try:
+        print(payload,"payload")
         user_record = await create_user(
             db=db,
             full_name=payload.full_name,
@@ -549,7 +550,7 @@ async def register_admin(
             phone_number=payload.phone_number,
             dob=payload.dob,
             gender=payload.gender,
-            role_id=payload.role_id,
+            role_id=1,
             status_id=1,
             created_by=current_user_id,
         )

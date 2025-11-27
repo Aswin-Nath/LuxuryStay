@@ -114,7 +114,7 @@ async def get_room_types(
     room_type_id: Optional[int] = Query(None),
     include_deleted: Optional[bool] = Query(False),
     db: AsyncSession = Depends(get_db),
-    _current_user=Depends(get_current_user),
+    token_payload: dict = Security(check_permission, scopes=["ROOM_MANAGEMENT:WRITE"]),
 ):
     if room_type_id is not None:
         room_type_record = await svc_get_room_type(db, room_type_id)

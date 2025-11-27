@@ -1,11 +1,12 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RoomsService, RoomType } from '../../../core/services/rooms/rooms.service';
+import { HasPermissionDirective } from "../../../core/directives/has-permission.directive";
 
 @Component({
   selector: 'app-home-page',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, HasPermissionDirective],
   templateUrl: './home-page.component.html',
   styleUrls: ['./home-page.component.css'],
 })

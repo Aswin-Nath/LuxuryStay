@@ -1,0 +1,44 @@
+.wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f7f7f7;
+  text-align: center;
+}
+
+.code {
+  font-size: 80px;
+  font-weight: 800;
+  color: #dc2626;
+}
+
+.title {
+  margin-top: 10px;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.desc {
+  color: #555;
+  margin: 10px auto;
+  max-width: 400px;
+}
+
+.btn {
+  padding: 12px 24px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary {
+  background: #2563eb;
+  color: white;
+}
+
+.secondary {
+  background: #333;
+  color: white;
+  margin-right: 10px;
+}

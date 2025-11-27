@@ -1,10 +1,12 @@
 <div class="p-4">
 	<h1 class="text-2xl font-bold">Home</h1>
-	<div class="mt-4">
-		<button class="btn btn-primary" (click)="fetchRoomTypes()" [disabled]="loading">{{ loading ? 'Loading...' : 'Get Room Types' }}</button>
-		<span *ngIf="error" class="text-red-600 ml-4">{{ error }}</span>
-	</div>
 
+
+	<ng-container *appHasPermission="'ROOM_MANAGEMENT:WRITE'">
+			<div class="mt-4">
+				<button class="btn btn-primary" (click)="fetchRoomTypes()" [disabled]="loading">{{ loading ? 'Loading...' : 'Get Room Types' }}</button>
+				<span *ngIf="error" class="text-red-600 ml-4">{{ error }}</span>
+			</div>
 	<div *ngIf="roomTypes.length" class="mt-4">
 		<h2 class="text-xl font-semibold">Room Types</h2>
 		<ul class="mt-2 list-disc pl-6">
@@ -15,9 +17,12 @@
 			</li>
 		</ul>
 	</div>
+</ng-container>
+
 	<div class="mt-6">
 		<button class="btn btn-secondary" (click)="fetchRooms()" [disabled]="loading">{{ loading ? 'Loading...' : 'Get Rooms' }}</button>
 	</div>
+	<ng-container *appHasPermission="'BOOKING:WRITE'">
 	<div *ngIf="rooms.length" class="mt-4">
 		<h2 class="text-xl font-semibold">Rooms</h2>
 		<ul class="mt-2 list-disc pl-6">
@@ -26,4 +31,6 @@
 			</li>
 		</ul>
 	</div>
+	</ng-container>
+
 </div>
