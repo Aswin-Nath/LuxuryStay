@@ -37,7 +37,13 @@ export class TokenInterceptor implements HttpInterceptor {
       authReq = req.clone({
         setHeaders: {
           Authorization: `Bearer ${accessToken}`
-        }
+        },
+        withCredentials: true  // ✅ REQUIRED for HttpOnly refresh cookie
+      });
+    } else if (isAuthRequest) {
+      // ✅ Also add withCredentials to auth requests to handle refresh cookie
+      authReq = req.clone({
+        withCredentials: true
       });
     }
 
@@ -92,13 +98,15 @@ export class TokenInterceptor implements HttpInterceptor {
         this.refreshSubject.next(newToken);
 
         const cloned = req.clone({
-          setHeaders: { Authorization: `Bearer ${newToken}` }
+          setHeaders: { Authorization: `Bearer ${newToken}` },
+          withCredentials: true  // ✅ Maintain credentials for retried request
         });
 
         return next.handle(cloned);
       }),
 
       catchError(error => {
+        console.error('TokenInterceptor: Token refresh failed', error);
         this.forceLogout();
         return throwError(() => error);
       }),
