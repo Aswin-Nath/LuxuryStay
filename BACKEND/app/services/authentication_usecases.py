@@ -122,7 +122,7 @@ async def signup(db: AsyncSession, payload: UserCreate, created_by: Optional[int
             gender=payload.gender,
             
             role_id=1,
-            status_id=1,
+            status="active",
             created_by=created_by,
         )
     except IntegrityError as exc:
@@ -269,7 +269,7 @@ async def change_password(
         BadRequestException: If new password doesn't meet requirements.
     """
     auth_user = await authenticate_user(
-        db, email=current_user.email, password=current_password
+        db, identifier=current_user.email, password=current_password
     )
     if not auth_user:
         raise UnauthorizedException("Current password incorrect")
@@ -447,7 +447,7 @@ async def logout_flow(db: AsyncSession, user_id: int):
     2. Verifying the session's JTI is NOT already blacklisted
     3. Checking if the session is still active
     4. Blacklisting both the access token and refresh token
-    5. Marking the session as inactive
+    5. Marking the session as
     
     This prevents token reuse and ensures the session is fully revoked.
     Uses user_id instead of access_token for reliable lookup even after token changes.
@@ -551,7 +551,7 @@ async def register_admin(
             dob=payload.dob,
             gender=payload.gender,
             role_id=payload.role_id,
-            status_id=1,
+            status="active",
             created_by=current_user_id,
         )
     except IntegrityError as exc:

@@ -1,0 +1,302 @@
+<app-customer-navbar></app-customer-navbar>
+<div class="bg-gray-50 flex flex-col min-h-screen">
+  <!-- ✅ Loading State -->
+  <div *ngIf="isLoading" class="flex items-center justify-center min-h-screen">
+    <div class="text-center">
+      <div class="animate-spin rounded-full h-12 w-12 border-4 border-yellow-600 border-t-transparent mx-auto mb-4"></div>
+      <p class="text-gray-600">Loading profile...</p>
+    </div>
+  </div>
+
+  <!-- ✅ Main Content -->
+  <div *ngIf="!isLoading" class="flex flex-col lg:flex-row flex-1 w-full mt-16 md:mt-20">
+    <!-- ✅ Sidebar Component -->
+    <div class="w-full lg:w-64 px-4 md:px-6 lg:px-8 py-6 shrink-0">
+      <app-customer-sidebar [currentPage]="currentPage"></app-customer-sidebar>
+    </div>
+
+    <!-- ✅ Main Content -->
+    <main class="flex-1 w-full px-4 md:px-6 lg:px-8 py-6 space-y-6 md:space-y-8 max-w-6xl">
+      <!-- ✅ Alert Messages -->
+      <div *ngIf="errorMessage" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm md:text-base">
+        {{ errorMessage }}
+      </div>
+      <div *ngIf="successMessage" class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm md:text-base">
+        {{ successMessage }}
+      </div>
+
+      <!-- ✅ Welcome Header -->
+      <div class="relative rounded-2xl p-[3px] bg-linear-to-r from-yellow-600 to-red-700 shadow">
+        <div class="bg-[#fdfaf4] rounded-2xl py-6 md:py-8 text-center">
+          <h2 class="text-2xl md:text-3xl lg:text-4xl text-gray-800 font-bold" style="font-family: 'Pacifico', cursive;">
+            Your Profile
+          </h2>
+        </div>
+      </div>
+
+      <!-- ✅ Profile Card -->
+      <div class="bg-white shadow-xl border border-gray-200 rounded-2xl p-4 md:p-6 lg:p-8 space-y-6 w-full">
+        <!-- Profile Image Section -->
+        <div class="flex flex-col items-center text-center mb-6">
+          <div class="relative">
+            <img 
+              [src]="profileImage" 
+              class="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-yellow-600 shadow-md object-cover" 
+              alt="Profile"
+            >
+            <label 
+              for="uploadImage" 
+              class="absolute bottom-0 right-0 bg-yellow-500 text-white p-2 rounded-full shadow cursor-pointer hover:bg-yellow-600"
+            >
+              <span class="material-icons text-sm">edit</span>
+            </label>
+            <input 
+              type="file" 
+              id="uploadImage" 
+              accept="image/*" 
+              class="hidden"
+              (change)="onImageUpload($event)"
+            >
+          </div>
+          <p class="mt-3 text-gray-700 font-medium text-sm md:text-base">Update Profile Picture</p>
+        </div>
+
+        <!-- Editable Profile Info -->
+        <div class="space-y-4 md:space-y-6">
+          <!-- Name -->
+          <div class="border-b pb-4">
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3">
+              <div class="flex-1">
+                <p class="text-gray-700 font-medium text-xs md:text-sm lg:text-base">Name</p>
+                <p *ngIf="!editingFields['name']" id="name-display" class="text-gray-900 font-semibold text-sm md:text-base mt-1">
+                  {{ getDisplayValue('name') }}
+                </p>
+              </div>
+              <button 
+                *ngIf="!editingFields['name']"
+                (click)="toggleEdit('name')" 
+                class="text-red-600 hover:underline flex items-center space-x-1 text-xs md:text-sm lg:text-base whitespace-nowrap"
+              >
+                <span class="material-icons text-sm">edit</span><span>Edit</span>
+              </button>
+            </div>
+            <div *ngIf="editingFields['name']" class="mt-3 flex flex-col sm:flex-row gap-3">
+              <input 
+                [(ngModel)]="formData.full_name"
+                type="text" 
+                class="flex-1 p-2 border rounded focus:ring-2 focus:ring-yellow-500 text-xs md:text-sm lg:text-base"
+              >
+              <button 
+                (click)="saveField('name')" 
+                class="px-3 md:px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 shadow text-xs md:text-sm lg:text-base font-medium"
+              >
+                Save
+              </button>
+              <button 
+                (click)="toggleEdit('name')" 
+                class="px-3 md:px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500 shadow text-xs md:text-sm lg:text-base font-medium"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          <!-- Gender -->
+          <div class="border-b pb-4">
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3">
+              <div class="flex-1">
+                <p class="text-gray-700 font-medium text-xs md:text-sm lg:text-base">Gender</p>
+                <p *ngIf="!editingFields['gender']" class="text-gray-900 font-semibold text-sm md:text-base mt-1">
+                  {{ getDisplayValue('gender') }}
+                </p>
+              </div>
+              <button 
+                *ngIf="!editingFields['gender']"
+                (click)="toggleEdit('gender')" 
+                class="text-red-600 hover:underline flex items-center space-x-1 text-xs md:text-sm lg:text-base whitespace-nowrap"
+              >
+                <span class="material-icons text-sm">edit</span><span>Edit</span>
+              </button>
+            </div>
+            <div *ngIf="editingFields['gender']" class="mt-3 flex flex-col sm:flex-row gap-3">
+              <select 
+                [(ngModel)]="formData.gender"
+                class="flex-1 p-2 border rounded focus:ring-2 focus:ring-yellow-500 text-xs md:text-sm lg:text-base"
+              >
+                <option value="">Select Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+              <button 
+                (click)="saveField('gender')" 
+                class="px-3 md:px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 shadow text-xs md:text-sm lg:text-base font-medium"
+              >
+                Save
+              </button>
+              <button 
+                (click)="toggleEdit('gender')" 
+                class="px-3 md:px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500 shadow text-xs md:text-sm lg:text-base font-medium"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          <!-- Email (Read-only) -->
+          <div class="border-b pb-4">
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+              <div class="flex-1">
+                <p class="text-gray-700 font-medium text-xs md:text-sm lg:text-base">Email</p>
+                <p class="text-gray-900 font-semibold text-sm md:text-base mt-1">
+                  {{ getDisplayValue('email') }}
+                </p>
+              </div>
+              <span class="text-gray-500 text-xs md:text-sm whitespace-nowrap">(Cannot change)</span>
+            </div>
+          </div>
+
+          <!-- Phone -->
+          <div class="border-b pb-4">
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3">
+              <div class="flex-1">
+                <p class="text-gray-700 font-medium text-xs md:text-sm lg:text-base">Phone</p>
+                <p *ngIf="!editingFields['phone']" class="text-gray-900 font-semibold text-sm md:text-base mt-1">
+                  {{ getDisplayValue('phone') }}
+                </p>
+              </div>
+              <button 
+                *ngIf="!editingFields['phone']"
+                (click)="toggleEdit('phone')" 
+                class="text-red-600 hover:underline flex items-center space-x-1 text-xs md:text-sm lg:text-base whitespace-nowrap"
+              >
+                <span class="material-icons text-sm">edit</span><span>Edit</span>
+              </button>
+            </div>
+            <div *ngIf="editingFields['phone']" class="mt-3 flex flex-col sm:flex-row gap-3">
+              <input 
+                [(ngModel)]="formData.phone_number"
+                type="tel" 
+                class="flex-1 p-2 border rounded focus:ring-2 focus:ring-yellow-500 text-xs md:text-sm lg:text-base"
+              >
+              <button 
+                (click)="saveField('phone')" 
+                class="px-3 md:px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 shadow text-xs md:text-sm lg:text-base font-medium"
+              >
+                Save
+              </button>
+              <button 
+                (click)="toggleEdit('phone')" 
+                class="px-3 md:px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500 shadow text-xs md:text-sm lg:text-base font-medium"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          <!-- Date of Birth -->
+          <div class="border-b pb-4">
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3">
+              <div class="flex-1">
+                <p class="text-gray-700 font-medium text-xs md:text-sm lg:text-base">Date of Birth</p>
+                <p *ngIf="!editingFields['dob']" class="text-gray-900 font-semibold text-sm md:text-base mt-1">
+                  {{ getDisplayValue('dob') }}
+                </p>
+              </div>
+              <button 
+                *ngIf="!editingFields['dob']"
+                (click)="toggleEdit('dob')" 
+                class="text-red-600 hover:underline flex items-center space-x-1 text-xs md:text-sm lg:text-base whitespace-nowrap"
+              >
+                <span class="material-icons text-sm">edit</span><span>Edit</span>
+              </button>
+            </div>
+            <div *ngIf="editingFields['dob']" class="mt-3 flex flex-col sm:flex-row gap-3">
+              <input 
+                [(ngModel)]="formData.dob"
+                type="date" 
+                class="flex-1 p-2 border rounded focus:ring-2 focus:ring-yellow-500 text-xs md:text-sm lg:text-base"
+              >
+              <button 
+                (click)="saveField('dob')" 
+                class="px-3 md:px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 shadow text-xs md:text-sm lg:text-base font-medium"
+              >
+                Save
+              </button>
+              <button 
+                (click)="toggleEdit('dob')" 
+                class="px-3 md:px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500 shadow text-xs md:text-sm lg:text-base font-medium"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          <!-- Change Password Section -->
+          <div class="mt-8 pt-4">
+            <button 
+              (click)="toggleEdit('password')" 
+              class="w-full sm:w-auto px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 shadow font-semibold text-sm md:text-base transition"
+            >
+              Change Password
+            </button>
+          </div>
+
+          <!-- Change Password Form -->
+          <div *ngIf="editingFields['password']" class="mt-6 border-t pt-6">
+            <h3 class="text-base md:text-lg font-semibold text-gray-800 mb-4">Change Password</h3>
+            
+            <!-- Current Password -->
+            <div class="mb-4">
+              <label class="block text-gray-700 font-medium text-xs md:text-sm lg:text-base mb-2">Current Password</label>
+              <input 
+                [(ngModel)]="passwordData.current_password"
+                type="password" 
+                placeholder="Enter your current password"
+                class="w-full p-2 md:p-3 border rounded-lg focus:ring-2 focus:ring-yellow-500 text-xs md:text-sm lg:text-base"
+              >
+            </div>
+
+            <!-- New Password -->
+            <div class="mb-4">
+              <label class="block text-gray-700 font-medium text-xs md:text-sm lg:text-base mb-2">New Password</label>
+              <input 
+                [(ngModel)]="passwordData.new_password"
+                type="password" 
+                placeholder="Enter new password"
+                class="w-full p-2 md:p-3 border rounded-lg focus:ring-2 focus:ring-yellow-500 text-xs md:text-sm lg:text-base"
+              >
+            </div>
+
+            <!-- Confirm Password -->
+            <div class="mb-6">
+              <label class="block text-gray-700 font-medium text-xs md:text-sm lg:text-base mb-2">Confirm Password</label>
+              <input 
+                [(ngModel)]="passwordData.confirm_password"
+                type="password" 
+                placeholder="Confirm new password"
+                class="w-full p-2 md:p-3 border rounded-lg focus:ring-2 focus:ring-yellow-500 text-xs md:text-sm lg:text-base"
+              >
+            </div>
+
+            <!-- Buttons -->
+            <div class="flex flex-col sm:flex-row gap-3">
+              <button 
+                (click)="changePassword()" 
+                class="flex-1 px-4 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 shadow font-semibold text-xs md:text-sm lg:text-base transition"
+              >
+                Update Password
+              </button>
+              <button 
+                (click)="toggleEdit('password')" 
+                class="px-4 py-3 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 shadow text-xs md:text-sm lg:text-base transition"
+              >
+                ✕ Close
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>

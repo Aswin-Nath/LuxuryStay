@@ -1,0 +1,329 @@
+<app-admin-navbar></app-admin-navbar>
+
+<div class="bg-gray-50 min-h-screen">
+  <div class="flex flex-col lg:flex-row flex-1 w-full mt-16 md:mt-20">
+    <!-- Sidebar -->
+    <div class="w-full lg:w-64 px-4 md:px-6 lg:px-8 py-6 shrink-0">
+      <app-admin-sidebar></app-admin-sidebar>
+    </div>
+
+    <!-- Main Content -->
+    <main class="flex-1 w-full px-4 md:px-6 lg:px-8 py-6 space-y-6 max-w-7xl">
+      <!-- Header -->
+      <div class="relative rounded-2xl p-[3px] bg-linear-to-r from-yellow-600 to-red-700 shadow">
+        <div class="bg-[#fdfaf4] rounded-2xl py-6 md:py-8 px-6">
+          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h2 class="text-2xl md:text-3xl lg:text-4xl text-gray-800 font-bold" style="font-family: 'Pacifico', cursive;">
+                Admin Management
+              </h2>
+              <p class="text-gray-600 text-sm md:text-base mt-2">Manage admin users, roles, and permissions</p>
+            </div>
+            <button
+              (click)="openCreateModal()"
+              class="flex items-center gap-2 px-6 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 shadow font-semibold text-sm md:text-base transition"
+            >
+              <i class="fas fa-plus"></i>
+              <span>Add Admin</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Alert Messages -->
+      <div *ngIf="errorMessage" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm md:text-base flex items-center justify-between">
+        <span>{{ errorMessage }}</span>
+        <button (click)="clearMessages()" class="text-red-700 hover:text-red-900">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div *ngIf="successMessage" class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm md:text-base flex items-center justify-between">
+        <span>{{ successMessage }}</span>
+        <button (click)="clearMessages()" class="text-green-700 hover:text-green-900">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+
+      <!-- Filters -->
+      <div class="bg-white shadow-lg rounded-2xl p-4 md:p-6 space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <!-- Search -->
+          <div class="col-span-1 sm:col-span-2">
+            <label class="block text-gray-700 font-medium text-xs md:text-sm mb-2">Search</label>
+            <div class="relative">
+              <input
+                type="text"
+                [(ngModel)]="searchTerm"
+                (keyup.enter)="onSearch()"
+                placeholder="Name, email..."
+                class="w-full px-4 py-2 pl-10 border rounded-lg focus:ring-2 focus:ring-yellow-500 text-sm"
+              />
+              <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+            </div>
+          </div>
+
+          <!-- Role Filter -->
+          <div>
+            <label class="block text-gray-700 font-medium text-xs md:text-sm mb-2">Role</label>
+            <select
+              [(ngModel)]="selectedRole"
+              (change)="onFilterChange()"
+              class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 text-sm"
+            >
+              <option [ngValue]="null">All Roles</option>
+              <option *ngFor="let role of roles" [ngValue]="role.role_id">
+                {{ role.role_name }}
+              </option>
+            </select>
+          </div>
+
+          <!-- Status Filter -->
+          <div>
+            <label class="block text-gray-700 font-medium text-xs md:text-sm mb-2">Status</label>
+            <select
+              [(ngModel)]="selectedStatus"
+              (change)="onFilterChange()"
+              class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 text-sm"
+            >
+              <option value="">All Status</option>
+              <option value="active">Active</option>
+              <option value="suspended">Suspended</option>
+            </select>
+          </div>
+
+          <!-- Date From -->
+          <div class="hidden lg:block">
+            <label class="block text-gray-700 font-medium text-xs md:text-sm mb-2">From Date</label>
+            <input
+              type="date"
+              [(ngModel)]="dateFrom"
+              (change)="onFilterChange()"
+              class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 text-sm"
+            />
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex flex-wrap gap-3">
+          <button
+            (click)="onSearch()"
+            class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 shadow text-sm font-medium"
+          >
+            <i class="fas fa-search mr-2"></i>Apply Filters
+          </button>
+          <button
+            (click)="clearFilters()"
+            class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 shadow text-sm font-medium"
+          >
+            <i class="fas fa-times mr-2"></i>Clear Filters
+          </button>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="bg-white shadow-lg rounded-2xl overflow-hidden">
+        <!-- Loading State -->
+        <div *ngIf="isLoading" class="flex items-center justify-center py-20">
+          <div class="text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-4 border-yellow-600 border-t-transparent mx-auto mb-4"></div>
+            <p class="text-gray-600">Loading admins...</p>
+          </div>
+        </div>
+
+        <!-- Table Content -->
+        <div *ngIf="!isLoading" class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="bg-gray-100 border-b">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs md:text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-200" (click)="sortBy('user_id')">
+                  ID <i class="fas ml-1" [ngClass]="getSortIcon('user_id')"></i>
+                </th>
+                <th class="px-4 py-3 text-left text-xs md:text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-200" (click)="sortBy('full_name')">
+                  Name <i class="fas ml-1" [ngClass]="getSortIcon('full_name')"></i>
+                </th>
+                <th class="px-4 py-3 text-left text-xs md:text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-200" (click)="sortBy('email')">
+                  Email <i class="fas ml-1" [ngClass]="getSortIcon('email')"></i>
+                </th>
+                <th class="px-4 py-3 text-left text-xs md:text-sm font-semibold text-gray-700">Phone</th>
+                <th class="px-4 py-3 text-left text-xs md:text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-200" (click)="sortBy('role_id')">
+                  Role <i class="fas ml-1" [ngClass]="getSortIcon('role_id')"></i>
+                </th>
+                <th class="px-4 py-3 text-left text-xs md:text-sm font-semibold text-gray-700">Status</th>
+                <th class="px-4 py-3 text-left text-xs md:text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-200" (click)="sortBy('created_at')">
+                  Created <i class="fas ml-1" [ngClass]="getSortIcon('created_at')"></i>
+                </th>
+                <th class="px-4 py-3 text-center text-xs md:text-sm font-semibold text-gray-700">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+              <tr *ngFor="let admin of filteredAdmins" class="hover:bg-gray-50 transition">
+                <td class="px-4 py-3 text-xs md:text-sm text-gray-700">{{ admin.user_id }}</td>
+                <td class="px-4 py-3 text-xs md:text-sm text-gray-900 font-medium">{{ admin.full_name }}</td>
+                <td class="px-4 py-3 text-xs md:text-sm text-gray-700">{{ admin.email }}</td>
+                <td class="px-4 py-3 text-xs md:text-sm text-gray-700">{{ admin.phone_number || 'N/A' }}</td>
+                <td class="px-4 py-3 text-xs md:text-sm">
+                  <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                    {{ getRoleName(admin.role_id) }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-xs md:text-sm">
+                  <span class="px-2 py-1 rounded-full text-xs font-medium" [ngClass]="getStatusClass(admin.status || 'active')">
+                    {{ admin.status || 'active' }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-xs md:text-sm text-gray-700">{{ formatDate(admin.created_at || '') }}</td>
+                <td class="px-4 py-3 text-center">
+                  <div class="flex items-center justify-center gap-2">
+                    <button
+                      (click)="viewAdmin(admin)"
+                      class="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs font-medium"
+                      title="View Details"
+                    >
+                      <i class="fas fa-eye"></i>
+                    </button>
+                    <button
+                      (click)="openEditModal(admin)"
+                      class="px-3 py-1 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 text-xs font-medium"
+                      title="Edit Admin"
+                    >
+                      <i class="fas fa-edit"></i>
+                    </button>
+                    <button
+                      (click)="openSuspendReasonModal(admin)"
+                      [class]="admin.status === 'suspended' ? 'px-3 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 text-xs font-medium' : 'px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs font-medium'"
+                      [title]="admin.status === 'suspended' ? 'Activate Admin' : 'Suspend Admin'"
+                    >
+                      <i [class]="admin.status === 'suspended' ? 'fas fa-shield-alt' : 'fas fa-ban'"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr *ngIf="filteredAdmins.length === 0">
+                <td colspan="8" class="px-4 py-12 text-center text-gray-500">
+                  <i class="fas fa-inbox text-4xl mb-4 block"></i>
+                  <p class="text-lg font-medium">No admins found</p>
+                  <p class="text-sm">Try adjusting your filters or search term</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div *ngIf="totalPages > 1" class="px-4 py-4 border-t bg-gray-50 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div class="text-sm text-gray-600">
+            Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPage * itemsPerPage, totalItems) }} of {{ totalItems }} results
+          </div>
+          
+          <div class="flex items-center gap-2">
+            <!-- Items per page -->
+            <select
+              [(ngModel)]="itemsPerPage"
+              (change)="onPageSizeChange()"
+              class="px-3 py-1 border rounded text-sm"
+            >
+              <option *ngFor="let size of pageSizeOptions" [value]="size">{{ size }} per page</option>
+            </select>
+
+            <!-- Page navigation -->
+            <button
+              (click)="previousPage()"
+              [disabled]="currentPage === 1"
+              class="px-3 py-1 border rounded text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <i class="fas fa-chevron-left"></i>
+            </button>
+            
+            <button
+              *ngFor="let page of getPageNumbers()"
+              (click)="goToPage(page)"
+              [class.bg-yellow-600]="page === currentPage"
+              [class.text-white]="page === currentPage"
+              [class.hover:bg-gray-100]="page !== currentPage"
+              class="px-3 py-1 border rounded text-sm transition"
+            >
+              {{ page }}
+            </button>
+            
+            <button
+              (click)="nextPage()"
+              [disabled]="currentPage === totalPages"
+              class="px-3 py-1 border rounded text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <i class="fas fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Admin Form Modal (Create/Edit) -->
+<app-admin-form-modal
+  [isOpen]="showCreateModal || showEditModal"
+  [mode]="showCreateModal ? 'create' : 'edit'"
+  [adminId]="selectedAdmin?.user_id || null"
+  [adminData]="showEditModal ? selectedAdmin : null"
+  (close)="closeModals()"
+  (success)="handleModalSuccess($event)">
+</app-admin-form-modal>
+
+<!-- Suspend/Unsuspend Modal -->
+<div *ngIf="showSuspendModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-2xl p-6 max-w-md w-full">
+    <div class="flex items-center justify-between mb-6">
+      <h3 class="text-xl font-bold text-gray-800">
+        {{ selectedAdmin?.status === 'suspended' ? 'Activate Admin' : 'Suspend Admin' }}
+      </h3>
+      <button (click)="closeModals()" class="text-gray-500 hover:text-gray-700">
+        <i class="fas fa-times text-xl"></i>
+      </button>
+    </div>
+    
+    <p class="text-gray-600 mb-4">
+      {{ selectedAdmin?.status === 'suspended' 
+        ? 'Are you sure you want to activate ' 
+        : 'Are you sure you want to suspend ' }}
+      <strong>{{ selectedAdmin?.full_name }}</strong>?
+    </p>
+
+    <!-- Suspend Reason Input (only show when suspending, not unsuspending) -->
+    <div *ngIf="selectedAdmin?.status !== 'suspended'" class="mb-4">
+      <label class="block text-gray-700 font-medium text-sm mb-2">Suspend Reason</label>
+      <textarea
+        [(ngModel)]="suspendReason"
+        placeholder="Enter reason for suspension (5-500 characters)"
+        maxlength="500"
+        class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 text-sm resize-none"
+        rows="3"
+      ></textarea>
+      <p class="text-gray-500 text-xs mt-1">{{ suspendReason.length || 0 }}/500 characters</p>
+      <p *ngIf="suspendReasonError" class="text-red-600 text-xs mt-1">{{ suspendReasonError }}</p>
+    </div>
+
+    <!-- Show existing reason if suspended -->
+    <div *ngIf="selectedAdmin?.status === 'suspended' && selectedAdmin && selectedAdmin.suspend_reason" class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+      <p class="text-xs text-gray-600 mb-1"><strong>Suspension Reason:</strong></p>
+      <p class="text-sm text-gray-700">{{ selectedAdmin && selectedAdmin.suspend_reason }}</p>
+    </div>
+
+    <div class="flex gap-3">
+      <button
+        (click)="confirmSuspend()"
+        [disabled]="selectedAdmin?.status !== 'suspended' && (!suspendReason || suspendReason.length < 5)"
+        [class]="selectedAdmin?.status === 'suspended' 
+          ? 'flex-1 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold disabled:opacity-50' 
+          : 'flex-1 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold disabled:opacity-50'"
+      >
+        {{ selectedAdmin?.status === 'suspended' ? 'Activate' : 'Suspend' }}
+      </button>
+      <button
+        (click)="closeModals()"
+        class="flex-1 px-6 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 font-semibold"
+      >
+        Cancel
+      </button>
+    </div>
+  </div>
+</div>

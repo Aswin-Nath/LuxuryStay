@@ -1,5 +1,5 @@
 from typing import List, Optional
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.sqlalchemy_schemas.roles import Roles
@@ -34,6 +34,11 @@ async def fetch_role_by_name(db: AsyncSession, role_name: str) -> Optional[Roles
 # ==========================================================
 # 🔹 PERMISSIONS CRUD
 # ==========================================================
+async def fetch_all_permissions(db: AsyncSession) -> List[Permissions]:
+	query_result = await db.execute(select(Permissions))
+	return query_result.scalars().all()
+
+
 async def fetch_permissions_by_role_id(db: AsyncSession, role_id: int) -> List[Permissions]:
 	query_result = await db.execute(
 		select(Permissions)
@@ -71,3 +76,11 @@ async def insert_permission_role_map(db: AsyncSession, role_id: int, permission_
 	db.add(permission_role_map_record)
 	await db.flush()
 	return permission_role_map_record
+
+
+async def delete_all_permissions_for_role(db: AsyncSession, role_id: int) -> None:
+	"""Delete all permission-role mappings for a specific role."""
+	await db.execute(
+		delete(PermissionRoleMap).where(PermissionRoleMap.role_id == role_id)
+	)
+	await db.flush()

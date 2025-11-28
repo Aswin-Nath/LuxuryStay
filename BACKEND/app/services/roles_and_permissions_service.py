@@ -6,12 +6,14 @@ from app.crud.roles_and_permissions import (
 	fetch_role_by_id,
 	fetch_role_by_name,
 	fetch_all_roles,
+	fetch_all_permissions,
 	insert_role_record,
 	fetch_permissions_by_role_id,
 	fetch_permissions_by_resources,
 	fetch_roles_by_permission_id,
 	fetch_permission_role_map,
 	insert_permission_role_map,
+	delete_all_permissions_for_role,
 )
 from app.models.sqlalchemy_schemas.roles import Roles
 
@@ -23,13 +25,13 @@ async def assign_permissions_to_role(db: AsyncSession, role_id: int, permission_
 	"""
 	Assign permissions to a role.
 	
-	Creates permission-role associations for a specific role. Skips permissions already
-	assigned to the role. Useful for role management and access control configuration.
+	Replaces all permissions for a role with the new set provided. First deletes all existing
+	permission-role associations, then creates new ones for the provided permission IDs.
 	
 	Args:
 		db (AsyncSession): Database session for executing queries.
 		role_id (int): The ID of the role to assign permissions to.
-		permission_ids (List[int]): List of permission IDs to assign.
+		permission_ids (List[int]): List of permission IDs to assign (replaces existing).
 	
 	Returns:
 		dict: Confirmation with role_id, assigned permission IDs, and success message.
@@ -41,10 +43,12 @@ async def assign_permissions_to_role(db: AsyncSession, role_id: int, permission_
 	if not role:
 		raise HTTPException(status_code=404, detail=f"Role ID {role_id} not found.")
 
+	# Delete all existing permissions for this role
+	await delete_all_permissions_for_role(db, role_id)
+	
+	# Add the new permissions
 	for pid in permission_ids:
-		existing = await fetch_permission_role_map(db, role_id, pid)
-		if not existing:
-			await insert_permission_role_map(db, role_id, pid)
+		await insert_permission_role_map(db, role_id, pid)
 
 	await db.commit()
 	return {
@@ -186,3 +190,23 @@ async def list_roles(db: AsyncSession) -> List[Roles]:
 		List[Roles]: All role records in the system.
 	"""
 	return await fetch_all_roles(db)
+
+
+# ==========================================================
+# 🔹 LIST ALL PERMISSIONS
+# ==========================================================
+async def list_all_permissions(db: AsyncSession) -> List:
+	"""
+	Retrieve all permissions in the system.
+	
+	Fetches complete list of all permissions available in the system. Permissions
+	define granular access control actions (READ, WRITE, UPDATE, DELETE) for resources.
+	Used for permission assignment to roles.
+	
+	Args:
+		db (AsyncSession): Database session for executing the query.
+	
+	Returns:
+		List: All permission records in the system.
+	"""
+	return await fetch_all_permissions(db)

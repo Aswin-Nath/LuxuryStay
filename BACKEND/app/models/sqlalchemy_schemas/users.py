@@ -2,6 +2,7 @@ from sqlalchemy import Column,Integer,String,DateTime,func,Enum,ForeignKey,Date,
 from sqlalchemy.orm import relationship
 import enum
 from app.database.postgres_connection import Base
+
 class GenderTypes(enum.Enum):
     Male="MALE"
     Female="FEMALE"
@@ -21,12 +22,13 @@ class Users(Base):
     last_password_updated = Column(DateTime, server_default=func.now())
     loyalty_points = Column(Integer, server_default="0")
     created_by = Column(Integer, ForeignKey("users.user_id"), nullable=True)
-    status_id = Column(Integer, ForeignKey("status_utility.status_id"), index=True, nullable=True)
+    status = Column(String(50), default="active", index=True, nullable=False)
+    suspend_reason = Column(String(500), nullable=True)
     is_deleted = Column(Boolean, server_default="false", index=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    profile_image_url=Column(String(150),unique=True,nullable=True)
+    profile_image_url = Column(String(150), unique=True, nullable=True)
+    
     # relationships
     role = relationship("Roles", back_populates="users")
-    status = relationship("StatusUtility", back_populates="users")
     creator = relationship("Users", remote_side=[user_id])

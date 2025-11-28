@@ -36,7 +36,8 @@ async def create_user_record(
     password_hash: str,
     phone_number: Optional[str],
     role_id: int,
-    status_id: int,
+    status: str = "active",
+    suspend_reason: Optional[str] = None,
     created_by: Optional[int] = None,
 ) -> Users:
     """Insert a new user record."""
@@ -46,7 +47,8 @@ async def create_user_record(
         password=password_hash,
         phone_number=phone_number,
         role_id=role_id,
-        status_id=status_id,
+        status=status,
+        suspend_reason=suspend_reason,
         created_by=created_by,
     )
     db.add(user_obj)

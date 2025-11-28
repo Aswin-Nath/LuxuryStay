@@ -6,7 +6,7 @@ import { PermissionService } from "../services/permissions/permissions";
     standalone: true
 })
 export class HasPermissionDirective{
-    private scope!: string;
+    private scope: string | null = null;
     
     constructor(
         private template:TemplateRef<any>,
@@ -19,12 +19,30 @@ export class HasPermissionDirective{
         });
     }
 
-    @Input() set appHasPermission(scope:string){
-        this.scope = scope;
+    @Input() set appHasPermission(scope: string | null | undefined){
+        // Store the exact scope value passed
+        this.scope = scope || null;
         this.updateView();
     }
 
     private updateView(){
+        // If no permission is set (null or undefined), show the element
+        if (!this.scope) {
+            console.log(`🔍 Directive Check [NO PERMISSION]:`, true);
+            this.view.clear();
+            this.view.createEmbeddedView(this.template);
+            return;
+        }
+
+        // If scope is 'ANY', show the element
+        if (this.scope === 'ANY') {
+            console.log(`🔍 Directive Check [ANY]:`, true);
+            this.view.clear();
+            this.view.createEmbeddedView(this.template);
+            return;
+        }
+
+        // Check if user has the permission
         const hasAccess = this.permissions.hasPermission(this.scope);
         console.log(`🔍 Directive Check [${this.scope}]:`, hasAccess);
         this.view.clear();

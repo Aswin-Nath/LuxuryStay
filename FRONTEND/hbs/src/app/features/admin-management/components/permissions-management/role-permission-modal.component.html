@@ -1,0 +1,124 @@
+<!-- Modal Backdrop -->
+<div *ngIf="isOpen" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+     (click)="onClose()">
+  
+  <!-- Modal Content -->
+  <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+       (click)="$event.stopPropagation()">
+    
+    <!-- Modal Header -->
+    <div class="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
+      <div>
+        <h2 class="text-2xl font-semibold text-gray-800">
+          Manage Permissions for <span class="text-blue-600">{{ roleName }}</span>
+        </h2>
+        <p class="text-gray-600 text-sm mt-1">Select permissions to assign to this role</p>
+      </div>
+      <button type="button" (click)="onClose()" 
+              class="text-gray-400 hover:text-gray-600 transition-colors">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="p-6 space-y-4">
+      
+      <!-- Quick Actions -->
+      <div class="flex gap-3 pb-4 border-b">
+        <button (click)="selectAll()"
+                class="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 font-medium text-sm">
+          <i class="fas fa-check-double mr-2"></i>Select All
+        </button>
+        <button (click)="deselectAll()"
+                class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium text-sm">
+          <i class="fas fa-times-circle mr-2"></i>Deselect All
+        </button>
+      </div>
+
+      <!-- Permission Groups -->
+      <div class="space-y-3">
+        <div *ngFor="let group of permissionsGrouped" class="border rounded-lg">
+          <!-- Resource Header -->
+          <div class="bg-gray-50 p-4 cursor-pointer hover:bg-gray-100 transition-colors flex items-center justify-between"
+               (click)="toggleResource(group.resource)">
+            <div class="flex items-center gap-3">
+              <svg *ngIf="expandedResources[group.resource]" class="w-5 h-5 text-gray-600">
+                <path d="M7 10l5 5 5-5z"/>
+              </svg>
+              <svg *ngIf="!expandedResources[group.resource]" class="w-5 h-5 text-gray-600">
+                <path d="M10 7l5 5-5 5z"/>
+              </svg>
+              <h3 class="font-semibold text-gray-800">{{ group.resource }}</h3>
+              <span *ngIf="isResourceSelected(group.resource)" 
+                    class="ml-2 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                {{ selectedResourcePermissions[group.resource]?.length || 0 }}/{{ group.permissions.length }}
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              <!-- Module Toggle Button -->
+              <button (click)="toggleAllResourcePermissions(group.resource); $event.stopPropagation()"
+                      [class]="areAllResourcePermissionsSelected(group.resource) ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'"
+                      class="px-3 py-1 rounded text-xs font-medium hover:opacity-80 transition-all">
+                <i class="fas" [ngClass]="areAllResourcePermissionsSelected(group.resource) ? 'fa-check-square' : 'fa-square'"></i>
+                {{ areAllResourcePermissionsSelected(group.resource) ? 'All' : 'None' }}
+              </button>
+              <span class="text-sm text-gray-500">{{ group.permissions.length }} perms</span>
+              <i class="fas" [ngClass]="expandedResources[group.resource] ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+            </div>
+          </div>
+
+          <!-- Permissions List -->
+          <div *ngIf="expandedResources[group.resource]" class="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 border-t">
+            <label *ngFor="let perm of group.permissions" 
+                   [ngClass]="{'selected': isPermissionSelected(perm.permission_id, group.resource)}"
+                   class="permission-item flex items-center gap-3 cursor-pointer p-2 rounded transition-colors relative border-l-4 border-transparent">
+              <input type="checkbox" 
+                     [checked]="isPermissionSelected(perm.permission_id, group.resource)"
+                     (change)="togglePermission(perm.permission_id, group.resource)"
+                     class="permission-checkbox w-4 h-4 text-blue-600 rounded border-gray-300 cursor-pointer">
+              <div class="flex-1">
+                <span class="font-medium text-gray-800">{{ perm.action }}</span>
+                <span class="text-xs text-gray-500 ml-2">(ID: {{ perm.permission_id }})</span>
+              </div>
+              <!-- Blue Checkmark for Selected Permissions -->
+              <span *ngIf="isPermissionSelected(perm.permission_id, group.resource)" 
+                    class="checkmark-icon text-blue-600 font-bold ml-2 shrink-0">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+              </span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary -->
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
+        <p class="text-blue-900 font-medium">
+          <i class="fas fa-info-circle mr-2"></i>
+          Total Permissions Selected: <span class="text-lg font-bold">{{ getAllSelectedPermissions().length }}</span>
+        </p>
+      </div>
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="sticky bottom-0 bg-white border-t px-6 py-4 flex justify-end gap-3">
+      <button type="button" (click)="onClose()"
+              [disabled]="isSubmitting"
+              class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 font-medium">
+        Cancel
+      </button>
+      <button type="button" (click)="onSave()"
+              [disabled]="isSubmitting || getAllSelectedPermissions().length === 0"
+              class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium">
+        <svg *ngIf="isSubmitting" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>{{ isSubmitting ? 'Saving...' : 'Save Permissions' }}</span>
+      </button>
+    </div>
+  </div>
+</div>

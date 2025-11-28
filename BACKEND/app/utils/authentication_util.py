@@ -97,7 +97,7 @@ async def create_user(
     dob: date | None,
     gender: str | GenderTypes | None,
     role_id: int,
-    status_id: int,
+    status: str = "active",
     created_by: int | None,
 ):
     hashed = _hash_password(password)
@@ -109,7 +109,7 @@ async def create_user(
         dob=dob,
         gender=_normalize_gender(gender),
         role_id=role_id,
-        status_id=status_id,
+        status=status,
         created_by=created_by
     )
     db.add(user_record)
@@ -369,7 +369,6 @@ async def revoke_session(db: AsyncSession, *, session: Sessions, reason: str | N
         )
     except Exception:
         pass
-    # mark session as inactive
     session.is_active = False
     session.revoked_at = datetime.utcnow()
     session.revoked_reason = reason

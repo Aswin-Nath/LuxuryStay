@@ -327,7 +327,7 @@ async def logout(
                 session = await get_session_by_refresh_token(db, refresh_token_cookie)
 
         if session:
-            # Use revoke_session which blacklists both tokens and marks session inactive
+            # Use revoke_session which blacklists both tokens and marks session 
             try:
                 await revoke_session(db, session=session, reason='user_logout')
             except Exception:

@@ -13,7 +13,9 @@ from app.services.roles_and_permissions_service import (
     get_permissions_by_role as svc_get_permissions_by_role,
     get_permissions_by_resources as svc_get_permissions_by_resources,
     get_roles_for_permission as svc_get_roles_for_permission,
-    create_role as svc_create_role, list_roles as svc_list_roles
+    create_role as svc_create_role, 
+    list_roles as svc_list_roles,
+    list_all_permissions as svc_list_all_permissions
 )
 from app.dependencies.authentication import check_permission, get_current_user
 from app.utils.authentication_util import invalidate_permissions_cache
@@ -309,5 +311,48 @@ async def list_roles(
 
     roles = await svc_list_roles(db)
     result = [RoleResponse.model_validate(r).model_copy(update={"message": "Fetched successfully"}) for r in roles]
+    await set_cached(cache_key, result, ttl=300)
+    return result
+
+
+# ==============================================================
+# 🔹 READ - Fetch list of all permissions
+# ==============================================================
+@roles_and_permissions_router.get("/all-permissions", response_model=List[PermissionResponse])
+async def list_all_permissions_endpoint(
+    db: AsyncSession = Depends(get_db),
+    token_payload: dict = Security(check_permission, scopes=["ADMIN_CREATION:READ"]),
+):
+    """
+    Retrieve all system permissions.
+    
+    Endpoint to fetch the complete list of all permissions available in the system. Results are
+    cached for 300 seconds (5 minutes) to reduce database load. Each permission record includes
+    permission_id and permission_name in format RESOURCE:ACTION. Used for permission assignment
+    to roles and permission management interfaces.
+    
+    **Authorization:** Requires ADMIN_CREATION:READ permission.
+    
+    Args:
+        db (AsyncSession): Database session dependency.
+        token_payload (dict): Token validation with ADMIN_CREATION:READ scope requirement.
+    
+    Returns:
+        List[PermissionResponse]: List of all permission records with success message.
+    
+    Raises:
+        HTTPException (403): If user lacks ADMIN_CREATION:READ permission.
+    
+    Side Effects:
+        - Uses Redis cache with key "permissions:all" and TTL of 300 seconds.
+        - Returns cached results if available, otherwise queries database and caches result.
+    """
+    cache_key = "permissions:all"
+    cached = await get_cached(cache_key)
+    if cached is not None:
+        return cached
+
+    permissions = await svc_list_all_permissions(db)
+    result = [PermissionResponse.model_validate(p).model_copy(update={"message": "Fetched successfully"}) for p in permissions]
     await set_cached(cache_key, result, ttl=300)
     return result

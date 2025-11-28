@@ -121,6 +121,7 @@ async def upload_profile_image(
         - Deletes old profile image from storage.
         - Updates user's profile_image_url field.
     """
+    return await upload_profile_image_service(db, current_user, file)
 
 
 # ==========================================================
@@ -157,3 +158,4 @@ async def change_my_password(
         - Creates audit log entry.
         - Invalidates any cached user session data.
     """
+    return await change_my_password_service(db, current_user, payload.current_password, payload.new_password)

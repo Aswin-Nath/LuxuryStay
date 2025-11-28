@@ -2,14 +2,16 @@
 <div class="fixed top-16 left-0 w-64 h-screen shadow-lg bg-white overflow-y-auto">
   <nav class="py-4">
     <ul class="space-y-1">
-      <li *ngFor="let link of sidebarLinks">
-        <a [routerLink]="link.route"
-           routerLinkActive="bg-yellow-100 text-yellow-700 border-r-4 border-yellow-500"
-           class="flex items-center px-6 py-3 text-gray-700 hover:bg-gray-100 hover:text-yellow-600 transition-colors">
-          <i class="fas {{ link.icon }} w-5 text-center mr-3"></i>
-          <span class="font-medium">{{ link.label }}</span>
-        </a>
-      </li>
+      <ng-container *ngFor="let link of sidebarLinks">
+        <li *ngIf="isMenuItemVisible(link.permission)">
+          <a [routerLink]="link.route"
+             routerLinkActive="bg-yellow-100 text-yellow-700 border-r-4 border-yellow-500"
+             class="flex items-center px-6 py-3 text-gray-700 hover:bg-gray-100 hover:text-yellow-600 transition-colors">
+            <i class="fas {{ link.icon }} w-5 text-center mr-3"></i>
+            <span class="font-medium">{{ link.label }}</span>
+          </a>
+        </li>
+      </ng-container>
     </ul>
   </nav>
   

@@ -54,6 +54,11 @@ export class AuthenticationService {
       withCredentials: true,
     }).pipe(
       tap((res) => {
+        // Store access token and expiration
+        localStorage.setItem('access_token', res.access_token);
+        localStorage.setItem('expires_in', String(res.expires_in));
+        localStorage.setItem('auth_role_id', String(res.role_id));
+        
         this.authStateSubject.next(true);
         if (res?.expires_in !== undefined) {
           this.setTokenRefreshTimer(res.expires_in);
@@ -80,6 +85,11 @@ export class AuthenticationService {
     return this.http.post<TokenResponse>(`${this.baseUrl}/refresh`, {}, { withCredentials: true }).pipe(
       tap((res) => {
         console.debug('AuthenticationService: refreshToken response', res);
+        
+        // Update token and expiration in localStorage
+        localStorage.setItem('access_token', res.access_token);
+        localStorage.setItem('expires_in', String(res.expires_in));
+        
         this.authStateSubject.next(true);
         // Reset timer with new expiration time
         if (res?.expires_in !== undefined) {

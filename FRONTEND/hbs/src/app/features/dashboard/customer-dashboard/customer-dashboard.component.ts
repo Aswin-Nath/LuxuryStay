@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { CustomerNavbarComponent } from '../../../core/components/customer-navbar/customer-navbar.component';
+import { CustomerSidebarComponent } from '../../../core/components/customer-sidebar/customer-sidebar.component';
 
 interface Booking {
   id: string;
@@ -28,7 +29,7 @@ interface Offer {
 @Component({
   selector: 'app-customer-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule, CustomerNavbarComponent],
+  imports: [CommonModule, RouterModule, CustomerNavbarComponent, CustomerSidebarComponent],
   templateUrl: './customer-dashboard.component.html',
   styleUrls: ['./customer-dashboard.component.css']
 })
@@ -90,17 +91,6 @@ export class CustomerDashboardComponent implements OnInit {
   showToast = false;
   toastMessage = '';
   toastType: 'success' | 'error' | 'info' = 'success';
-
-  // Sidebar links
-  sidebarLinks = [
-    { label: 'Overview', route: '/customer/dashboard', icon: 'fa-home', page: 'dashboard' },
-    { label: 'My Bookings', route: '/customer/bookings', icon: 'fa-calendar-check', page: 'booking' },
-    { label: 'Wishlist', route: '/customer/wishlist', icon: 'fa-heart', page: 'saved' },
-    { label: 'My Issues', route: '/customer/issues', icon: 'fa-exclamation-circle', page: 'issues' },
-    { label: 'My Refunds', route: '/customer/refunds', icon: 'fa-money-bill-wave', page: 'refunds' },
-    { label: 'Profile', route: '/customer/profile', icon: 'fa-user', page: 'profile' },
-    { label: 'Reports', route: '/customer/reports', icon: 'fa-chart-bar', page: 'report' }
-  ];
 
   currentPage = 'dashboard';
 
