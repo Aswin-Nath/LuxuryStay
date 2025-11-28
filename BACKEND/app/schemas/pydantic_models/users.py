@@ -10,14 +10,19 @@ ALLOWED_GENDERS = {"male", "female", "other"}
 PHONE_REGEX = r'^\+?\d{10,15}$'
 
 
-class UserCreate(BaseModel):
+class   UserCreate(BaseModel):
     full_name: str = Field(..., min_length=3, max_length=100)
     email: EmailStr
     password: str = Field(..., min_length=8)
     phone_number: str = Field(..., pattern=PHONE_REGEX)
     dob: date
     gender: str
+    role_id:int=Field(...,gt=1)
 
+    @field_validator("role_id")
+    def validate_role(cls,value:int):
+        if value==0:
+            return ValueError("role_id value must greater than 1")
     # --- DOB VALIDATION ---
     @field_validator('dob')
     def dob_must_be_in_past(cls, value: date) -> date:

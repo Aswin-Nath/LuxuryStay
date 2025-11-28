@@ -8,12 +8,15 @@ export class PublicGuard implements CanActivate {
 
   canActivate(): boolean {
     const token = localStorage.getItem('access_token');
-
+    const role_id=localStorage.getItem("auth_role_id");
     if (token) {
-      this.router.navigate(['/home_page']);
-      return false;
-    }
-
+      if(role_id=="1"){
+        this.router.navigate(['/dashboard']);
+      }
+      else{
+        this.router.navigate(['admin/dashboard']);
+      }
+  }
     return true;
   }
 }

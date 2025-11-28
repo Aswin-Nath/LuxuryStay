@@ -1,0 +1,289 @@
+<app-admin-navbar></app-admin-navbar>
+
+<!-- SIDEBAR -->
+<app-admin-sidebar></app-admin-sidebar>
+
+<!-- MAIN -->
+<main class="ml-64 pt-16 p-8 h-screen overflow-y-auto bg-gray-50">
+
+  <header class="flex items-start justify-between mb-6">
+    <div>
+      <h1 class="text-3xl font-extrabold text-gray-800">Welcome, Admin <span class="text-yellow-500">👋</span></h1>
+    </div>
+    <!-- Quick top-right CTA -->
+    <div class="flex items-center gap-3">
+      <button (click)="exportCsv()" class="px-4 py-2 rounded-md bg-gray-100 hover:bg-gray-200 text-sm">Export CSV</button>
+    </div>
+  </header>
+
+  <!-- FILTER BAR -->
+  <section class="bg-white shadow rounded-xl p-4 mb-8">
+    <div class="flex flex-wrap items-center gap-4">
+      <span class="text-gray-600 font-medium">Filter by:</span>
+
+      <!-- Preset pills -->
+      <div class="flex gap-2">
+        <button *ngFor="let range of ['1D', '1W', '1M', '1Y']"
+                (click)="selectRange(range)"
+                [class.bg-yellow-500]="currentRange === range"
+                [class.text-white]="currentRange === range"
+                class="px-4 py-2 rounded-lg bg-gray-200 filter-pill">
+          {{ range }}
+        </button>
+        <button (click)="selectRange('custom')"
+                [class.bg-yellow-500]="currentRange === 'custom'"
+                [class.text-white]="currentRange === 'custom'"
+                class="px-4 py-2 rounded-lg bg-gray-200 filter-pill">
+          Custom
+        </button>
+      </div>
+
+      <!-- Inline date inputs (appear when custom selected) -->
+      <div *ngIf="showCustomDates" class="flex items-center gap-2 ml-4">
+        <input [(ngModel)]="fromDate" type="date" class="border p-2 rounded-lg" />
+        <span class="text-gray-500">to</span>
+        <input [(ngModel)]="toDate" type="date" class="border p-2 rounded-lg" />
+        <button (click)="applyCustomRange()" class="px-4 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-700 text-white">Apply</button>
+      </div>
+
+      <!-- quick filter: status -->
+      <div class="ml-auto flex items-center gap-3">
+        <label class="text-sm text-gray-500">Status</label>
+        <select [(ngModel)]="statusFilter" (change)="onStatusFilterChange()" class="border rounded-md p-2 text-sm">
+          <option value="all">All</option>
+          <option value="confirmed">Confirmed</option>
+          <option value="checkedin">Checked-in</option>
+          <option value="checkedout">Checked-out</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+    </div>
+  </section>
+
+  <!-- KPIs & Quick Actions -->
+  <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+
+    <!-- KPI Grid -->
+    <div class="bg-white shadow rounded-xl p-6">
+      <h3 class="text-lg font-semibold text-gray-700 mb-4">Overview</h3>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div class="bg-gray-100 p-4 rounded-lg text-center stat-card">
+          <p class="text-sm text-gray-500">Total Bookings</p>
+          <p class="text-xl font-bold text-yellow-600">{{ totalBookings }}</p>
+        </div>
+
+        <div class="bg-gray-100 p-4 rounded-lg text-center stat-card">
+          <p class="text-sm text-gray-500">Net Revenue</p>
+          <p class="text-xl font-bold text-green-600">{{ formatCurrency(netRevenue) }}</p>
+        </div>
+
+        <div class="bg-gray-100 p-4 rounded-lg text-center stat-card">
+          <p class="text-sm text-gray-500">Refunds Sent</p>
+          <p class="text-xl font-bold text-red-600">{{ formatCurrency(refundsSent) }}</p>
+        </div>
+
+        <div class="bg-gray-100 p-4 rounded-lg text-center stat-card">
+          <p class="text-sm text-gray-500">Rooms Available</p>
+          <p class="text-xl font-bold text-blue-600">{{ roomsAvailable }}</p>
+        </div>
+
+        <div class="bg-gray-100 p-4 rounded-lg text-center stat-card">
+          <p class="text-sm text-gray-500">ADR (Avg Daily Rate)</p>
+          <p class="text-xl font-bold text-indigo-600">{{ formatCurrency(adr) }}</p>
+        </div>
+
+        <div class="bg-gray-100 p-4 rounded-lg text-center stat-card">
+          <p class="text-sm text-gray-500">RevPAR</p>
+          <p class="text-xl font-bold text-purple-600">{{ formatCurrency(revpar) }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="bg-white shadow rounded-xl p-6">
+      <h3 class="text-lg font-semibold text-gray-700 mb-4">Quick Actions</h3>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <button routerLink="/admin/rooms/add" class="py-3 rounded-lg shadow bg-yellow-500 text-white hover:bg-yellow-600 transition">Add Room</button>
+        <button routerLink="/admin/rooms" class="py-3 rounded-lg shadow bg-gray-500 text-white hover:bg-gray-600 transition">Freeze/Edit Rooms</button>
+        <button (click)="backupData()" class="py-3 rounded-lg shadow bg-purple-500 text-white hover:bg-purple-600 transition">Backup Data</button>
+      </div>
+
+      <div class="mt-6">
+        <p class="text-sm text-gray-500">Quick stats</p>
+        <div class="flex items-center gap-4 mt-3">
+          <div class="p-3 bg-gray-50 rounded-md">
+            <p class="text-xs text-gray-500">Cancellation Rate</p>
+            <p class="font-bold text-red-600">{{ cancelRate }}%</p>
+          </div>
+          <div class="p-3 bg-gray-50 rounded-md">
+            <p class="text-xs text-gray-500">No-Show Rate</p>
+            <p class="font-bold text-orange-600">{{ noShowRate }}%</p>
+          </div>
+          <div class="p-3 bg-gray-50 rounded-md">
+            <p class="text-xs text-gray-500">Retention Rate</p>
+            <p class="font-bold text-green-600">{{ retentionRate }}%</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- Charts -->
+  <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+
+    <!-- Daily Bookings -->
+    <div class="bg-white shadow rounded-xl p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold text-gray-700">Daily Bookings</h3>
+      </div>
+      <div class="chart-wrap">
+        <canvas #dailyBookingsChart></canvas>
+      </div>
+    </div>
+
+    <!-- Top Room Types by Revenue -->
+    <div class="bg-white shadow rounded-xl p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold text-gray-700">Top Room Types by Revenue</h3>
+      </div>
+      <div class="chart-wrap">
+        <canvas #roomTypeChart></canvas>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- Tables: Upcoming checkins/checkouts -->
+  <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+
+    <!-- Upcoming Checkouts -->
+    <div class="bg-white shadow rounded-xl p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold text-gray-700">Upcoming 10 Checkouts</h3>
+        <span class="text-sm text-gray-500">{{ checkoutsList.length }} items</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="text-left text-gray-600">
+            <tr>
+              <th class="py-2 px-3">Guest</th>
+              <th class="py-2 px-3">Room</th>
+              <th class="py-2 px-3">Check-in</th>
+              <th class="py-2 px-3">Check-out</th>
+            </tr>
+          </thead>
+          <tbody class="text-gray-700">
+            <tr *ngFor="let b of checkoutsList">
+              <td class="py-2 px-3">{{ b.guest }}</td>
+              <td class="py-2 px-3">{{ b.roomNo }} · {{ b.roomType }}</td>
+              <td class="py-2 px-3">{{ b.checkIn }}</td>
+              <td class="py-2 px-3">{{ b.checkOut }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Upcoming Check-ins -->
+    <div class="bg-white shadow rounded-xl p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold text-gray-700">Upcoming 10 Check-ins</h3>
+        <span class="text-sm text-gray-500">{{ checkinsList.length }} items</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="text-left text-gray-600">
+            <tr>
+              <th class="py-2 px-3">Guest</th>
+              <th class="py-2 px-3">Room</th>
+              <th class="py-2 px-3">Check-in</th>
+              <th class="py-2 px-3">Check-out</th>
+            </tr>
+          </thead>
+          <tbody class="text-gray-700">
+            <tr *ngFor="let b of checkinsList">
+              <td class="py-2 px-3">{{ b.guest }}</td>
+              <td class="py-2 px-3">{{ b.roomNo }} · {{ b.roomType }}</td>
+              <td class="py-2 px-3">{{ b.checkIn }}</td>
+              <td class="py-2 px-3">{{ b.checkOut }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </section>
+
+  <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+
+    <!-- Refunds Tracker -->
+    <div class="bg-white shadow rounded-xl p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold text-gray-700">Refunds Tracker</h3>
+        <span class="text-sm text-gray-500">Shows refunds and % of revenue</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="text-left text-gray-600">
+            <tr>
+              <th class="py-2 px-3">Refund ID</th>
+              <th class="py-2 px-3">Booking ID</th>
+              <th class="py-2 px-3">Guest</th>
+              <th class="py-2 px-3">Amount</th>
+              <th class="py-2 px-3">Reason</th>
+              <th class="py-2 px-3">Date</th>
+            </tr>
+          </thead>
+          <tbody class="text-gray-700">
+            <tr *ngFor="let b of refundsList">
+              <td class="py-2 px-3">RFD-{{ b.id }}</td>
+              <td class="py-2 px-3">{{ b.id }}</td>
+              <td class="py-2 px-3">{{ b.guest }}</td>
+              <td class="py-2 px-3">{{ formatCurrency(b.refunded) }}</td>
+              <td class="py-2 px-3">{{ b.cancellationReason || 'Other' }}</td>
+              <td class="py-2 px-3">{{ b.bookingDate }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="mt-4">
+        <p class="text-sm text-gray-500">Refunds as % of revenue: <span class="font-bold text-red-600">{{ refundPercent }}%</span></p>
+      </div>
+    </div>
+
+    <!-- Top Guests -->
+    <div class="bg-white shadow rounded-xl p-6">
+      <h3 class="text-lg font-semibold text-gray-700 mb-4">Top Guests</h3>
+
+      <div class="grid grid-cols-1 gap-4">
+        <div>
+          <p class="text-sm text-gray-500 mb-2">Top Guests (Lifetime Value)</p>
+          <ul class="space-y-2">
+            <li *ngFor="let g of topGuestsList" 
+                class="flex justify-between items-center p-2 bg-gray-50 rounded-md">
+              <span class="font-medium">{{ g.guest }}</span>
+              <span class="text-green-600 font-bold">{{ formatCurrency(g.lifetimeSpend) }}</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+
+  </section>
+
+  <!-- Footer spacing -->
+  <div class="h-24"></div>
+
+</main>
+
+<!-- Toast Notification -->
+<div *ngIf="showToast"
+     class="fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white transition-all duration-300 z-50"
+     [ngClass]="getToastClass()">
+  <div class="flex items-center gap-2">
+    <span class="material-icons text-sm">{{ getToastIcon() }}</span>
+    <span>{{ toastMessage }}</span>
+  </div>
+</div>

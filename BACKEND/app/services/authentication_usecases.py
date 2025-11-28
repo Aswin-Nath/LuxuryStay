@@ -550,7 +550,7 @@ async def register_admin(
             phone_number=payload.phone_number,
             dob=payload.dob,
             gender=payload.gender,
-            role_id=1,
+            role_id=payload.role_id,
             status_id=1,
             created_by=current_user_id,
         )

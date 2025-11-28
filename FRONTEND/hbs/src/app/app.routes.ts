@@ -8,6 +8,8 @@ import { PublicGuard } from './core/guards/public.guard';
 import { ForbiddenPageComponent } from './core/components/forbidden-page/forbidden-page.component';
 import { PermissionResolver } from './core/resolver/permission.resolver';
 import { PermissionGuard } from './core/guards/permission.guard';
+import { CustomerDashboardComponent } from './features/dashboard/customer-dashboard/customer-dashboard.component';
+import { AdminDashboardComponent } from './features/dashboard/admin-dashboard/admin-dashboard.component';
 
 export const routes: Routes = [
 	{ path: '', redirectTo: 'login', pathMatch: 'full' },
@@ -23,6 +25,22 @@ export const routes: Routes = [
 				path: 'home_page',
 				component: HomePageComponent,
 				canActivate: [PermissionGuard]
+			},
+			// Customer Routes
+			{
+				path: '',
+				children: [
+					{ path: 'dashboard', component: CustomerDashboardComponent },
+					{ path: '', redirectTo: 'dashboard', pathMatch: 'full' }
+				]
+			},
+			// Admin Routes
+			{
+				path: 'admin',
+				children: [
+					{ path: 'dashboard', component: AdminDashboardComponent },
+					{ path: '', redirectTo: 'dashboard', pathMatch: 'full' }
+				]
 			}
 		]
 	},

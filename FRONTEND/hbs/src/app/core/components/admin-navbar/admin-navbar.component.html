@@ -1,0 +1,25 @@
+<!-- ✅ Admin Navbar -->
+<header class="flex justify-between items-center bg-white shadow-md px-4 sm:px-6 py-2 fixed top-0 left-0 w-full z-50">
+  <a routerLink="" class="flex items-center space-x-2">
+    <img src="/assets/images/Hotel_logo.png" alt="Hotel Logo"
+      class="h-8 sm:h-10 rounded-full border-2 border-yellow-600 p-1">
+    <h1 class="text-lg sm:text-xl font-bold text-yellow-700">LuxuryStay</h1>
+  </a>
+
+  <!-- Admin Quick Actions -->
+  <div class="flex items-center space-x-4">
+    <!-- Admin Badge -->
+    <span
+      class="hidden sm:inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+      <i class="fas fa-shield-alt mr-1"></i>
+      Admin Panel
+    </span>
+
+    <!-- Logout Button -->
+    <button (click)="logout()"
+      class="px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition text-sm">
+      <i class="fas fa-sign-out-alt mr-1"></i>
+      Logout
+    </button>
+  </div>
+</header>

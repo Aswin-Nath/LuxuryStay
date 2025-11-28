@@ -196,7 +196,13 @@ export class Login implements AfterViewInit {
   setTimeout(() => document.body.classList.add('fade-page'), 300);
   setTimeout(() => {
     this.loading = false;
-    this.router.navigate(['/home_page']);
+    if(response.role_id==1){
+      this.router.navigate(['/dashboard']);
+    }
+    else{
+      this.router.navigate(['admin/dashboard']);
+
+    }
   }, 900);
 }
 

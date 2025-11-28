@@ -1,0 +1,37 @@
+/* Mobile dropdown slide effect */
+.max-h-0 {
+  max-height: 0;
+}
+
+.max-h-screen {
+  max-height: 100vh;
+}
+
+.glow-btn {
+  position: relative;
+  transition: all 0.3s ease;
+  animation: glow-pulse 2s infinite ease-in-out;
+}
+
+@keyframes glow-pulse {
+  0% {
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+    transform: scale(1.05);
+  }
+  100% {
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
+    transform: scale(1);
+  }
+}
+
+.-translate-y-full {
+  transform: translateY(-100%);
+}
+
+.translate-y-0 {
+  transform: translateY(0);
+}
