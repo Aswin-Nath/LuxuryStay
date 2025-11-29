@@ -11,9 +11,7 @@
 		<h2 class="text-xl font-semibold">Room Types</h2>
 		<ul class="mt-2 list-disc pl-6">
 			<li *ngFor="let r of roomTypes">
-				<strong>{{ r.room_type_name }}</strong>
-				<div *ngIf="r.description">{{ r.description }}</div>
-				<div *ngIf="r.message" class="text-sm text-gray-500">{{ r.message }}</div>
+				<strong>{{ r.type_name }}</strong> - ₹{{ r.price_per_night }}/night
 			</li>
 		</ul>
 	</div>
@@ -27,7 +25,7 @@
 		<h2 class="text-xl font-semibold">Rooms</h2>
 		<ul class="mt-2 list-disc pl-6">
 			<li *ngFor="let r of rooms">
-				<strong>ID: {{r.room_id}}</strong> - {{r.room_name || (r.room_type_name || r.room_id)}}
+				<strong>Room {{ r.room_no }}</strong> - {{ r.room_type.type_name }} ({{ r.room_status }})
 			</li>
 		</ul>
 	</div>

@@ -10,7 +10,7 @@ from app.models.sqlalchemy_schemas.rooms import (
     Rooms,
     RoomTypes,
     RoomAmenities,
-    RoomAmenityMap,
+    RoomTypeAmenityMap,
 )
 
 
@@ -28,6 +28,7 @@ from app.crud.rooms import (
     fetch_room_by_id,
     fetch_room_by_number,
     fetch_rooms_filtered,
+    fetch_rooms_by_type_id,
     update_room_by_id,
     soft_delete_room,
 
@@ -37,14 +38,20 @@ from app.crud.rooms import (
     fetch_amenity_by_id,
     fetch_amenity_by_name,
     remove_amenity,
+    update_amenity_by_id,
 
-    # Room-Amenity Mapping CRUD
-    fetch_mapping_exists,
-    insert_room_amenity_map,
-    fetch_amenities_by_room_id,
+    # Room Type-Amenity Mapping CRUD
+    insert_room_type_amenity_map,
+    fetch_amenities_by_room_type_id,
+    fetch_room_types_by_amenity_id,
+    delete_room_type_amenity_map,
+    delete_all_amenities_for_room_type,
     fetch_rooms_by_amenity_id,
     fetch_mapping_by_ids,
     delete_room_amenity_map,
+    fetch_mapping_exists,
+    insert_room_amenity_map,
+    fetch_amenities_by_room_id,
 )
 
 # ==========================================================
@@ -55,17 +62,34 @@ async def create_room_type(db: AsyncSession, payload) -> RoomTypes:
 	if existing_type:
 		raise HTTPException(status_code=409, detail="Room type already exists")
 
-	room_type_record = await insert_room_type(db, payload.model_dump())
+	# Extract amenities before creating room type (not part of RoomTypes model)
+	data = payload.model_dump(exclude={'amenities'})
+	amenity_ids = payload.amenities or []
+	
+	room_type_record = await insert_room_type(db, data)
 	await db.commit()
 	await db.refresh(room_type_record)
+	
+	# Map amenities directly to the room type (not to individual rooms)
+	if amenity_ids:
+		for amenity_id in amenity_ids:
+			try:
+				await insert_room_type_amenity_map(db, {
+					'room_type_id': room_type_record.room_type_id,
+					'amenity_id': amenity_id
+				})
+			except Exception:
+				pass  # Silently skip if mapping already exists
+		await db.commit()
+	
 	return room_type_record
 
 
 # ==========================================================
 # 🔹 LIST ROOM TYPES
 # ==========================================================
-async def list_room_types(db: AsyncSession, include_deleted: Optional[bool] = False) -> List[RoomTypes]:
-	return await fetch_all_room_types(db, include_deleted)
+async def list_room_types(db: AsyncSession) -> List[RoomTypes]:
+	return await fetch_all_room_types(db)
 
 
 # ==========================================================
@@ -139,7 +163,7 @@ async def create_room(db: AsyncSession, payload) -> Rooms:
 
 	room_record = await insert_room(db, room_data)
 	await db.commit()
-	await db.refresh(room_record)
+	await db.refresh(room_record, ["room_type"])
 	return room_record
 
 
@@ -261,18 +285,21 @@ async def delete_room(db: AsyncSession, room_id: int) -> None:
 
 
 # ==========================================================
-# 🔹 BULK UPLOAD ROOMS (EXCEL)
+# 🔹 BULK UPLOAD ROOMS (CSV/EXCEL)
 # ==========================================================
-async def bulk_upload_rooms(db: AsyncSession, file_content: bytes) -> Dict[str, Any]:
+async def bulk_upload_rooms(db: AsyncSession, file_content: bytes, filename: str = "") -> Dict[str, Any]:
 	"""
-	Bulk upload rooms from an Excel file.
+	Bulk upload rooms from a CSV or Excel file.
 	
-	Reads an Excel file containing room data and creates multiple rooms at once. Validates each row for
+	Reads a CSV or Excel file containing room data and creates multiple rooms at once. Validates each row for
 	required fields and data integrity. Returns a summary of successfully created rooms and skipped entries.
+	
+	Supports both room_type_id (integer) and room_type_name (string) columns.
 	
 	Args:
 		db (AsyncSession): The database session for executing queries.
-		file_content (bytes): The raw bytes content of the Excel file (.xlsx format).
+		file_content (bytes): The raw bytes content of the file.
+		filename (str): The original filename to detect file type.
 	
 	Returns:
 		Dict[str, Any]: A dictionary containing:
@@ -283,37 +310,100 @@ async def bulk_upload_rooms(db: AsyncSession, file_content: bytes) -> Dict[str, 
 			- skipped_rooms (List): Details of skipped rooms with reasons.
 	
 	Raises:
-		HTTPException (400): If the Excel file cannot be read or required columns are missing.
+		HTTPException (400): If the file cannot be read or required columns are missing.
 	"""
 	try:
-		df = pd.read_excel(BytesIO(file_content))
+		# Detect file type from filename or try to read as CSV first, then Excel
+		if filename.lower().endswith('.csv'):
+			df = pd.read_csv(BytesIO(file_content))
+		else:
+			# Try Excel first (handles .xlsx, .xls)
+			try:
+				df = pd.read_excel(BytesIO(file_content), engine='openpyxl')
+			except Exception:
+				# Fallback to CSV if Excel fails
+				df = pd.read_csv(BytesIO(file_content))
 	except Exception as e:
-		raise HTTPException(status_code=400, detail=f"Failed to read Excel file: {str(e)}")
+		raise HTTPException(status_code=400, detail=f"Failed to read file: {str(e)}")
 
-	required_columns = {"room_no", "room_type_id"}
+	# Normalize column names: strip whitespace and convert to lowercase
+	df.columns = df.columns.str.strip().str.lower()
+	
+	# Debug: log available columns for troubleshooting
+	available_columns = list(df.columns)
+
+	# Check if user uploaded room type data instead of room data
+	room_type_indicators = {'price', 'adults capacity', 'children capacity', 'square', 'description', 'amenities', 'occupancy'}
+	if any(col in available_columns for col in room_type_indicators) and 'room_no' not in available_columns:
+		raise HTTPException(
+			status_code=400,
+			detail="❌ It looks like you're trying to upload ROOM TYPES, not ROOMS. The Bulk Add feature is for adding individual rooms to existing room types. "
+				   "Columns detected: " + ", ".join(available_columns) + ". "
+				   "✅ For adding rooms, use this format: room_no, room_type_name, room_status (optional), freeze_reason (optional). "
+				   "Example: 101, Deluxe, AVAILABLE, NONE"
+		)
+
+	required_columns = {"room_no"}
 	if not required_columns.issubset(df.columns):
 		raise HTTPException(
 			status_code=400,
-			detail=f"Excel must contain columns: {', '.join(required_columns)}"
+			detail=f"❌ File must contain 'room_no' column. Available columns: {', '.join(available_columns)}. "
+				   f"✅ Expected columns: room_no, room_type_name, room_status (optional), freeze_reason (optional)"
+		)
+
+	# Check that at least one of room_type_id or room_type_name exists
+	if "room_type_id" not in df.columns and "room_type_name" not in df.columns:
+		raise HTTPException(
+			status_code=400,
+			detail="❌ File must contain either 'room_type_id' or 'room_type_name' column. Available columns: " + ", ".join(available_columns) + ". "
+				   "✅ Use room_type_name (e.g., 'Deluxe', 'Standard') - IDs are not supported in bulk uploads."
 		)
 
 	created_rooms, skipped_rooms = [], []
 
 	for idx, row in df.iterrows():
 		try:
+			# Safely get room_no with error handling
+			if "room_no" not in row.index:
+				skipped_rooms.append({"room_no": f"Row {idx + 2}", "reason": "room_no column not found"})
+				continue
+			
 			room_no = str(row["room_no"]).strip()
-			room_type_id = int(row["room_type_id"])
 			room_status = str(row.get("room_status", "AVAILABLE")).strip().upper()
 			freeze_reason = str(row.get("freeze_reason", "NONE")).strip().upper()
 
-			if not room_no:
+			if not room_no or room_no == "nan":
 				skipped_rooms.append({"room_no": f"Row {idx + 2}", "reason": "Room number is empty"})
 				continue
 
+			# Resolve room_type_id from either room_type_id or room_type_name
+			room_type_id = None
+			
+			if "room_type_id" in df.columns and pd.notna(row.get("room_type_id")):
+				try:
+					room_type_id = int(row["room_type_id"])
+				except (ValueError, TypeError):
+					skipped_rooms.append({"room_no": room_no, "reason": "room_type_id must be a valid integer"})
+					continue
+			
+			elif "room_type_name" in df.columns and pd.notna(row.get("room_type_name")):
+				room_type_name = str(row["room_type_name"]).strip()
+				room_type = await fetch_room_type_by_name(db, room_type_name)
+				if not room_type:
+					skipped_rooms.append({"room_no": room_no, "reason": f"Room type '{room_type_name}' not found"})
+					continue
+				room_type_id = room_type.room_type_id
+			
+			else:
+				skipped_rooms.append({"room_no": room_no, "reason": "Must provide either room_type_id or room_type_name"})
+				continue
+
+			# Validate room exists
 			if await fetch_room_by_number(db, room_no):
 				skipped_rooms.append({"room_no": room_no, "reason": "Room number already exists"})
 				continue
 
+			# Validate room type exists
 			room_type = await fetch_room_type_by_id(db, room_type_id)
 			if not room_type:
 				skipped_rooms.append({"room_no": room_no, "reason": f"Room type ID {room_type_id} not found"})
@@ -544,13 +634,44 @@ async def delete_amenity(db: AsyncSession, amenity_id: int) -> None:
 	if not amenity_record:
 		raise HTTPException(status_code=404, detail="Amenity not found")
 
-	# check if amenity is mapped to any rooms using a COUNT query
-	mapped_count = await db.execute(
-		select(func.count()).select_from(RoomAmenityMap).where(RoomAmenityMap.amenity_id == amenity_id)
+	# ✅ Delete all room-type-amenity mappings for this amenity (CASCADE should handle this, but explicit delete is safer)
+	mappings_result = await db.execute(
+		select(RoomTypeAmenityMap).where(RoomTypeAmenityMap.amenity_id == amenity_id)
 	)
-	count_result = mapped_count.scalar()
-	if count_result > 0:
-		raise HTTPException(status_code=400, detail="Amenity is mapped to rooms; unmap first")
+	mappings = mappings_result.scalars().all()
+	
+	# Delete each mapping
+	for mapping in mappings:
+		await db.delete(mapping)
+	
+	print(f"[DELETE_AMENITY] Deleted {len(mappings)} room-type-amenity mappings for amenity {amenity_id}")
 
+	# Then delete the amenity itself
 	await remove_amenity(db, amenity_record)
 	await db.commit()
+	print(f"[DELETE_AMENITY] Successfully deleted amenity {amenity_id}")
+
+
+# 🔹 UPDATE AMENITY
+# ==========================================================
+async def update_amenity(db: AsyncSession, amenity_id: int, payload) -> RoomAmenities:
+	amenity_record = await fetch_amenity_by_id(db, amenity_id)
+	if not amenity_record:
+		raise HTTPException(status_code=404, detail="Amenity not found")
+
+	# Check if new name already exists (if different from current)
+	if hasattr(payload, 'amenity_name') and payload.amenity_name != amenity_record.amenity_name:
+		existing = await fetch_amenity_by_name(db, payload.amenity_name)
+		if existing:
+			raise HTTPException(status_code=400, detail="Amenity name already exists")
+
+	updates = {}
+	if hasattr(payload, 'amenity_name'):
+		updates['amenity_name'] = payload.amenity_name
+	
+	if updates:
+		await update_amenity_by_id(db, amenity_id, updates)
+	
+	await db.commit()
+	return await fetch_amenity_by_id(db, amenity_id)
+

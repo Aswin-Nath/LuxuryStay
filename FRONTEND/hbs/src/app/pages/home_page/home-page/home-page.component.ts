@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RoomsService, RoomType } from '../../../core/services/rooms/rooms.service';
+import { RoomsService, RoomType, Room, PaginatedRoomsResponse } from '../../../core/services/rooms/rooms.service';
 import { HasPermissionDirective } from "../../../core/directives/has-permission.directive";
 
 @Component({
@@ -12,7 +12,7 @@ import { HasPermissionDirective } from "../../../core/directives/has-permission.
 })
 export class HomePageComponent {
   roomTypes: RoomType[] = [];
-  rooms: any[] = [];
+  rooms: Room[] = [];
   loading = false;
   error = '';
 
@@ -21,12 +21,12 @@ export class HomePageComponent {
   fetchRoomTypes() {
     this.loading = true;
     this.error = '';
-    this.roomsService.getRoomTypes(false).subscribe({
-      next: (res) => {
+    this.roomsService.getRoomTypes().subscribe({
+      next: (res: RoomType[]) => {
         this.roomTypes = res;
         this.loading = false;
       },
-      error: (err) => {
+      error: (err: any) => {
         this.error = err?.error?.detail || err?.message || 'Failed to load room types';
         this.loading = false;
       }
@@ -37,11 +37,11 @@ export class HomePageComponent {
     this.loading = true;
     this.error = '';
     this.roomsService.getRooms().subscribe({
-      next: (res) => {
-        this.rooms = res;
+      next: (res: PaginatedRoomsResponse) => {
+        this.rooms = res.data;
         this.loading = false;
       },
-      error: (err) => {
+      error: (err: any) => {
         this.error = err?.error?.detail || err?.message || 'Failed to load rooms';
         this.loading = false;
       }

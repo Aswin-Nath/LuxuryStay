@@ -55,6 +55,7 @@ class RoomTypes(Base):
     
     # Relationships
     rooms = relationship("Rooms", back_populates="room_type", cascade="all, delete-orphan")
+    amenities = relationship("RoomTypeAmenityMap", back_populates="room_type", cascade="all, delete-orphan")
 
 # ==============================================================
 # ROOMS
@@ -72,7 +73,6 @@ class Rooms(Base):
     is_deleted = Column(Boolean, nullable=False, default=False, index=True)
     # Relationships
     room_type = relationship("RoomTypes", back_populates="rooms")
-    amenities = relationship("RoomAmenityMap", back_populates="room", cascade="all, delete-orphan")
     booking_room_maps = relationship("BookingRoomMap", back_populates="room", cascade="all, delete-orphan")
     hold_expires_at = Column(DateTime(timezone=True), nullable=True)
 # ==============================================================
@@ -85,17 +85,17 @@ class RoomAmenities(Base):
     amenity_name = Column(String(100), nullable=False, unique=True, index=True)
 
     # Relationships
-    rooms = relationship("RoomAmenityMap", back_populates="amenity", cascade="all, delete-orphan")
+    room_types = relationship("RoomTypeAmenityMap", back_populates="amenity", cascade="all, delete-orphan")
 
 # ==============================================================
-# ROOM–AMENITY MAP (MANY-TO-MANY)
+# ROOM TYPE–AMENITY MAP (MANY-TO-MANY)
 # ==============================================================
-class RoomAmenityMap(Base):
-    __tablename__ = "room_amenity_map"
+class RoomTypeAmenityMap(Base):
+    __tablename__ = "room_type_amenity_map"
 
-    room_id = Column(Integer, ForeignKey("rooms.room_id", ondelete="CASCADE"), primary_key=True, index=True)
+    room_type_id = Column(Integer, ForeignKey("room_types.room_type_id", ondelete="CASCADE"), primary_key=True, index=True)
     amenity_id = Column(Integer, ForeignKey("room_amenities.amenity_id", ondelete="CASCADE"), primary_key=True, index=True)
 
     # Relationships
-    room = relationship("Rooms", back_populates="amenities")
-    amenity = relationship("RoomAmenities", back_populates="rooms")
+    room_type = relationship("RoomTypes", back_populates="amenities")
+    amenity = relationship("RoomAmenities", back_populates="room_types")

@@ -23,6 +23,7 @@ export class AdminSidebarComponent implements OnInit {
     { label: 'Dashboard', route: '/admin/dashboard', icon: 'fa-tachometer-alt' },
     { label: 'Bookings', route: '/admin/bookings', icon: 'fa-calendar-check' },
     { label: 'Rooms', route: '/admin/rooms', icon: 'fa-bed' },
+    { label: 'Room Types & Amenities', route: '/admin/room-types-amenities', icon: 'fa-layer-group' },
     { label: 'Guests', route: '/admin/guests', icon: 'fa-users' },
     { label: 'Admin Management', route: '/admin/management', icon: 'fa-user-shield', permission: 'ADMIN_CREATION:READ' },
     { label: 'Role Management', route: '/admin/roles', icon: 'fa-user-tag', permission: 'ADMIN_CREATION:READ' },

@@ -26,15 +26,44 @@ class FreezeReason(str, Enum):
 # ==============================================================
 # ROOM TYPES
 # ==============================================================
+
+class RoomAmenityDetail(BaseModel):
+    """Schema for amenities included in room type responses"""
+    amenity_id: int
+    amenity_name: str
+
+    model_config = {"from_attributes": True}
+
+
 class RoomTypeCreate(BaseModel):
-    type_name: str = Field(..., max_length=50)
-    max_adult_count: int = Field(..., ge=1)
+    type_name: Optional[str] = Field(None, max_length=50)
+    max_adult_count: Optional[int] = Field(None, ge=1)
     max_child_count: int = Field(0, ge=0)
     price_per_night: float = Field(..., ge=0)
     description: Optional[str] = None
-    square_ft: int = Field(..., ge=0)
+    square_ft: int = Field(50, ge=0)
+    amenities: Optional[list] = None
 
     model_config = {"from_attributes": True}
+
+    def __init__(self, **data):
+        # Map frontend field names to backend field names
+        if 'room_type_name' in data and 'type_name' not in data:
+            data['type_name'] = data.pop('room_type_name')
+        else:
+            data.pop('room_type_name', None)  # Remove if exists
+            
+        if 'occupancy_limit_adults' in data and 'max_adult_count' not in data:
+            data['max_adult_count'] = data.pop('occupancy_limit_adults')
+        else:
+            data.pop('occupancy_limit_adults', None)  # Remove if exists
+            
+        if 'occupancy_limit_children' in data and 'max_child_count' not in data:
+            data['max_child_count'] = data.pop('occupancy_limit_children')
+        else:
+            data.pop('occupancy_limit_children', None)  # Remove if exists
+        
+        super().__init__(**data)
 
 
 class RoomTypeResponse(RoomTypeCreate):
@@ -43,7 +72,10 @@ class RoomTypeResponse(RoomTypeCreate):
     created_at: datetime
     updated_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = {
+        "from_attributes": True,
+        "extra": "ignore"  # Ignore extra attributes from ORM (like amenities relationship)
+    }
 
 
 class RoomType(BaseModel):
@@ -221,3 +253,7 @@ class BulkRoomUploadResponse(BaseModel):
     message: str = "Bulk upload completed"
 
     model_config = {"from_attributes": True}
+
+
+# Rebuild models to resolve forward references
+RoomTypeResponse.model_rebuild()

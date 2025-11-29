@@ -12,10 +12,14 @@ import { CustomerDashboardComponent } from './features/dashboard/customer-dashbo
 import { AdminDashboardComponent } from './features/dashboard/admin-dashboard/admin-dashboard.component';
 import { ProfileComponent } from './features/profile/customer/profile.component';
 import { AdminProfileComponent } from './features/profile/admin/admin-profile.component';
-// import { AdminManagementComponent } from './features/admin-management/admin-management.component';
-// import { RoleManagementComponent } from './features/admin-management/role-management.component';
 import { AdminManagementComponent } from './features/admin-management/components/dashboard/admin-management.component';
 import { RoleManagementComponent } from './features/admin-management/components/roles-management/role-management.component';
+import { Rooms } from './features/room-management/rooms/rooms';
+import { IndividualRoomComponent } from './features/room-management/individual-room/individual-room';
+import { EditRoomComponent } from './features/room-management/edit-room/edit-room';
+import { RoomTypesAmenitiesManagementComponent } from './features/room-management/room-types-amenities-management/room-types-amenities-management';
+import { EditRoomTypeComponent } from './features/room-management/edit-room-type/edit-room-type';
+import { ViewRoomTypeComponent } from './features/room-management/view-room-type/view-room-type';
 export const routes: Routes = [
 	{ path: '', redirectTo: 'login', pathMatch: 'full' },
 	{ path: 'login', component: Login, canActivate: [PublicGuard] },
@@ -57,6 +61,32 @@ export const routes: Routes = [
 						component: RoleManagementComponent,
 						canActivate: [PermissionGuard],
 						data: { requiredPermission: 'ADMIN_CREATION:READ' }
+					},
+					{
+						path: 'rooms',
+						children: [
+							{ path: '', component: Rooms },
+							{ path: ':id/view', component: IndividualRoomComponent },
+							{ path: ':id/edit', component: EditRoomComponent }
+						]
+					},
+					{
+						path: 'room-types-amenities',
+						component: RoomTypesAmenitiesManagementComponent,
+						canActivate: [PermissionGuard],
+						data: { requiredPermission: 'ADMIN_CREATION:READ' }
+					},
+					{
+						path: 'room-type/:id/view',
+						component: ViewRoomTypeComponent,
+						canActivate: [PermissionGuard],
+						data: { requiredPermission: 'ROOM_MANAGEMENT:READ' }
+					},
+					{
+						path: 'edit-room-type/:id',
+						component: EditRoomTypeComponent,
+						canActivate: [PermissionGuard],
+						data: { requiredPermission: 'ROOM_MANAGEMENT:WRITE' }
 					},
 					{ path: '', redirectTo: 'dashboard', pathMatch: 'full' }
 				]

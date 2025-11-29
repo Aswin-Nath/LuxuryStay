@@ -1,0 +1,303 @@
+<app-spinner [isLoading]="isSaving" message="Updating room type..."></app-spinner>
+
+<app-admin-navbar></app-admin-navbar>
+
+<div class="bg-gray-50 min-h-screen">
+  <div class="flex flex-col lg:flex-row flex-1 w-full mt-16 md:mt-20">
+    <!-- Sidebar -->
+    <div class="w-full lg:w-64 px-4 md:px-6 lg:px-8 py-4 shrink-0">
+      <app-admin-sidebar></app-admin-sidebar>
+    </div>
+
+    <!-- Main Content -->
+    <main class="flex-1 w-full px-4 md:px-6 lg:px-8 py-4 space-y-4">
+      <!-- Header -->
+      <div class="relative rounded-lg p-[3px] bg-linear-to-r from-yellow-600 to-red-700 shadow">
+        <div class="bg-[#fdfaf4] rounded-lg py-4 md:py-6 px-6">
+          <h2 class="text-2xl md:text-3xl text-gray-800 font-bold">Edit Room Type</h2>
+          <p class="text-gray-600 text-xs md:text-sm mt-1">Update room type details, pricing, and amenities</p>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div *ngIf="loading" class="bg-white p-8 text-center rounded-lg shadow">
+        <div class="inline-block">
+          <div class="animate-spin h-8 w-8 border-4 border-yellow-600 border-t-transparent rounded-full"></div>
+        </div>
+        <p class="text-gray-600 mt-3 text-sm">Loading room type details...</p>
+      </div>
+
+      <!-- Error State -->
+      <div *ngIf="error && !loading" class="bg-red-50 border border-red-200 p-4 rounded-lg text-red-700 text-sm">
+        {{ error }}
+      </div>
+
+      <!-- Success State -->
+      <div *ngIf="success" class="bg-green-50 border border-green-200 p-4 rounded-lg text-green-700 text-sm">
+        {{ success }}
+      </div>
+
+      <!-- Form Content -->
+      <div *ngIf="!loading && roomType" class="space-y-4">
+        <!-- Basic Info Section -->
+        <div class="bg-white rounded-lg shadow p-6 space-y-4">
+          <h3 class="text-lg font-semibold text-gray-800">Basic Information</h3>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Room Type Name</label>
+              <input 
+                [(ngModel)]="typeName" 
+                type="text" 
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-600"
+                placeholder="e.g., Deluxe Suite">
+            </div>
+          </div>
+        </div>
+
+        <!-- Pricing & Capacity Section -->
+        <div class="bg-white rounded-lg shadow p-6 space-y-4">
+          <h3 class="text-lg font-semibold text-gray-800">Pricing & Capacity</h3>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Price Per Night ($)</label>
+              <input 
+                [(ngModel)]="price" 
+                type="number" 
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-600"
+                placeholder="0">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Max Adults</label>
+              <input 
+                [(ngModel)]="maxAdults" 
+                type="number" 
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-600"
+                placeholder="0">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Max Children</label>
+              <input 
+                [(ngModel)]="maxChildren" 
+                type="number" 
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-600"
+                placeholder="0">
+            </div>
+          </div>
+        </div>
+
+        <!-- Description Section -->
+        <div class="bg-white rounded-lg shadow p-6 space-y-4">
+          <h3 class="text-lg font-semibold text-gray-800">Description</h3>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Room Description</label>
+            <textarea 
+              [(ngModel)]="description" 
+              (input)="onDescriptionInput($event)"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-600 resize-none"
+              rows="4"
+              placeholder="Describe your room type..."></textarea>
+            <div class="text-right text-xs text-gray-500 mt-1">{{ descriptionCharCount }}/{{ maxDescriptionChars }}</div>
+          </div>
+        </div>
+
+        <!-- Amenities Section -->
+        <div class="bg-white rounded-lg shadow p-6 space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-800">Room Amenities</h3>
+            <button 
+              (click)="openRoomsModal()"
+              class="flex items-center gap-2 px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm">
+              <span class="material-icons text-sm">visibility</span>
+              View Rooms
+            </button>
+          </div>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            <div *ngFor="let amenity of allAmenities" class="flex items-center p-3 border rounded-lg hover:bg-gray-50 transition" [class.bg-green-50]="isAmenitySelected(amenity.amenity_id)" [class.border-green-300]="isAmenitySelected(amenity.amenity_id)">
+              <input 
+                type="checkbox" 
+                [checked]="isAmenitySelected(amenity.amenity_id)"
+                (change)="toggleAmenity(amenity.amenity_id)"
+                class="w-4 h-4 text-green-600 rounded focus:ring-2 focus:ring-green-600 cursor-pointer">
+              <label class="ml-3 text-sm text-gray-700 cursor-pointer flex-1 font-medium">
+                {{ amenity.amenity_name }}
+              </label>
+              <span *ngIf="isAmenitySelected(amenity.amenity_id)" class="material-icons text-sm text-green-600">check_circle</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Images Section -->
+        <div class="bg-white rounded-lg shadow p-6 space-y-4">
+          <h3 class="text-lg font-semibold text-gray-800">Room Images (Max {{ maxImages }})</h3>
+          
+          <!-- Existing Images -->
+          <div *ngIf="existingImages && existingImages.length > 0" class="space-y-3">
+            <div class="text-sm font-medium text-gray-600 mb-2">Existing Images ({{ existingImages.length }})</div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              <div *ngFor="let image of existingImages; let i = index" class="relative group">
+                <img [src]="image.image_url" alt="Room" class="w-full h-24 object-cover rounded-lg" [class.ring-2]="image.is_primary" [class.ring-yellow-500]="image.is_primary">
+                <div *ngIf="image.is_primary" class="absolute top-1 left-1 bg-yellow-500 text-white rounded-full p-1">
+                  <span class="material-icons text-xs">star</span>
+                </div>
+                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 rounded-lg transition flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100">
+                  <button 
+                    (click)="setImageAsPrimary(image.image_id)"
+                    [disabled]="image.is_primary"
+                    title="Set as primary"
+                    class="bg-yellow-600 hover:bg-yellow-700 disabled:opacity-50 text-white rounded-full p-1 transition">
+                    <span class="material-icons text-sm">star</span>
+                  </button>
+                  <button 
+                    (click)="deleteExistingImage(image.image_id, i)"
+                    title="Delete image"
+                    class="bg-red-600 hover:bg-red-700 text-white rounded-full p-1 transition">
+                    <span class="material-icons text-sm">delete</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Upload New Images -->
+          <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:bg-gray-50 transition"
+            (click)="imageInput.click()">
+            <span class="material-icons text-3xl text-gray-400">cloud_upload</span>
+            <p class="text-gray-600 mt-2 text-sm">Upload New Images</p>
+            <input 
+              #imageInput 
+              type="file" 
+              multiple 
+              accept="image/*"
+              hidden 
+              (change)="onImageSelect($event)">
+          </div>
+
+          <!-- New Image Previews -->
+          <div *ngIf="imagePreviews.length > 0" class="space-y-2">
+            <div class="text-sm font-medium text-gray-600">New Images to Upload ({{ imagePreviews.length }})</div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              <div *ngFor="let preview of imagePreviews; let i = index" class="relative">
+                <img [src]="preview" alt="Preview" class="w-full h-24 object-cover rounded-lg border-2 border-yellow-300">
+                <button 
+                  (click)="removeImage(i)"
+                  class="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 transition">
+                  <span class="material-icons text-sm">close</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div *ngIf="!existingImages || (existingImages.length === 0 && imagePreviews.length === 0)" class="text-gray-500 text-sm text-center py-4">
+            No images uploaded yet
+          </div>
+        </div>
+
+        <!-- Videos Section -->
+        <div class="bg-white rounded-lg shadow p-6 space-y-4">
+          <h3 class="text-lg font-semibold text-gray-800">Room Videos (Max {{ maxVideos }})</h3>
+          
+          <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:bg-gray-50 transition"
+            (click)="videoInput.click()">
+            <span class="material-icons text-3xl text-gray-400">videocam</span>
+            <p class="text-gray-600 mt-2 text-sm">Upload Videos</p>
+            <input 
+              #videoInput 
+              type="file" 
+              multiple 
+              accept="video/*"
+              hidden 
+              (change)="onVideoSelect($event)">
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            <div *ngFor="let preview of videoPreviews; let i = index" class="relative">
+              <video [src]="preview" class="w-full h-24 object-cover rounded-lg bg-black"></video>
+              <button 
+                (click)="removeVideo(i)"
+                class="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 transition">
+                <span class="material-icons text-sm">close</span>
+              </button>
+            </div>
+          </div>
+
+          <div *ngIf="videoPreviews.length === 0" class="text-gray-500 text-sm text-center py-4">
+            No videos uploaded yet
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="bg-white rounded-lg shadow p-6 flex flex-col sm:flex-row gap-3 justify-end">
+          <button 
+            (click)="cancel()"
+            class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium w-full sm:w-auto">
+            <span class="material-icons inline mr-2">close</span>Cancel
+          </button>
+          <button 
+            (click)="openConfirmModal()"
+            [disabled]="isSaving"
+            class="px-6 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition font-medium disabled:opacity-50 w-full sm:w-auto">
+            <span class="material-icons inline mr-2">save</span>{{ isSaving ? 'Saving...' : 'Save Changes' }}
+          </button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Confirm Modal -->
+<div *ngIf="showConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-lg shadow-xl max-w-sm w-full p-4 sm:p-6">
+    <h3 class="text-lg font-semibold text-gray-800 mb-4">Confirm Save</h3>
+    <p class="text-gray-600 mb-6 text-sm">Are you sure you want to save these changes?</p>
+    <div class="flex flex-col sm:flex-row gap-3 justify-end">
+      <button 
+        (click)="closeConfirmModal()"
+        class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition w-full sm:w-auto">
+        Cancel
+      </button>
+      <button 
+        (click)="saveChanges()"
+        class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition w-full sm:w-auto">
+        Save
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Rooms Modal -->
+<div *ngIf="showRoomsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-96 overflow-y-auto p-4 sm:p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold text-gray-800">Rooms of This Type</h3>
+      <button 
+        (click)="closeRoomsModal()"
+        class="text-gray-500 hover:text-gray-700">
+        <span class="material-icons">close</span>
+      </button>
+    </div>
+    
+    <div *ngIf="roomsForThisType.length > 0" class="space-y-2">
+      <div *ngFor="let room of roomsForThisType" class="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+        <div>
+          <p class="font-medium text-gray-800">Room #{{ room.room_no }}</p>
+          <p class="text-sm text-gray-500">ID: {{ room.room_id }}</p>
+        </div>
+        <button 
+          (click)="viewRoom(room.room_id)"
+          class="flex items-center gap-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-sm">
+          <span class="material-icons text-sm">visibility</span>
+          View
+        </button>
+      </div>
+    </div>
+    
+    <div *ngIf="roomsForThisType.length === 0" class="text-center py-8 text-gray-500">
+      <span class="material-icons text-4xl text-gray-400 mb-2 block">info</span>
+      <p>No rooms found for this type</p>
+    </div>
+  </div>
+</div>

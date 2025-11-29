@@ -1,0 +1,62 @@
+/* Edit Room Type Styles */
+
+/* Responsive utilities */
+@media (max-width: 640px) {
+  :host ::ng-deep .px-4 {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+  
+  :host ::ng-deep main {
+    padding: 0.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  :host ::ng-deep .lg\:flex-row {
+    flex-direction: column;
+  }
+  
+  :host ::ng-deep .lg\:w-64 {
+    width: 100%;
+  }
+  
+  :host ::ng-deep .text-2xl {
+    font-size: 1.5rem;
+  }
+}
+
+/* Form input focus states */
+:host ::ng-deep input:focus,
+:host ::ng-deep textarea:focus {
+  outline: none;
+  border-color: #ca8a04;
+  box-shadow: 0 0 0 3px rgba(202, 138, 4, 0.1);
+}
+
+/* Smooth transitions */
+:host ::ng-deep button {
+  transition: all 0.2s ease;
+}
+
+:host ::ng-deep button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+/* Better spacing on mobile */
+@media (max-width: 640px) {
+  :host ::ng-deep .space-y-4 > * + * {
+    margin-top: 0.75rem;
+  }
+  
+  :host ::ng-deep .gap-4 {
+    gap: 0.75rem;
+  }
+}
+
+/* Grid responsiveness */
+@media (max-width: 768px) {
+  :host ::ng-deep .grid {
+    grid-template-columns: repeat(auto-fit, minmax(100%, 1fr));
+  }
+}
