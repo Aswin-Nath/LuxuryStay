@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router } from '@angular/router';
 import { CustomerNavbarComponent } from '../../../core/components/customer-navbar/customer-navbar.component';
 import { CustomerSidebarComponent } from '../../../core/components/customer-sidebar/customer-sidebar.component';
 
@@ -94,7 +94,7 @@ export class CustomerDashboardComponent implements OnInit {
 
   currentPage = 'dashboard';
 
-  constructor() { }
+  constructor(private router: Router) { }
 
   ngOnInit(): void {
     this.loadSavedOffers();
@@ -158,5 +158,9 @@ export class CustomerDashboardComponent implements OnInit {
 
   getDiscountBadgeClass(type: string): string {
     return type === 'percent' ? 'bg-green-100 text-green-800' : 'bg-pink-100 text-pink-800';
+  }
+
+  bookNow(): void {
+    this.router.navigate(['/booking']);
   }
 }

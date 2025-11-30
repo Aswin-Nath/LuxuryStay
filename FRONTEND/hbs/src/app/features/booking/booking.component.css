@@ -1,0 +1,382 @@
+/* ===================================================
+   ANIMATIONS
+   =================================================== */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+.animate-slideInRight {
+  animation: slideInRight 0.5s ease-in-out;
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 1000px 100%;
+}
+
+/* ===================================================
+   SCROLLING & GENERAL STYLES
+   =================================================== */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* ===================================================
+   TRANSITIONS
+   =================================================== */
+* {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+button {
+  transition: all 0.3s ease !important;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+input, textarea, select {
+  transition: all 0.3s ease;
+}
+
+input:focus, textarea:focus, select:focus {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* ===================================================
+   ROOM CARDS
+   =================================================== */
+.room-card {
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.room-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+}
+
+/* ===================================================
+   TIMER STYLING
+   =================================================== */
+.timer-display {
+  font-family: 'Courier New', monospace;
+  letter-spacing: 3px;
+  font-weight: 900;
+}
+
+.text-green-500 {
+  color: #10b981;
+}
+
+.text-yellow-500 {
+  color: #eab308;
+}
+
+.text-red-500 {
+  color: #ef4444;
+}
+
+/* ===================================================
+   TABS
+   =================================================== */
+.tab-button {
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.tab-button.active {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.tab-button.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: #2563eb;
+  border-radius: 2px;
+}
+
+/* ===================================================
+   GRADIENTS
+   =================================================== */
+.gradient-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.gradient-success {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.gradient-danger {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+/* ===================================================
+   CARDS
+   =================================================== */
+.card-shadow {
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+}
+
+.card-shadow:hover {
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  transform: translateY(-4px);
+}
+
+/* ===================================================
+   BUTTONS
+   =================================================== */
+.btn-primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background: white;
+  color: #374151;
+  border: 2px solid #e5e7eb;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: #f0f9ff;
+}
+
+/* ===================================================
+   BADGES & LABELS
+   =================================================== */
+.badge {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.badge-success {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.badge-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge-danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* ===================================================
+   RESPONSIVE
+   =================================================== */
+@media (max-width: 768px) {
+  .animate-fadeIn {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+
+  .room-card {
+    margin-bottom: 1rem;
+  }
+
+  .timer-display {
+    font-size: 1.5rem;
+  }
+}
+
+/* ===================================================
+   LOADING STATE
+   =================================================== */
+.loading-skeleton {
+  animation: shimmer 2s infinite;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 1000px 100%;
+  border-radius: 8px;
+}
+
+/* ===================================================
+   FORM CONTROLS
+   =================================================== */
+input[type="date"],
+input[type="number"],
+input[type="text"],
+select {
+  border: 2px solid #e5e7eb;
+  transition: all 0.3s ease;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 1rem;
+}
+
+input[type="date"]:focus,
+input[type="number"]:focus,
+input[type="text"]:focus,
+select:focus {
+  border-color: #3b82f6;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* ===================================================
+   ALERTS
+   =================================================== */
+.alert {
+  padding: 16px;
+  border-radius: 8px;
+  border-left: 4px solid;
+  animation: slideInRight 0.3s ease-in-out;
+}
+
+.alert-warning {
+  background: #fffbeb;
+  border-left-color: #eab308;
+  color: #78350f;
+}
+
+.alert-error {
+  background: #fee2e2;
+  border-left-color: #ef4444;
+  color: #7f1d1d;
+}
+
+.alert-success {
+  background: #ecfdf5;
+  border-left-color: #10b981;
+  color: #065f46;
+}
+
+/* ===================================================
+   PRICE DISPLAY
+   =================================================== */
+.price-display {
+  font-family: 'Courier New', monospace;
+  font-weight: 900;
+  letter-spacing: 1px;
+}
+
+/* ===================================================
+   STICKY ELEMENTS
+   =================================================== */
+.sticky {
+  position: sticky;
+}
+
+/* ===================================================
+   GLASS MORPHISM (optional)
+   =================================================== */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* ===================================================
+   SHADOWS
+   =================================================== */
+.shadow-sm {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.shadow-md {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.shadow-lg {
+  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+}
+
+.shadow-xl {
+  box-shadow: 0 20px 25px rgba(0, 0, 0, 0.15);
+}
+
+.shadow-2xl {
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+}

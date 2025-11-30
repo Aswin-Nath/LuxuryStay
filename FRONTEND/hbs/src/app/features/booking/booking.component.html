@@ -1,0 +1,322 @@
+<div class="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-blue-900">
+  <!-- HEADER WITH TIMER (Only show after dates are selected) -->
+  <div *ngIf="currentPhase !== 'dates'" class="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-gray-200 shadow-lg">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+      <div>
+        <h1 class="text-3xl font-bold bg-linear-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          ✨ Book Your Stay
+        </h1>
+        <p class="text-sm text-gray-600 mt-1">Reserve your perfect luxury room</p>
+      </div>
+      
+      <!-- TIMER DISPLAY -->
+      <div class="flex items-center gap-6">
+        <div class="text-right">
+          <p class="text-xs text-gray-500 font-semibold tracking-wide">SESSION EXPIRES IN</p>
+          <div [ngClass]="'text-4xl font-black font-mono ' + timerColor + ' transition-all'">
+            {{ getTimerDisplay() }}
+          </div>
+          <p class="text-xs text-gray-500 mt-1" [ngClass]="remainingMinutes <= 2 ? 'text-red-500' : ''">
+            {{ remainingMinutes <= 2 ? '⚠️ Hurry!' : '⏱️ ' + remainingMinutes + ' min left' }}
+          </p>
+        </div>
+
+        <!-- CLOSE BUTTON -->
+        <button 
+          (click)="goBack()" 
+          class="p-2 hover:bg-gray-100 rounded-full transition">
+          <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-6 py-8">
+    <!-- BREADCRUMB PROGRESS (Only show after dates selected) -->
+    <div *ngIf="currentPhase !== 'dates'" class="mb-8 flex items-center gap-2 text-sm">
+      <span [ngClass]="'px-4 py-2 rounded-full font-semibold transition-all ' + (currentPhase === 'search' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700')">
+        🏨 Room Selection
+      </span>
+    </div>
+
+    <!-- ===================================================
+         PHASE 1: DATE SELECTION
+         =================================================== -->
+    <div *ngIf="currentPhase === 'dates'" class="max-w-2xl mx-auto animate-fadeIn">
+      <div class="bg-white rounded-2xl shadow-2xl p-12">
+        <h1 class="text-4xl font-bold text-center bg-linear-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
+          📅 Plan Your Stay
+        </h1>
+        <p class="text-center text-gray-600 text-lg mb-12">Select your check-in and check-out dates to get started</p>
+
+        <div class="space-y-8">
+          <!-- Check-in Date -->
+          <div>
+            <label class="block text-xl font-bold text-gray-800 mb-4">Check-in Date</label>
+            <input 
+              type="date" 
+              [(ngModel)]="checkIn"
+              (change)="onDateChange()"
+              class="w-full px-6 py-4 text-lg border-3 border-gray-300 rounded-xl focus:border-blue-600 focus:outline-none transition bg-white"
+              style="color: black;">
+            <p class="text-sm text-gray-600 mt-2">When are you arriving?</p>
+          </div>
+
+          <!-- Check-out Date -->
+          <div>
+            <label class="block text-xl font-bold text-gray-800 mb-4">Check-out Date</label>
+            <input 
+              type="date" 
+              [(ngModel)]="checkOut"
+              (change)="onDateChange()"
+              class="w-full px-6 py-4 text-lg border-3 border-gray-300 rounded-xl focus:border-blue-600 focus:outline-none transition bg-white"
+              style="color: black;">
+            <p class="text-sm text-gray-600 mt-2">When are you leaving?</p>
+          </div>
+
+          <!-- Error Message -->
+          <div *ngIf="searchError" class="bg-red-50 border-l-4 border-red-500 p-6 rounded">
+            <p class="text-red-700 font-semibold">❌ {{ searchError }}</p>
+          </div>
+
+          <!-- Duration Info -->
+          <div class="bg-linear-to-r from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-200">
+            <p class="text-gray-800 font-semibold">
+              📍 Duration: <span class="text-blue-600 text-lg">{{ calculateNumberOfNights() }} night(s)</span>
+            </p>
+          </div>
+
+          <!-- Continue Button -->
+          <button 
+            (click)="proceedWithDates()"
+            class="w-full py-4 bg-linear-to-r from-blue-600 to-blue-700 text-white font-bold text-lg rounded-xl hover:from-blue-700 hover:to-blue-800 transition transform hover:scale-105 shadow-lg">
+            🔍 Search Available Rooms
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================
+         PHASE 2: SEARCH + SIDEBAR (Merged)
+         =================================================== -->
+    <div *ngIf="currentPhase === 'search'" class="grid lg:grid-cols-4 gap-8 animate-fadeIn">
+      <!-- LEFT: Search Content (3 columns) -->
+      <div class="lg:col-span-3 space-y-6">
+        <!-- Date Info & Back Button -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 flex justify-between items-center">
+          <div>
+            <h2 class="text-2xl font-bold text-gray-800">📅 {{ checkIn }} → {{ checkOut }}</h2>
+            <p class="text-gray-600 text-sm mt-1">{{ calculateNumberOfNights() }} night(s) stay</p>
+          </div>
+          <button 
+            (click)="currentPhase = 'dates'"
+            class="px-6 py-3 border-2 border-blue-600 text-blue-600 font-semibold rounded-lg hover:bg-blue-50 transition">
+            ← Change Dates
+          </button>
+        </div>
+
+        <!-- Room Types with Cart-like Selection -->
+        <div *ngIf="availableRoomTypes.length > 0" class="bg-linear-to-r from-blue-50 to-indigo-50 rounded-2xl shadow-lg p-8">
+          <h2 class="text-2xl font-bold text-gray-800 mb-6">🛒 Select Room Types</h2>
+          
+          <div class="grid md:grid-cols-1 lg:grid-cols-2 gap-6">
+            <div *ngFor="let rt of availableRoomTypes" 
+              class="bg-white rounded-xl p-6 border-2 border-blue-200 hover:shadow-lg transition">
+              
+              <div class="flex items-start justify-between mb-4">
+                <div class="flex-1">
+                  <h3 class="text-xl font-bold text-gray-800">{{ rt.type_name }}</h3>
+                  <p class="text-sm text-gray-600 mt-1">Capacity: {{ rt.max_adult_count }} Adult(s), {{ rt.max_child_count }} Child(ren)</p>
+                  <p class="text-sm text-gray-600">📐 {{ rt.square_ft }} sq ft</p>
+                </div>
+                <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-bold">
+                  {{ getAvailableCount(rt) }} available
+                </span>
+              </div>
+
+              <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                <div class="flex items-baseline gap-1">
+                  <span class="text-xs text-gray-600">Price per night</span>
+                  <span class="text-2xl font-bold text-blue-600">₹{{ rt.price_per_night | number:'1.0-0' }}</span>
+                </div>
+              </div>
+
+              <p class="text-sm text-gray-700 mb-4">{{ rt.description }}</p>
+
+              <!-- Counter Controls -->
+              <div class="flex items-center justify-between bg-gray-50 rounded-lg p-4">
+                <div class="flex items-center gap-3">
+                  <button 
+                    (click)="decreaseRoomCount(rt)"
+                    [disabled]="getRoomTypeCount(rt.type_name) <= 0"
+                    class="w-8 h-8 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white rounded-full flex items-center justify-center transition">
+                    <i class="fas fa-minus text-xs"></i>
+                  </button>
+                  
+                  <div class="text-center">
+                    <div class="text-2xl font-bold text-gray-800">{{ getRoomTypeCount(rt.type_name) }}</div>
+                    <div class="text-xs text-gray-600">rooms</div>
+                  </div>
+                  
+                  <button 
+                    (click)="increaseRoomCount(rt)"
+                    [disabled]="getAvailableCount(rt) <= 0 || getTotalSelectedRooms() >= 5"
+                    class="w-8 h-8 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white rounded-full flex items-center justify-center transition">
+                    <i class="fas fa-plus text-xs"></i>
+                  </button>
+                </div>
+                
+                <div class="text-right">
+                  <div class="text-sm text-gray-600">Subtotal</div>
+                  <div class="text-lg font-bold text-blue-600">
+                    ₹{{ getRoomTypeCount(rt.type_name) * rt.price_per_night | number:'1.0-0' }}
+                  </div>
+                </div>
+              </div>
+
+              <div *ngIf="getRoomTypeCount(rt.type_name) > 0" class="mt-3 text-xs text-green-700 bg-green-50 p-2 rounded">
+                ✅ {{ getRoomTypeCount(rt.type_name) }} {{ rt.type_name }} room(s) selected
+              </div>
+            </div>
+          </div>
+
+          <!-- Total Summary -->
+          <div *ngIf="getTotalSelectedRooms() > 0" class="mt-6 bg-white rounded-lg p-6 border-2 border-blue-300">
+            <div class="flex justify-between items-center">
+              <div>
+                <h4 class="text-lg font-bold text-gray-800">Total Selection</h4>
+                <p class="text-sm text-gray-600">{{ getTotalSelectedRooms() }} room(s) for {{ calculateNumberOfNights() }} night(s)</p>
+              </div>
+              <div class="text-right">
+                <div class="text-2xl font-bold text-blue-600">₹{{ getTotalPrice() | number:'1.0-0' }}</div>
+                <div class="text-sm text-gray-600">per night</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="mt-6 flex gap-4">
+            <button 
+              *ngIf="getTotalSelectedRooms() > 0"
+              (click)="clearAllSelections()"
+              class="flex-1 py-3 bg-red-100 hover:bg-red-200 text-red-700 font-semibold rounded-lg transition">
+              🗑️ Clear All
+            </button>
+            
+            <button 
+              (click)="completeRoomSelection()"
+              [disabled]="getTotalSelectedRooms() === 0"
+              class="flex-2 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-semibold rounded-lg transition">
+              {{ getTotalSelectedRooms() > 0 ? '✅ Complete Selection' : '🛒 Select rooms to continue' }}
+            </button>
+          </div>
+        </div>
+
+      <!-- RIGHT: CART SIDEBAR (1 column) -->
+      <div class="lg:col-span-1">
+        <div class="bg-linear-to-br from-blue-50 to-indigo-50 rounded-2xl shadow-2xl p-6 sticky top-24">
+          <h3 class="text-xl font-bold text-gray-800 mb-4">🛒 Your Cart</h3>
+          
+          <div *ngIf="getTotalSelectedRooms() === 0" class="text-center py-8 text-gray-600">
+            <i class="fas fa-shopping-cart text-4xl mb-4 text-gray-400"></i>
+            <p class="font-semibold">No rooms selected</p>
+            <p class="text-xs mt-2">Use the + buttons to add rooms</p>
+            <p class="text-xs text-blue-600">Maximum 5 rooms allowed</p>
+          </div>
+
+          <!-- Cart Items -->
+          <div *ngIf="getTotalSelectedRooms() > 0" class="space-y-4">
+            <div *ngFor="let cartItem of (roomCart | keyvalue)" 
+              class="bg-white rounded-lg p-4 border-l-4 border-blue-600 shadow-sm">
+              
+              <div class="flex items-start justify-between mb-2">
+                <div class="flex-1">
+                  <h4 class="font-bold text-gray-800 text-sm">{{ cartItem.value.roomType.type_name }}</h4>
+                  <p class="text-xs text-gray-600">{{ cartItem.value.count }} room(s)</p>
+                </div>
+                <button 
+                  (click)="decreaseRoomCount(cartItem.value.roomType)"
+                  class="w-6 h-6 bg-red-100 hover:bg-red-200 text-red-600 rounded-full flex items-center justify-center text-xs">
+                  <i class="fas fa-minus"></i>
+                </button>
+              </div>
+
+              <!-- Room Details -->
+              <div class="text-xs text-gray-700 space-y-1 mb-3">
+                <p>👥 {{ cartItem.value.roomType.max_adult_count }} adults, {{ cartItem.value.roomType.max_child_count }} children</p>
+                <p>📐 {{ cartItem.value.roomType.square_ft }} sq ft</p>
+                <p>💰 ₹{{ cartItem.value.roomType.price_per_night }} x {{ cartItem.value.count }}</p>
+              </div>
+
+              <!-- Lock Details -->
+              <div class="bg-gray-50 rounded p-2 text-xs">
+                <p class="font-semibold text-gray-800 mb-1">Reserved Rooms:</p>
+                <div class="space-y-1">
+                  <div *ngFor="let lock of cartItem.value.locks; let i = index" class="text-gray-600">
+                    {{ cartItem.value.roomType.type_name }} {{ i + 1 }}
+                    <span class="text-green-600 ml-2">🔒 {{ lock.expires_at | date:'short' }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Subtotal -->
+              <div class="mt-3 pt-2 border-t border-gray-200">
+                <div class="flex justify-between items-center text-sm">
+                  <span class="text-gray-600">Subtotal:</span>
+                  <span class="font-bold text-blue-600">
+                    ₹{{ cartItem.value.count * cartItem.value.roomType.price_per_night | number:'1.0-0' }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Cart Summary -->
+            <div class="bg-white rounded-lg p-4 border-2 border-blue-300 shadow-sm">
+              <h4 class="text-lg font-bold text-gray-800 mb-2">Total Summary</h4>
+              
+              <div class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                  <span class="text-gray-600">Total Rooms:</span>
+                  <span class="font-semibold">{{ getTotalSelectedRooms() }}</span>
+                </div>
+                
+                <div class="flex justify-between">
+                  <span class="text-gray-600">Duration:</span>
+                  <span class="font-semibold">{{ calculateNumberOfNights() }} night(s)</span>
+                </div>
+                
+                <div class="flex justify-between pt-2 border-t border-gray-200">
+                  <span class="text-gray-800 font-semibold">Per Night:</span>
+                  <span class="text-xl font-bold text-blue-600">₹{{ getTotalPrice() | number:'1.0-0' }}</span>
+                </div>
+                
+                <div class="flex justify-between text-lg font-bold text-green-600">
+                  <span>Total Stay:</span>
+                  <span>₹{{ getTotalPrice() * calculateNumberOfNights() | number:'1.0-0' }}</span>
+                </div>
+              </div>
+
+              <!-- Lock Expiry Warning -->
+              <div class="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                <p class="text-yellow-800">⚠️ Rooms are locked for 15 minutes</p>
+                <p class="text-yellow-600">Complete selection before locks expire</p>
+              </div>
+              
+              <!-- Complete Room Selection Button -->
+              <button 
+                *ngIf="getTotalSelectedRooms() > 0"
+                (click)="completeRoomSelection()"
+                class="w-full mt-4 py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition transform hover:scale-105 shadow-lg">
+                ✅ Complete Room Selection
+                <div class="text-sm font-normal mt-1">
+                  {{ getTotalSelectedRooms() }} room(s) • ₹{{ getTotalPrice() * calculateNumberOfNights() | number:'1.0-0' }}
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+

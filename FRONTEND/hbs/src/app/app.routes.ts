@@ -20,6 +20,7 @@ import { EditRoomComponent } from './features/room-management/edit-room/edit-roo
 import { RoomTypesAmenitiesManagementComponent } from './features/room-management/room-types-amenities-management/room-types-amenities-management';
 import { EditRoomTypeComponent } from './features/room-management/edit-room-type/edit-room-type';
 import { ViewRoomTypeComponent } from './features/room-management/view-room-type/view-room-type';
+import { BookingComponent } from './features/booking/booking.component';
 export const routes: Routes = [
 	{ path: '', redirectTo: 'login', pathMatch: 'full' },
 	{ path: 'login', component: Login, canActivate: [PublicGuard] },
@@ -41,6 +42,7 @@ export const routes: Routes = [
 				children: [
 					{ path: 'dashboard', component: CustomerDashboardComponent },
 					{ path: 'profile', component: ProfileComponent },
+					{ path: 'booking', component: BookingComponent },
 					{ path: '', redirectTo: 'dashboard', pathMatch: 'full' }
 				]
 			},

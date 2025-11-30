@@ -100,3 +100,23 @@ class RoomTypeAmenityMap(Base):
     # Relationships
     room_type = relationship("RoomTypes", back_populates="amenities")
     amenity = relationship("RoomAmenities", back_populates="room_types")
+
+# ==============================================================
+# ROOM AVAILABILITY LOCKS
+# ==============================================================
+class RoomAvailabilityLocks(Base):
+    __tablename__ = "room_availability_locks"
+
+    lock_id = Column(Integer, primary_key=True, autoincrement=True)
+    room_id = Column(Integer, ForeignKey("rooms.room_id", ondelete="CASCADE"), nullable=False, index=True)
+    room_type_id = Column(Integer, ForeignKey("room_types.room_type_id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
+    check_in = Column(TIMESTAMP(timezone=True), nullable=False, index=True)
+    check_out = Column(TIMESTAMP(timezone=True), nullable=False, index=True)
+    expires_at = Column(TIMESTAMP(timezone=True), nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    # Relationships
+    room = relationship("Rooms")
+    room_type = relationship("RoomTypes")
+    user = relationship("Users")

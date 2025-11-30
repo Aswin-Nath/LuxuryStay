@@ -24,6 +24,7 @@ from app.routes.reports import router as reports_router
 from app.routes.content import router as content_router
 from app.routes.payments import router as payment_router
 from app.routes.users import users_router
+from app.routes.v2_booking import router as v2_booking_router
 from app.workers.release_room_holds_worker import run_hold_release_scheduler
 import os
 import logging
@@ -75,6 +76,7 @@ app.include_router(reports_router)
 app.include_router(content_router)
 app.include_router(payment_router)
 app.include_router(users_router)
+app.include_router(v2_booking_router)
 
 @app.get("/docs", include_in_schema=False)
 def custom_docs():
