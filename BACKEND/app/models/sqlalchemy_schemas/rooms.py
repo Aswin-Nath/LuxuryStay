@@ -71,6 +71,7 @@ class Rooms(Base):
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
     is_deleted = Column(Boolean, nullable=False, default=False, index=True)
+    locked_by_user_id = Column(Integer, ForeignKey("users.user_id"), nullable=True, index=True)
     # Relationships
     room_type = relationship("RoomTypes", back_populates="rooms")
     booking_room_maps = relationship("BookingRoomMap", back_populates="room", cascade="all, delete-orphan")

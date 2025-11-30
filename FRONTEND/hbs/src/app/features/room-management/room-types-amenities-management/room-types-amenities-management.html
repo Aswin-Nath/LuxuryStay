@@ -78,49 +78,99 @@
         </div>
 
         <!-- Room Types Table -->
-        <div *ngIf="!loadingRoomTypes && roomTypes.length > 0" class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="bg-white shadow-lg border border-gray-200 rounded-xl overflow-hidden" *ngIf="!loadingRoomTypes && roomTypes.length > 0">
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
-              <thead class="bg-gray-100 border-b border-gray-200">
+              <thead class="bg-yellow-50 border-b border-gray-300">
                 <tr>
-                  <th class="px-3 md:px-4 py-2 text-left font-semibold text-gray-700 text-xs md:text-sm">Type Name</th>
-                  <th class="px-3 md:px-4 py-2 text-left font-semibold text-gray-700 text-xs md:text-sm">Description</th>
-                  <th class="px-3 md:px-4 py-2 text-center font-semibold text-gray-700 text-xs md:text-sm">Total</th>
-                  <th class="px-3 md:px-4 py-2 text-center font-semibold text-gray-700 text-xs md:text-sm">Available</th>
-                  <th class="px-3 md:px-4 py-2 text-center font-semibold text-gray-700 text-xs md:text-sm">Booked</th>
-                  <th class="px-3 md:px-4 py-2 text-center font-semibold text-gray-700 text-xs md:text-sm">Frozen</th>
-                  <th class="px-3 md:px-4 py-2 text-center font-semibold text-gray-700 text-xs md:text-sm">Maintenance</th>
-                  <th class="px-3 md:px-4 py-2 text-center font-semibold text-gray-700 text-xs md:text-sm">Actions</th>
+                  <th class="p-3 text-left font-semibold text-gray-700 cursor-pointer hover:bg-yellow-100" (click)="sortByColumn('type_name')">
+                    <div class="flex items-center gap-2">
+                      <span class="material-icons text-lg text-gray-500">king_bed</span>
+                      <span>Type Name</span>
+                      <i class="fas ml-1" [ngClass]="getSortIcon('type_name')"></i>
+                    </div>
+                  </th>
+                  <th class="p-3 text-left font-semibold text-gray-700 cursor-pointer hover:bg-yellow-100" (click)="sortByColumn('description')">
+                    <div class="flex items-center gap-2">
+                      <span class="material-icons text-lg text-gray-500">description</span>
+                      <span>Description</span>
+                      <i class="fas ml-1" [ngClass]="getSortIcon('description')"></i>
+                    </div>
+                  </th>
+                  <th class="p-3 text-center font-semibold text-gray-700 cursor-pointer hover:bg-yellow-100" (click)="sortByColumn('totalCount')">
+                    <div class="flex items-center justify-center gap-2">
+                      <span class="material-icons text-lg text-gray-500">home</span>
+                      <span>Total</span>
+                      <i class="fas ml-1" [ngClass]="getSortIcon('totalCount')"></i>
+                    </div>
+                  </th>
+                  <th class="p-3 text-center font-semibold text-gray-700 cursor-pointer hover:bg-yellow-100" (click)="sortByColumn('availableCount')">
+                    <div class="flex items-center justify-center gap-2">
+                      <span class="material-icons text-lg text-gray-500">check_circle</span>
+                      <span>Available</span>
+                      <i class="fas ml-1" [ngClass]="getSortIcon('availableCount')"></i>
+                    </div>
+                  </th>
+                  <th class="p-3 text-center font-semibold text-gray-700 cursor-pointer hover:bg-yellow-100" (click)="sortByColumn('bookedCount')">
+                    <div class="flex items-center justify-center gap-2">
+                      <span class="material-icons text-lg text-gray-500">event_busy</span>
+                      <span>Booked</span>
+                      <i class="fas ml-1" [ngClass]="getSortIcon('bookedCount')"></i>
+                    </div>
+                  </th>
+                  <th class="p-3 text-center font-semibold text-gray-700 cursor-pointer hover:bg-yellow-100" (click)="sortByColumn('frozenCount')">
+                    <div class="flex items-center justify-center gap-2">
+                      <span class="material-icons text-lg text-gray-500">lock</span>
+                      <span>Frozen</span>
+                      <i class="fas ml-1" [ngClass]="getSortIcon('frozenCount')"></i>
+                    </div>
+                  </th>
+                  <th class="p-3 text-center font-semibold text-gray-700 cursor-pointer hover:bg-yellow-100" (click)="sortByColumn('maintenanceCount')">
+                    <div class="flex items-center justify-center gap-2">
+                      <span class="material-icons text-lg text-gray-500">build</span>
+                      <span>Maintenance</span>
+                      <i class="fas ml-1" [ngClass]="getSortIcon('maintenanceCount')"></i>
+                    </div>
+                  </th>
+                  <th class="p-3 text-center font-semibold text-gray-700">
+                    <div class="flex items-center justify-center gap-2">
+                      <span class="material-icons text-lg text-gray-500">settings</span>
+                      Action
+                    </div>
+                  </th>
                 </tr>
               </thead>
-              <tbody>
-                <tr *ngFor="let roomType of roomTypes" class="border-b border-gray-200 hover:bg-gray-50">
-                  <td class="px-3 md:px-4 py-2 font-medium text-gray-800 truncate text-xs md:text-sm">{{ roomType.type_name }}</td>
-                  <td class="px-3 md:px-4 py-2 text-gray-600 truncate text-xs md:text-sm">{{ roomType.description }}</td>
-                  <td class="px-3 md:px-4 py-2 text-center text-gray-800 font-semibold text-xs md:text-sm">
-                    <span class="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs">{{ roomType.totalCount || 0 }}</span>
+              <tbody class="divide-y divide-gray-200">
+                <tr *ngFor="let roomType of roomTypes" class="hover:bg-gray-50">
+                  <td class="p-3 font-medium text-blue-600">
+                    <div class="flex items-center gap-2">
+                      <span class="material-icons text-gray-600 text-sm">king_bed</span>
+                      {{ roomType.type_name }}
+                    </div>
                   </td>
-                  <td class="px-3 md:px-4 py-2 text-center text-gray-800 font-semibold text-xs md:text-sm">
-                    <span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">{{ roomType.availableCount || 0 }}</span>
+                  <td class="p-3 text-gray-600">{{ roomType.description }}</td>
+                  <td class="p-3 text-center font-semibold text-gray-700">
+                    <span class="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-xs">{{ roomType.totalCount || 0 }}</span>
                   </td>
-                  <td class="px-3 md:px-4 py-2 text-center text-gray-800 font-semibold text-xs md:text-sm">
-                    <span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">{{ roomType.bookedCount || 0 }}</span>
+                  <td class="p-3 text-center font-semibold text-gray-700">
+                    <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs">{{ roomType.availableCount || 0 }}</span>
                   </td>
-                  <td class="px-3 md:px-4 py-2 text-center text-gray-800 font-semibold text-xs md:text-sm">
-                    <span class="bg-red-100 text-red-700 px-2 py-1 rounded text-xs">{{ roomType.frozenCount || 0 }}</span>
+                  <td class="p-3 text-center font-semibold text-gray-700">
+                    <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs">{{ roomType.bookedCount || 0 }}</span>
                   </td>
-                  <td class="px-3 md:px-4 py-2 text-center text-gray-800 font-semibold text-xs md:text-sm">
-                    <span class="bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-xs">{{ roomType.maintenanceCount || 0 }}</span>
+                  <td class="p-3 text-center font-semibold text-gray-700">
+                    <span class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-xs">{{ roomType.frozenCount || 0 }}</span>
                   </td>
-                  <td class="px-3 md:px-4 py-2 text-center">
+                  <td class="p-3 text-center font-semibold text-gray-700">
+                    <span class="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs">{{ roomType.maintenanceCount || 0 }}</span>
+                  </td>
+                  <td class="p-3 text-center">
                     <div class="flex items-center justify-center gap-2">
-                      <button (click)="viewRoomType(roomType.room_type_id)" class="inline-flex items-center gap-1 px-2 md:px-3 py-1 bg-green-50 text-green-600 rounded hover:bg-green-100 transition text-xs md:text-sm" title="View Room Type">
+                      <button (click)="viewRoomType(roomType.room_type_id)" class="px-2 py-1 text-yellow-700 hover:bg-yellow-100 rounded transition" title="View">
                         <span class="material-icons text-sm">visibility</span>
-                        <span class="hidden sm:inline">View</span>
                       </button>
-                      <button (click)="editRoomType(roomType.room_type_id)" class="inline-flex items-center gap-1 px-2 md:px-3 py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition text-xs md:text-sm" title="Edit Room Type">
+                      <button (click)="editRoomType(roomType.room_type_id)" class="px-2 py-1 text-yellow-700 hover:bg-yellow-100 rounded transition" title="Edit">
                         <span class="material-icons text-sm">edit</span>
-                        <span class="hidden sm:inline">Edit</span>
                       </button>
                     </div>
                   </td>
@@ -161,39 +211,66 @@
         </div>
 
         <!-- Amenities Table -->
-        <div *ngIf="!loadingAmenities && amenities.length > 0" class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="bg-white shadow-lg border border-gray-200 rounded-xl overflow-hidden" *ngIf="!loadingAmenities && amenities.length > 0">
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
-              <thead class="bg-gray-100 border-b border-gray-200">
+              <thead class="bg-yellow-50 border-b border-gray-300">
                 <tr>
-                  <th class="px-3 md:px-4 py-2 text-left font-semibold text-gray-700 text-xs md:text-sm">Amenity Name</th>
-                  <th class="px-3 md:px-4 py-2 text-left font-semibold text-gray-700 text-xs md:text-sm">Description</th>
-                  <th class="px-3 md:px-4 py-2 text-center font-semibold text-gray-700 text-xs md:text-sm">Room Count</th>
-                  <th class="px-3 md:px-4 py-2 text-center font-semibold text-gray-700 text-xs md:text-sm">Actions</th>
+                  <th class="p-3 text-left font-semibold text-gray-700 cursor-pointer hover:bg-yellow-100" (click)="sortAmenitiesByColumn('amenity_name')">
+                    <div class="flex items-center gap-2">
+                      <span class="material-icons text-lg text-gray-500">star</span>
+                      <span>Amenity Name</span>
+                      <i class="fas ml-1" [ngClass]="getAmenitySortIcon('amenity_name')"></i>
+                    </div>
+                  </th>
+                  <th class="p-3 text-left font-semibold text-gray-700 cursor-pointer hover:bg-yellow-100" (click)="sortAmenitiesByColumn('description')">
+                    <div class="flex items-center gap-2">
+                      <span class="material-icons text-lg text-gray-500">description</span>
+                      <span>Description</span>
+                      <i class="fas ml-1" [ngClass]="getAmenitySortIcon('description')"></i>
+                    </div>
+                  </th>
+                  <th class="p-3 text-center font-semibold text-gray-700 cursor-pointer hover:bg-yellow-100" (click)="sortAmenitiesByColumn('roomCount')">
+                    <div class="flex items-center justify-center gap-2">
+                      <span class="material-icons text-lg text-gray-500">home</span>
+                      <span>Room Count</span>
+                      <i class="fas ml-1" [ngClass]="getAmenitySortIcon('roomCount')"></i>
+                    </div>
+                  </th>
+                  <th class="p-3 text-center font-semibold text-gray-700">
+                    <div class="flex items-center justify-center gap-2">
+                      <span class="material-icons text-lg text-gray-500">settings</span>
+                      Action
+                    </div>
+                  </th>
                 </tr>
               </thead>
-              <tbody>
-                <tr *ngFor="let amenity of amenities" class="border-b border-gray-200 hover:bg-gray-50">
-                  <td class="px-3 md:px-4 py-2 font-medium text-gray-800 truncate text-xs md:text-sm">{{ amenity.amenity_name }}</td>
-                  <td class="px-3 md:px-4 py-2 text-gray-600 truncate text-xs md:text-sm">{{ amenity.description }}</td>
-                  <td class="px-3 md:px-4 py-2 text-center text-gray-800 font-semibold text-xs md:text-sm">
-                    <span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">{{ amenity.roomCount }} rooms</span>
+              <tbody class="divide-y divide-gray-200">
+                <tr *ngFor="let amenity of amenities" class="hover:bg-gray-50">
+                  <td class="p-3 font-medium text-blue-600">
+                    <div class="flex items-center gap-2">
+                      <span class="material-icons text-gray-600 text-sm">star</span>
+                      {{ amenity.amenity_name }}
+                    </div>
                   </td>
-                  <td class="px-3 md:px-4 py-2 text-center space-x-1">
-                    <button 
-                      (click)="showAmenityRooms(amenity)"
-                      class="inline-flex items-center gap-1 px-2 md:px-3 py-1 bg-green-50 text-green-600 rounded hover:bg-green-100 transition text-xs md:text-sm">
-                      <span class="material-icons text-sm">visibility</span>
-                      <span class="hidden sm:inline">View</span>
-                    </button>
-                    <button (click)="openEditAmenityModal(amenity)" class="inline-flex items-center gap-1 px-2 md:px-3 py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition text-xs md:text-sm">
-                      <span class="material-icons text-sm">edit</span>
-                      <span class="hidden sm:inline">Edit</span>
-                    </button>
-                    <button (click)="deleteAmenity(amenity.amenity_id)" class="inline-flex items-center gap-1 px-2 md:px-3 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100 transition text-xs md:text-sm">
-                      <span class="material-icons text-sm">delete</span>
-                      <span class="hidden sm:inline">Delete</span>
-                    </button>
+                  <td class="p-3 text-gray-600">{{ amenity.description }}</td>
+                  <td class="p-3 text-center font-semibold text-gray-700">
+                    <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs">{{ amenity.roomCount }} rooms</span>
+                  </td>
+                  <td class="p-3 text-center">
+                    <div class="flex items-center justify-center gap-2">
+                      <button 
+                        (click)="showAmenityRooms(amenity)"
+                        class="px-2 py-1 text-yellow-700 hover:bg-yellow-100 rounded transition" title="View">
+                        <span class="material-icons text-sm">visibility</span>
+                      </button>
+                      <button (click)="openEditAmenityModal(amenity)" class="px-2 py-1 text-yellow-700 hover:bg-yellow-100 rounded transition" title="Edit">
+                        <span class="material-icons text-sm">edit</span>
+                      </button>
+                      <button (click)="deleteAmenity(amenity.amenity_id)" class="px-2 py-1 text-red-700 hover:bg-red-100 rounded transition" title="Delete">
+                        <span class="material-icons text-sm">delete</span>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               </tbody>

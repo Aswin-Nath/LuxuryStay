@@ -1,8 +1,9 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router, NavigationEnd } from '@angular/router';
 import { HasPermissionDirective } from '../../directives/has-permission.directive';
 import { PermissionService } from '../../services/permissions/permissions';
+import { filter } from 'rxjs/operators';
 
 interface SidebarLink {
   label: string;
@@ -35,9 +36,19 @@ export class AdminSidebarComponent implements OnInit {
     { label: 'Settings', route: '/admin/settings', icon: 'fa-cog' }
   ];
 
-  constructor(public permissionService: PermissionService) {}
+  currentRoute: string = '';
 
-  ngOnInit(): void {}
+  constructor(public permissionService: PermissionService, private router: Router) {}
+
+  ngOnInit(): void {
+    // Track current route changes
+    this.currentRoute = this.router.url;
+    this.router.events
+      .pipe(filter(event => event instanceof NavigationEnd))
+      .subscribe((event: any) => {
+        this.currentRoute = event.url;
+      });
+  }
 
   /**
    * Check if a menu item should be visible
@@ -50,5 +61,30 @@ export class AdminSidebarComponent implements OnInit {
     }
     // If permission is set, check if user has it
     return this.permissionService.hasPermission(permission);
+  }
+
+  /**
+   * Check if a route is currently active (including sub-routes)
+   * E.g., /admin/room-types-amenities/view/123 matches /admin/room-types-amenities
+   * Also handles related routes like /admin/room-type/:id/view which should highlight /admin/room-types-amenities
+   */
+  isRouteActive(route: string): boolean {
+    // Direct match or sub-route match
+    if (this.currentRoute.startsWith(route)) {
+      return true;
+    }
+    
+    // Special handling for room-types-amenities and related routes
+    if (route === '/admin/room-types-amenities') {
+      // Highlight if on any of these related routes
+      const relatedRoutes = [
+        '/admin/room-types-amenities',
+        '/admin/room-type/',
+        '/admin/edit-room-type/'
+      ];
+      return relatedRoutes.some(r => this.currentRoute.startsWith(r));
+    }
+    
+    return false;
   }
 }

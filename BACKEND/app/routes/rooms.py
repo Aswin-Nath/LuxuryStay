@@ -1022,9 +1022,17 @@ async def get_amenities_with_room_count(
         return cached
     
     # Join: Amenities -> RoomTypeAmenityMap -> RoomTypes -> Rooms and count rooms
+    # Use outer join so amenities with no rooms still appear (with count 0)
+    from sqlalchemy import case
+    
     stmt = select(
         RoomAmenities,
-        func.count(Rooms.room_id.distinct()).label("room_count")
+        func.count(
+            case(
+                (Rooms.is_deleted.is_(False), Rooms.room_id),
+                else_=None
+            )
+        ).label("room_count")
     ).outerjoin(
         RoomTypeAmenityMap,
         RoomAmenities.amenity_id == RoomTypeAmenityMap.amenity_id
@@ -1034,8 +1042,6 @@ async def get_amenities_with_room_count(
     ).outerjoin(
         Rooms,
         RoomTypes.room_type_id == Rooms.room_type_id
-    ).where(
-        Rooms.is_deleted.is_(False)  # Only count non-deleted rooms
     ).group_by(RoomAmenities.amenity_id)
     
     result = await db.execute(stmt)

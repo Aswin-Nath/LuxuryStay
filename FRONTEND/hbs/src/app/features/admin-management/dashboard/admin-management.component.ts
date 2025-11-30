@@ -2,9 +2,9 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
-import { AdminNavbarComponent } from '../../../../core/components/admin-navbar/admin-navbar.component';
-import { AdminSidebarComponent } from '../../../../core/components/admin-sidebar/admin-sidebar.component';
-import { AdminManagementService, AdminUser, Role } from '../../../../core/services/admin-management/admin-management.service';
+import { AdminNavbarComponent } from '../../../core/components/admin-navbar/admin-navbar.component';
+import { AdminSidebarComponent } from '../../../core/components/admin-sidebar/admin-sidebar.component';
+import { AdminManagementService, AdminUser, Role } from '../../../core/services/admin-management/admin-management.service';
 import { AdminFormModalComponent } from '../users-management/admin-form-modal.component';
 
 @Component({

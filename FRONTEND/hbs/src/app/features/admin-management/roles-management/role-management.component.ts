@@ -1,9 +1,9 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { AdminNavbarComponent } from '../../../../core/components/admin-navbar/admin-navbar.component';
-import { AdminSidebarComponent } from '../../../../core/components/admin-sidebar/admin-sidebar.component';
-import { RoleManagementService, Role, PermissionGroup, Permission } from '../../../../core/services/role-management/role-management.service';
+import { AdminNavbarComponent } from '../../../core/components/admin-navbar/admin-navbar.component';
+import { AdminSidebarComponent } from '../../../core/components/admin-sidebar/admin-sidebar.component';
+import { RoleManagementService, Role, PermissionGroup, Permission } from '../../../core/services/role-management/role-management.service';
 // import { RolePermissionModalComponent } from '../permissions-management/role-permission-modal.component';
 import { AddRoleModalComponent } from './add-role-modal.component';
 // import { RolePermissionModalComponent } from '../../role-permission-modal.component';

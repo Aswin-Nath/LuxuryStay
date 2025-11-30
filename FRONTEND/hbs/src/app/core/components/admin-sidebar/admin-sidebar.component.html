@@ -5,7 +5,10 @@
       <ng-container *ngFor="let link of sidebarLinks">
         <li *ngIf="isMenuItemVisible(link.permission)">
           <a [routerLink]="link.route"
-             routerLinkActive="bg-yellow-100 text-yellow-700 border-r-4 border-yellow-500"
+             [class.bg-yellow-100]="isRouteActive(link.route)"
+             [class.text-yellow-700]="isRouteActive(link.route)"
+             [class.border-r-4]="isRouteActive(link.route)"
+             [class.border-yellow-500]="isRouteActive(link.route)"
              class="flex items-center px-6 py-3 text-gray-700 hover:bg-gray-100 hover:text-yellow-600 transition-colors">
             <i class="fas {{ link.icon }} w-5 text-center mr-3"></i>
             <span class="font-medium">{{ link.label }}</span>

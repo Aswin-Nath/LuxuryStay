@@ -1,7 +1,7 @@
 import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { PermissionGroup, Permission } from '../../../../core/services/role-management/role-management.service';
+import { PermissionGroup, Permission } from '../../../core/services/role-management/role-management.service';
 
 @Component({
   selector: 'app-role-permission-modal',

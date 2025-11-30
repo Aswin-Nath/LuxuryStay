@@ -1,8 +1,8 @@
 import { Component, OnInit, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { AdminManagementService, CreateAdminPayload, Role } from '../../../../core/services/admin-management/admin-management.service';
-import { RoleManagementService } from '../../../../core/services/role-management/role-management.service';
+import { AdminManagementService, CreateAdminPayload, Role } from '../../../core/services/admin-management/admin-management.service';
+import { RoleManagementService } from '../../../core/services/role-management/role-management.service';
 
 @Component({
   selector: 'app-admin-form-modal',

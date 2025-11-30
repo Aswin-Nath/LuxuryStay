@@ -27,6 +27,8 @@ export class RoomTypesAmenitiesManagementComponent implements OnInit {
   roomTypes: any[] = [];
   loadingRoomTypes = false;
   errorRoomTypes: string | null = null;
+  sortColumn: string = 'type_name';
+  sortDirection: 'asc' | 'desc' = 'asc';
   roomTypeKpis = {
     totalTypes: 0,
     activeRooms: 0,
@@ -39,6 +41,8 @@ export class RoomTypesAmenitiesManagementComponent implements OnInit {
   amenities: any[] = [];
   loadingAmenities = false;
   errorAmenities: string | null = null;
+  amenitySortColumn: string = 'amenity_name';
+  amenitySortDirection: 'asc' | 'desc' = 'asc';
   selectedAmenityForRooms: any = null;
   amenityRooms: any[] = [];
 
@@ -66,6 +70,81 @@ export class RoomTypesAmenitiesManagementComponent implements OnInit {
 
   isActiveTab(tab: string): boolean {
     return this.activeTab === tab;
+  }
+
+  // Sorting methods
+  sortByColumn(column: string): void {
+    if (this.sortColumn === column) {
+      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.sortColumn = column;
+      this.sortDirection = 'asc';
+    }
+    this.sortRoomTypes();
+  }
+
+  sortRoomTypes(): void {
+    this.roomTypes.sort((a, b) => {
+      let aValue = a[this.sortColumn];
+      let bValue = b[this.sortColumn];
+
+      if (aValue === null || aValue === undefined) aValue = '';
+      if (bValue === null || bValue === undefined) bValue = '';
+
+      if (typeof aValue === 'string') {
+        aValue = aValue.toLowerCase();
+        bValue = bValue.toLowerCase();
+      }
+
+      if (aValue < bValue) {
+        return this.sortDirection === 'asc' ? -1 : 1;
+      } else if (aValue > bValue) {
+        return this.sortDirection === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+  }
+
+  getSortIcon(column: string): string {
+    if (this.sortColumn !== column) return 'fa-sort';
+    return this.sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down';
+  }
+
+  sortAmenitiesByColumn(column: string): void {
+    if (this.amenitySortColumn === column) {
+      this.amenitySortDirection = this.amenitySortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.amenitySortColumn = column;
+      this.amenitySortDirection = 'asc';
+    }
+    this.sortAmenities();
+  }
+
+  sortAmenities(): void {
+    this.amenities.sort((a, b) => {
+      let aValue = a[this.amenitySortColumn];
+      let bValue = b[this.amenitySortColumn];
+
+      if (aValue === null || aValue === undefined) aValue = '';
+      if (bValue === null || bValue === undefined) bValue = '';
+
+      if (typeof aValue === 'string') {
+        aValue = aValue.toLowerCase();
+        bValue = bValue.toLowerCase();
+      }
+
+      if (aValue < bValue) {
+        return this.amenitySortDirection === 'asc' ? -1 : 1;
+      } else if (aValue > bValue) {
+        return this.amenitySortDirection === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+  }
+
+  getAmenitySortIcon(column: string): string {
+    if (this.amenitySortColumn !== column) return 'fa-sort';
+    return this.amenitySortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down';
   }
 
   loadRoomTypes(): void {
