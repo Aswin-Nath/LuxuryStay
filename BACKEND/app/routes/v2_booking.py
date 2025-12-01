@@ -12,7 +12,38 @@ from app.models.sqlalchemy_schemas.payments import Payments
 from app.crud.bookings import create_payment
 import uuid
 
-router = APIRouter(prefix="/api/v2/rooms", tags=["Room Availability Locking"])
+router = APIRouter(prefix="/v2/rooms", tags=["Room Availability Locking"])
+
+# ==========================================================
+# 📋 GET ALL ROOM TYPES (For dropdown/filter)
+# ==========================================================
+@router.get("/room-types")
+async def get_all_room_types(db: AsyncSession = Depends(get_db)):
+    """
+    Get all available room types from database.
+    Used for populating room type dropdown in search filters.
+    
+    Returns: List of all room types with full details
+    """
+    result = await db.execute(select(RoomTypes))
+    room_types = result.scalars().all()
+
+    return {
+        "total": len(room_types),
+        "results": [
+            {
+                "room_type_id": rt.room_type_id,
+                "type_name": rt.type_name,
+                "max_adult_count": rt.max_adult_count,
+                "max_child_count": rt.max_child_count,
+                "price_per_night": float(rt.price_per_night),
+                "description": rt.description,
+                "square_ft": rt.square_ft
+            }
+            for rt in room_types
+        ]
+    }
+
 
 # ==========================================================
 # 🔒 LOCK ROOM BY TYPE
@@ -29,6 +60,11 @@ async def lock_room(
     """
     Lock one AVAILABLE room from room_type for a date window.
     
+    Returns consistent HTTP status codes:
+    - 404: Room type doesn't exist (ROOM_TYPE_NOT_FOUND)
+    - 409: No availability for selected dates (ROOM_UNAVAILABLE)
+    - 423: Lock conflict (ROOM_LOCK_FAILED)
+    
     Body:
     {
       "room_type_id": 2,
@@ -42,10 +78,16 @@ async def lock_room(
         check_out_date = datetime.strptime(check_out, "%Y-%m-%d").date()
         expiry = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid date format")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid date format. Use YYYY-MM-DD for dates and ISO 8601 for expires_at"
+        )
 
     if check_in_date >= check_out_date:
-        raise HTTPException(status_code=400, detail="check_in must be before check_out")
+        raise HTTPException(
+            status_code=400,
+            detail="check_in must be before check_out"
+        )
 
     now = datetime.utcnow()
 
@@ -56,7 +98,10 @@ async def lock_room(
     room_type = rt_result.scalar_one_or_none()
     
     if not room_type:
-        raise HTTPException(status_code=404, detail="Room type not found")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Room type with ID {room_type_id} does not exist",
+        )
 
     # 2. Get all rooms in this type
     result = await db.execute(
@@ -65,7 +110,11 @@ async def lock_room(
     rooms = result.scalars().all()
 
     if not rooms:
-        raise HTTPException(status_code=404, detail="No rooms of this type")
+        # 409 Conflict: Room type exists but has no physical rooms (no availability)
+        raise HTTPException(
+            status_code=409,
+            detail=f"No {room_type.type_name} rooms currently available. Please try another room type."
+        )
 
     # 3. Find rooms already locked for this date window
     locked_result = await db.execute(
@@ -80,7 +129,11 @@ async def lock_room(
     free_room = next((r for r in rooms if r.room_id not in locked_ids), None)
 
     if not free_room:
-        raise HTTPException(status_code=409, detail="No available rooms for selected dates")
+        # 409 Conflict: No availability (user can retry with different dates)
+        raise HTTPException(
+            status_code=409,
+            detail=f"No {room_type.type_name} rooms available for {check_in} to {check_out}"
+        )
 
     # 5. Insert lock
     lock = RoomAvailabilityLocks(
@@ -141,7 +194,10 @@ async def unlock_room(
     if lock.user_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="Not your lock")
 
-    await db.delete(lock)
+    # Properly delete the lock
+    await db.execute(
+        delete(RoomAvailabilityLocks).where(RoomAvailabilityLocks.lock_id == lock_id)
+    )
     await db.commit()
 
     return {"unlocked": True}

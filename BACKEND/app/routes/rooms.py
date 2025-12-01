@@ -146,6 +146,7 @@ async def create_room_type(
     import json
     from app.core.cloudinary import cloudinary_client
     
+    
     try:
         amenity_ids = json.loads(amenities) if amenities != "[]" else []
     except:

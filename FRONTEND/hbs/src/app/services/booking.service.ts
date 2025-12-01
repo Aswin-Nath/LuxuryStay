@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, BehaviorSubject, interval, of } from 'rxjs';
+import { Observable, BehaviorSubject, interval, of, Subject } from 'rxjs';
 import { map, switchMap, takeUntil } from 'rxjs/operators';
+import { environment } from '../../environments/environment';
 
 export interface Room {
   room_id: number;
@@ -61,7 +62,18 @@ export interface BookingSummary {
   providedIn: 'root'
 })
 export class BookingService {
-  private apiUrl = 'http://localhost:8000/api/v2/rooms';
+  private bookingApiUrl = `${environment.apiUrl}/v2/rooms`;
+  private imageApiUrl = `${environment.apiUrl}/room-management`;
+  
+  // Expose booking API URL for room booking operations
+  getBookingApiUrl(): string {
+    return this.bookingApiUrl;
+  }
+  
+  // Expose image API URL for room images
+  getImageApiUrl(): string {
+    return this.imageApiUrl;
+  }
   
   // State management
   private bookingSession = new BehaviorSubject<BookingSession | null>(null);
@@ -75,6 +87,9 @@ export class BookingService {
 
   private isSessionExpired = new BehaviorSubject<boolean>(false);
   public isSessionExpired$ = this.isSessionExpired.asObservable();
+
+  // Timer cleanup subject - allows us to stop previous timers
+  private timerCleanup = new Subject<void>();
 
   constructor(private http: HttpClient) {}
 
@@ -100,18 +115,43 @@ export class BookingService {
       .set('check_out', checkOut);
 
     if (filters) {
-      if (filters.room_type_id) params = params.set('room_type_id', filters.room_type_id.toString());
-      if (filters.type_name) params = params.set('type_name', filters.type_name);
-      if (filters.price_per_night_min) params = params.set('price_per_night_min', filters.price_per_night_min.toString());
-      if (filters.price_per_night_max) params = params.set('price_per_night_max', filters.price_per_night_max.toString());
-      if (filters.max_adult_count) params = params.set('max_adult_count', filters.max_adult_count.toString());
-      if (filters.max_child_count) params = params.set('max_child_count', filters.max_child_count.toString());
-      if (filters.square_ft_min) params = params.set('square_ft_min', filters.square_ft_min.toString());
-      if (filters.square_ft_max) params = params.set('square_ft_max', filters.square_ft_max.toString());
+      // Add filters ONLY if they have actual values (not empty string, not 0, not undefined, not null)
+      // Send room_type_id (number) to backend, not type_name (string)
+      if (filters.room_type_id && filters.room_type_id > 0) 
+        params = params.set('room_type_id', filters.room_type_id.toString());
+      
+      if (filters.price_per_night_min && filters.price_per_night_min > 0) 
+        params = params.set('price_per_night_min', filters.price_per_night_min.toString());
+      
+      if (filters.price_per_night_max && filters.price_per_night_max > 0) 
+        params = params.set('price_per_night_max', filters.price_per_night_max.toString());
+      
+      if (filters.max_adult_count && filters.max_adult_count > 0) 
+        params = params.set('max_adult_count', filters.max_adult_count.toString());
+      
+      if (filters.max_child_count !== undefined && filters.max_child_count > 0) 
+        params = params.set('max_child_count', filters.max_child_count.toString());
+      
+      if (filters.square_ft_min && filters.square_ft_min > 0) 
+        params = params.set('square_ft_min', filters.square_ft_min.toString());
+      
+      if (filters.square_ft_max && filters.square_ft_max > 0) 
+        params = params.set('square_ft_max', filters.square_ft_max.toString());
     }
 
-    return this.http.get<any>(`${this.apiUrl}/search`, { params }).pipe(
+    console.log('🔍 Search request with params:', params.keys().map(key => `${key}=${params.get(key)}`).join('&'));
+
+    return this.http.get<any>(`${this.bookingApiUrl}/search`, { params }).pipe(
       map(response => response.results || [])
+    );
+  }
+
+  // ===================================================
+  // GET ALL ROOM TYPES (For dropdown/filter)
+  // ===================================================
+  getAllRoomTypes(): Observable<Room[]> {
+    return this.http.get<any>(`${this.bookingApiUrl}/room-types`).pipe(
+      map(response => response.results || response || [])
     );
   }
 
@@ -120,7 +160,7 @@ export class BookingService {
   // ===================================================
   createBookingSession(checkIn: string, checkOut: string): Observable<BookingSession> {
     return this.http.post<BookingSession>(
-      `${this.apiUrl}/booking/session`,
+      `${this.bookingApiUrl}/booking/session`,
       { check_in: checkIn, check_out: checkOut }
     ).pipe(
       map(session => {
@@ -133,37 +173,48 @@ export class BookingService {
 
   getBookingSession(sessionId: string): Observable<BookingSession> {
     return this.http.get<BookingSession>(
-      `${this.apiUrl}/booking/session/${sessionId}`
+      `${this.bookingApiUrl}/booking/session/${sessionId}`
     );
   }
 
   private startSessionTimer(session: BookingSession): void {
     const expiryTime = new Date(session.expiry_time).getTime();
     
-    // Set initial remaining time immediately
-    const now = new Date().getTime();
-    const initialRemaining = Math.max(0, Math.floor((expiryTime - now) / 1000));
+    // Get the current remaining time (from old session if exists)
+    const currentRemaining = this.remainingTime.getValue();
+    
+    // If there's already a running timer, just update the expiry time and let it continue
+    // This preserves the countdown instead of resetting to 15 minutes
+    // Otherwise, calculate the initial remaining time from the session expiry
+    let initialRemaining = currentRemaining;
+    if (initialRemaining <= 0 || initialRemaining > 900) {
+      // Only reset if no timer is running or timer is invalid
+      const now = new Date().getTime();
+      initialRemaining = Math.max(0, Math.floor((expiryTime - now) / 1000));
+    }
+    
     this.remainingTime.next(initialRemaining);
+    
+    // Create a subject to handle this specific subscription cleanup
+    const timerSubject = new Subject<void>();
     
     interval(1000)
       .pipe(
-        switchMap(() => {
-          const now = new Date().getTime();
-          const remaining = Math.max(0, Math.floor((expiryTime - now) / 1000));
-          
-          this.remainingTime.next(remaining);
-          
-          if (remaining <= 0) {
-            this.isSessionExpired.next(true);
-          }
-          
-          return of(remaining);
-        }),
-        takeUntil(this.isSessionExpired$.pipe(
-          switchMap(expired => expired ? of(true) : of(false))
-        ))
+        takeUntil(timerSubject),
+        takeUntil(this.timerCleanup) // Also stop if timerCleanup fires (for new session)
       )
-      .subscribe();
+      .subscribe(() => {
+        const now = new Date().getTime();
+        const remaining = Math.max(0, Math.floor((expiryTime - now) / 1000));
+        
+        this.remainingTime.next(remaining);
+        
+        if (remaining <= 0) {
+          this.isSessionExpired.next(true);
+          timerSubject.next();
+          timerSubject.complete();
+        }
+      });
   }
 
   getSessionRemainingMinutes(): number {
@@ -184,7 +235,7 @@ export class BookingService {
     expiresAt: string
   ): Observable<RoomLock> {
     return this.http.post<RoomLock>(
-      `${this.apiUrl}/lock`,
+      `${this.bookingApiUrl}/lock`,
       {
         room_type_id: roomTypeId,
         check_in: checkIn,
@@ -202,7 +253,7 @@ export class BookingService {
 
   unlockRoom(lockId: number): Observable<any> {
     return this.http.post(
-      `${this.apiUrl}/unlock/${lockId}`,
+      `${this.bookingApiUrl}/unlock/${lockId}`,
       {}
     ).pipe(
       map(() => {
@@ -217,7 +268,7 @@ export class BookingService {
 
   // Release all locks for current user (used when dates change)
   releaseAllLocks(): Observable<any> {
-    return this.http.post(`${this.apiUrl}/release-all-locks`, {}).pipe(
+    return this.http.post(`${this.bookingApiUrl}/release-all-locks`, {}).pipe(
       map((response) => {
         // Clear all local locks
         this.selectedLocks.next([]);
@@ -227,7 +278,7 @@ export class BookingService {
   }
 
   getMyLocks(): Observable<RoomLock[]> {
-    return this.http.get<RoomLock[]>(`${this.apiUrl}/my-locks`).pipe(
+    return this.http.get<RoomLock[]>(`${this.bookingApiUrl}/my-locks`).pipe(
       map(locks => {
         this.selectedLocks.next(locks);
         return locks;
@@ -245,7 +296,7 @@ export class BookingService {
   getBookingSummary(lockIds: number[]): Observable<BookingSummary> {
     const params = new HttpParams().set('lock_ids', lockIds.join(','));
     return this.http.get<BookingSummary>(
-      `${this.apiUrl}/booking/summary`,
+      `${this.bookingApiUrl}/booking/summary`,
       { params }
     );
   }
