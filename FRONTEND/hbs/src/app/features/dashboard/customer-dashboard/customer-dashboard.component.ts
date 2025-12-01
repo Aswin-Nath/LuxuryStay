@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
 import { CustomerNavbarComponent } from '../../../core/components/customer-navbar/customer-navbar.component';
 import { CustomerSidebarComponent } from '../../../core/components/customer-sidebar/customer-sidebar.component';
@@ -29,7 +30,7 @@ interface Offer {
 @Component({
   selector: 'app-customer-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule, CustomerNavbarComponent, CustomerSidebarComponent],
+  imports: [CommonModule, FormsModule, RouterModule, CustomerNavbarComponent, CustomerSidebarComponent],
   templateUrl: './customer-dashboard.component.html',
   styleUrls: ['./customer-dashboard.component.css']
 })
@@ -38,6 +39,12 @@ export class CustomerDashboardComponent implements OnInit {
   bookingsCount = 3;
   offersCount = 6;
   rewardPoints = 2450;
+
+  // Date picker modal properties
+  showDatePickerModal: boolean = false;
+  checkIn: string = '';
+  checkOut: string = '';
+  datePickerError: string = '';
 
   // Upcoming Bookings
   upcomingBookings: Booking[] = [
@@ -161,6 +168,57 @@ export class CustomerDashboardComponent implements OnInit {
   }
 
   bookNow(): void {
-    this.router.navigate(['/booking']);
+    // Initialize with today and tomorrow dates
+    const today = new Date().toISOString().split('T')[0];
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    this.checkIn = today;
+    this.checkOut = tomorrow;
+    this.datePickerError = '';
+    this.showDatePickerModal = true;
+  }
+
+  /**
+   * Close date picker modal
+   */
+  closeBookingModal(): void {
+    this.showDatePickerModal = false;
+    this.datePickerError = '';
+  }
+
+  /**
+   * Proceed with booking - navigate to booking component with dates
+   */
+  proceedWithBooking(): void {
+    if (!this.checkIn || !this.checkOut) {
+      this.datePickerError = 'Please select check-in and check-out dates';
+      return;
+    }
+
+    if (this.checkIn >= this.checkOut) {
+      this.datePickerError = 'Check-out date must be after check-in date';
+      return;
+    }
+
+    this.datePickerError = '';
+    
+    // Navigate to booking component with dates as query parameters
+    this.router.navigate(['/booking'], {
+      queryParams: {
+        checkIn: this.checkIn,
+        checkOut: this.checkOut
+      }
+    });
+  }
+
+  /**
+   * Calculate number of nights
+   */
+  calculateNumberOfNights(): number {
+    if (!this.checkIn || !this.checkOut) return 1;
+    const start = new Date(this.checkIn);
+    const end = new Date(this.checkOut);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return Math.max(1, diffDays);
   }
 }

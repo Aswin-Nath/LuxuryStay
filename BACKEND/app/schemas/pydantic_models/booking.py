@@ -151,6 +151,7 @@ class BookingResponse(BaseModel):
     check_out: date
     check_out_time: time
     total_price: float
+    booking_time:datetime
     status: str
     is_deleted: bool
     created_at: Optional[datetime] = None

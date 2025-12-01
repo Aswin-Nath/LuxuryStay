@@ -1,4 +1,5 @@
 from typing import List, Optional
+from datetime import datetime
 from fastapi import (
     APIRouter,
     Depends,
@@ -129,14 +130,84 @@ async def get_admin_booking_by_id(
 # ==========================================================
 @router.get("/customer", response_model=List[BookingResponse])
 async def get_customer_bookings(
-    status: Optional[str] = Query(None),
+    status: Optional[str] = Query(None, description="Filter by booking status (CONFIRMED, PENDING, CANCELLED, CHECKED_IN, CHECKED_OUT)"),
+    min_price: Optional[float] = Query(None, description="Filter bookings with total_price >= min_price"),
+    max_price: Optional[float] = Query(None, description="Filter bookings with total_price <= max_price"),
+    room_type_id: Optional[str] = Query(None, description="Comma-separated room type IDs to filter by (e.g., 1,2,3)"),
+    check_in_date: Optional[str] = Query(None, description="Filter bookings with check_in >= this date (YYYY-MM-DD format)"),
+    check_out_date: Optional[str] = Query(None, description="Filter bookings with check_out <= this date (YYYY-MM-DD format)"),
     limit: int = Query(20, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
     token_payload: dict = Security(check_permission, scopes=["BOOKING:READ", "CUSTOMER"]),
 ):
-    items = await svc_query_bookings(db, user_id=current_user.user_id, status=status)
+    """
+    Retrieve current user's bookings with advanced filtering.
+    
+    Supports filtering by status, price range, room types, and date range.
+    
+    Query Parameters:
+        - status: Filter by booking status (CONFIRMED, PENDING, CANCELLED, CHECKED_IN, CHECKED_OUT)
+        - min_price/max_price: Filter by total price range
+        - room_type_id: Comma-separated room type IDs (e.g., "1,2,3")
+        - check_in_date: Filter bookings from this date (YYYY-MM-DD)
+        - check_out_date: Filter bookings until this date (YYYY-MM-DD)
+        - limit/offset: Pagination parameters
+    
+    Examples:
+        GET /bookings/customer?status=CONFIRMED&min_price=100&max_price=500
+        GET /bookings/customer?room_type_id=1,2&check_in_date=2025-12-01
+    """
+    # Parse room_type_id from comma-separated string
+    room_type_list = None
+    if room_type_id:
+        try:
+            room_type_list = [int(rt.strip()) for rt in room_type_id.split(',')]
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="room_type_id must be comma-separated integers (e.g., '1,2,3')"
+            )
+    
+    # Parse dates
+    check_in_date_parsed = None
+    check_out_date_parsed = None
+    if check_in_date:
+        try:
+            check_in_date_parsed = datetime.strptime(check_in_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="check_in_date must be in YYYY-MM-DD format"
+            )
+    
+    if check_out_date:
+        try:
+            check_out_date_parsed = datetime.strptime(check_out_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="check_out_date must be in YYYY-MM-DD format"
+            )
+    
+    # Convert price filters to Decimal
+    from decimal import Decimal
+    min_price_decimal = Decimal(str(min_price)) if min_price is not None else None
+    max_price_decimal = Decimal(str(max_price)) if max_price is not None else None
+    
+    # Query with filters
+    items = await svc_query_bookings(
+        db, 
+        user_id=current_user.user_id, 
+        status=status,
+        min_price=min_price_decimal,
+        max_price=max_price_decimal,
+        room_types=room_type_list,
+        check_in_date=check_in_date_parsed,
+        check_out_date=check_out_date_parsed,
+    )
+    
     return [BookingResponse.model_validate(i).model_dump(exclude={"created_at"}) for i in items]
 
 
@@ -158,3 +229,32 @@ async def get_admin_bookings(
         items = await svc_list_bookings(db, limit=limit, offset=offset)
 
     return [BookingResponse.model_validate(i).model_dump(exclude={"created_at"}) for i in items]
+
+
+# ==========================================================
+# 🔹 READ - Get all distinct booking statuses
+# ==========================================================
+@router.get("/statuses", response_model=List[str])
+async def get_booking_statuses(
+    db: AsyncSession = Depends(get_db),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:READ"]),
+):
+    """
+    Retrieve all distinct booking statuses from the database.
+    
+    Used for populating status filter dropdowns in the UI.
+    Returns unique statuses that have been used in bookings.
+    
+    Returns:
+        List[str]: List of unique booking status values
+    
+    Examples:
+        GET /bookings/statuses → ["CONFIRMED", "PENDING", "CANCELLED", "CHECKED_IN", "CHECKED_OUT"]
+    """
+    from sqlalchemy import select, distinct
+    
+    stmt = select(distinct(Bookings.status)).order_by(Bookings.status)
+    result = await db.execute(stmt)
+    statuses = [row[0] for row in result.fetchall() if row[0]]
+    
+    return statuses

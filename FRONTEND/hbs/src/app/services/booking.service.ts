@@ -64,6 +64,7 @@ export interface BookingSummary {
 export class BookingService {
   private bookingApiUrl = `${environment.apiUrl}/v2/rooms`;
   private imageApiUrl = `${environment.apiUrl}/room-management`;
+  private profileApiUrl = `${environment.apiUrl}/profile`;
   
   // Expose booking API URL for room booking operations
   getBookingApiUrl(): string {
@@ -92,6 +93,13 @@ export class BookingService {
   private timerCleanup = new Subject<void>();
 
   constructor(private http: HttpClient) {}
+
+  // ===================================================
+  // USER PROFILE
+  // ===================================================
+  getUserProfile() {
+    return this.http.get<any>(`${this.profileApiUrl}/`);
+  }
 
   // ===================================================
   // ROOM SEARCH
@@ -178,20 +186,14 @@ export class BookingService {
   }
 
   private startSessionTimer(session: BookingSession): void {
+    // IMPORTANT: Kill all previous timers when starting a new session
+    this.timerCleanup.next();
+    
     const expiryTime = new Date(session.expiry_time).getTime();
     
-    // Get the current remaining time (from old session if exists)
-    const currentRemaining = this.remainingTime.getValue();
-    
-    // If there's already a running timer, just update the expiry time and let it continue
-    // This preserves the countdown instead of resetting to 15 minutes
-    // Otherwise, calculate the initial remaining time from the session expiry
-    let initialRemaining = currentRemaining;
-    if (initialRemaining <= 0 || initialRemaining > 900) {
-      // Only reset if no timer is running or timer is invalid
-      const now = new Date().getTime();
-      initialRemaining = Math.max(0, Math.floor((expiryTime - now) / 1000));
-    }
+    // For NEW sessions, always calculate fresh remaining time from expiry time
+    const now = new Date().getTime();
+    const initialRemaining = Math.max(0, Math.floor((expiryTime - now) / 1000));
     
     this.remainingTime.next(initialRemaining);
     
@@ -301,7 +303,35 @@ export class BookingService {
     );
   }
 
-  // Booking confirmation removed - keeping only room selection functionality
+  // ===================================================
+  // BOOKING CONFIRMATION WITH GUEST DETAILS
+  // ===================================================
+  confirmBooking(
+    paymentMethodId: number,
+    roomsGuestDetails: any[],
+    upiId?: string
+  ): Observable<any> {
+    const payload: any = {
+      payment_method_id: paymentMethodId,
+      rooms_guest_details: roomsGuestDetails
+    };
+
+    // Add UPI ID if provided
+    if (upiId) {
+      payload.upi_id = upiId;
+    }
+
+    return this.http.post<any>(
+      `${this.bookingApiUrl}/booking/confirm`,
+      payload
+    ).pipe(
+      map(response => {
+        // Clear bookings after successful confirmation
+        this.selectedLocks.next([]);
+        return response;
+      })
+    );
+  }
 
   // ===================================================
   // HELPERS

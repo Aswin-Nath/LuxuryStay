@@ -1,0 +1,201 @@
+<body class="bg-gray-50 flex flex-col min-h-screen">
+  <!-- Navbar Component -->
+  <app-customer-navbar></app-customer-navbar>
+
+  <!-- Main Content -->
+  <div class="bg-gray-50 min-h-screen">
+    <div class="w-full px-4 md:px-6 lg:px-8 py-6 mt-16 md:mt-20 max-w-6xl mx-auto">
+      <!-- ✅ Main Content -->
+  
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="flex items-center justify-center py-12">
+    <div class="text-center">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-600 mx-auto"></div>
+      <p class="mt-4 text-gray-600">Loading booking details...</p>
+    </div>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error && !isLoading" class="bg-red-50 border-l-4 border-red-500 p-4 rounded">
+    <p class="text-red-700 font-medium">{{ error }}</p>
+  </div>
+
+  <!-- Main Content -->
+  <div *ngIf="!isLoading && booking && !error">
+    <!-- Header with Back Button -->
+    <div class="flex items-center justify-between mb-8">
+      <button
+        (click)="goBack()"
+        class="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-yellow-500 to-pink-500 text-white rounded-lg hover:opacity-90 transition"
+      >
+        <span class="material-icons text-sm">arrow_back</span>
+        Back to Bookings
+      </button>
+      <button
+        (click)="downloadInvoice()"
+        class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+      >
+        <span class="material-icons text-sm">download</span>
+        Download Invoice
+      </button>
+    </div>
+
+    <!-- Page Title -->
+    <div class="relative rounded-2xl border-2 border-red-400 bg-[#fdfaf4] py-6 sm:py-8 text-center shadow mb-8">
+      <h2 class="text-2xl sm:text-3xl lg:text-4xl text-gray-800 font-bold">Booking Details</h2>
+      <p class="text-sm sm:text-base text-gray-500 mt-2">Booking #{{ booking.booking_id }}</p>
+    </div>
+
+    <!-- Booking Summary Card -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      <!-- Left: Booking Info -->
+      <div class="lg:col-span-2">
+        <div class="bg-white rounded-2xl border-2 border-yellow-400 p-6 shadow-sm">
+          <div class="flex items-center justify-between mb-6">
+            <h3 class="text-lg font-semibold text-yellow-700">Booking Information</h3>
+            <span
+              [ngClass]="'inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ' + getStatusBadgeClass(booking.status)"
+            >
+              <span class="material-icons text-sm mr-1">{{ getStatusIcon(booking.status) }}</span>
+              {{ booking.status | uppercase }}
+            </span>
+          </div>
+
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div>
+              <p class="text-xs font-medium text-gray-600">Check-in</p>
+              <p class="text-lg font-semibold text-gray-800 mt-1">{{ formatDate(booking.check_in) }}</p>
+              <p class="text-sm text-gray-500">{{ booking.check_in_time }}</p>
+            </div>
+
+            <div>
+              <p class="text-xs font-medium text-gray-600">Check-out</p>
+              <p class="text-lg font-semibold text-gray-800 mt-1">{{ formatDate(booking.check_out) }}</p>
+              <p class="text-sm text-gray-500">{{ booking.check_out_time }}</p>
+            </div>
+
+            <div>
+              <p class="text-xs font-medium text-gray-600">Duration</p>
+              <p class="text-lg font-semibold text-gray-800 mt-1">{{ calculateNights() }} night(s)</p>
+            </div>
+
+            <div>
+              <p class="text-xs font-medium text-gray-600">Number of Rooms</p>
+              <p class="text-lg font-semibold text-gray-800 mt-1">{{ booking.room_count }}</p>
+            </div>
+
+            <div>
+              <p class="text-xs font-medium text-gray-600">Booking Date</p>
+              <p class="text-lg font-semibold text-gray-800 mt-1">{{ formatBookingDateTime(booking.booking_time || booking.created_at || '') }}</p>
+            </div>
+
+            <div>
+              <p class="text-xs font-medium text-gray-600">Last Updated</p>
+              <p class="text-lg font-semibold text-gray-800 mt-1">{{ formatDate(booking.updated_at || '') }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Price Summary -->
+      <div class="bg-white rounded-2xl border-2 border-yellow-400 p-6 shadow-sm h-fit">
+        <h3 class="text-lg font-semibold text-yellow-700 mb-4">Price Summary</h3>
+
+        <div class="space-y-3 border-b border-gray-200 pb-4">
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-600">Subtotal</span>
+            <span class="font-medium text-gray-800">₹{{ getSubtotal().toLocaleString() }}</span>
+          </div>
+
+          <div *ngFor="let tax of booking.taxes" class="flex justify-between text-sm">
+            <span class="text-gray-600">Tax #{{ tax.tax_id }}</span>
+            <span class="font-medium text-gray-800">₹{{ tax.tax_amount.toLocaleString() }}</span>
+          </div>
+        </div>
+
+        <div class="flex justify-between text-lg font-bold text-yellow-700 mt-4 pt-4">
+          <span>Total</span>
+          <span>₹{{ booking.total_price.toLocaleString() }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Guest Information -->
+    <div class="bg-white rounded-2xl border-2 border-yellow-400 p-6 shadow-sm mb-8">
+      <h3 class="text-lg font-semibold text-yellow-700 mb-4">Guest Information</h3>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div>
+          <p class="text-xs font-medium text-gray-600 mb-1">Primary Guest Name</p>
+          <p class="text-lg font-semibold text-gray-800">{{ booking.primary_customer_name || 'Not provided' }}</p>
+        </div>
+
+        <div>
+          <p class="text-xs font-medium text-gray-600 mb-1">Phone Number</p>
+          <p class="text-lg font-semibold text-gray-800">{{ booking.primary_customer_phone_number || 'Not provided' }}</p>
+        </div>
+
+        <div>
+          <p class="text-xs font-medium text-gray-600 mb-1">Date of Birth</p>
+          <p class="text-lg font-semibold text-gray-800">
+            {{ booking.primary_customer_dob ? formatDate(booking.primary_customer_dob) : 'Not provided' }}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rooms Details -->
+    <div *ngIf="booking.rooms && booking.rooms.length > 0" class="bg-white rounded-2xl border-2 border-yellow-400 p-6 shadow-sm mb-8">
+      <h3 class="text-lg font-semibold text-yellow-700 mb-4">Room Details</h3>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="px-4 py-3 text-left font-semibold text-gray-700">Room ID</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-700">Room Type</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-700">Adults</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-700">Children</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-700">Status</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-700">Rating</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200">
+            <tr *ngFor="let room of booking.rooms" class="hover:bg-gray-50">
+              <td class="px-4 py-3 font-medium text-gray-800">#{{ room.room_id }}</td>
+              <td class="px-4 py-3 text-gray-700">Room Type {{ room.room_type_id }}</td>
+              <td class="px-4 py-3 text-gray-700">{{ room.adults }}</td>
+              <td class="px-4 py-3 text-gray-700">{{ room.children || 0 }}</td>
+              <td class="px-4 py-3">
+                <span
+                  [ngClass]="{
+                    'bg-green-100 text-green-800': room.is_room_active,
+                    'bg-red-100 text-red-800': !room.is_room_active
+                  }"
+                  class="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                >
+                  {{ room.is_room_active ? 'Active' : 'Inactive' }}
+                </span>
+              </td>
+              <td class="px-4 py-3">
+                <span *ngIf="room.rating_given && room.rating_given > 0" class="text-yellow-500 font-semibold">{{ room.rating_given }}/5 ⭐</span>
+                <span *ngIf="!room.rating_given || room.rating_given === 0" class="text-gray-400">Not rated</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- No Rooms -->
+    <div
+      *ngIf="!booking.rooms || booking.rooms.length === 0"
+      class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded mb-8 text-blue-700"
+    >
+      No room details available for this booking.
+    </div>
+    </div>
+
+    </div>
+  </div>
+</body>

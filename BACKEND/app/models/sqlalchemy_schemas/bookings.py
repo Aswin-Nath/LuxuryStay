@@ -28,6 +28,7 @@ class Bookings(Base):
     check_in_time = Column(Time, server_default="12:00:00")
     check_out = Column(Date, nullable=False)
     check_out_time = Column(Time, server_default="11:00:00")
+    booking_time = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
     total_price = Column(Numeric(12, 2), nullable=False)
     status = Column(String(50), nullable=False, server_default="Confirmed", index=True)
     is_deleted = Column(Boolean, server_default="false", index=True)
@@ -51,8 +52,14 @@ class BookingRoomMap(Base):
     booking_id = Column(Integer, ForeignKey("bookings.booking_id", ondelete="CASCADE"), primary_key=True, index=True)
     room_id = Column(Integer, ForeignKey("rooms.room_id"), primary_key=True, index=True)
     room_type_id = Column(Integer, ForeignKey("room_types.room_type_id"), nullable=False)
-    adults = Column(SmallInteger,server_default="1")
+    adults = Column(SmallInteger, server_default="1")
     children = Column(SmallInteger, server_default="0")
+    
+    # ✅ NEW: Guest Details
+    guest_name = Column(String(150), nullable=True, comment="Primary adult guest name")
+    guest_age = Column(SmallInteger, nullable=True, comment="Primary adult guest age (18+)")
+    special_requests = Column(Text, nullable=True, comment="Special requests for this room")
+    
     is_pre_edited_room = Column(Boolean, server_default="false", nullable=True, index=True)
     is_post_edited_room = Column(Boolean, server_default="false", nullable=True, index=True)
     is_room_active = Column(Boolean, server_default="true", nullable=True, index=True)
@@ -62,6 +69,8 @@ class BookingRoomMap(Base):
         nullable=True,
         comment="Array of room_ids suggested by admin for this booking room during post-edit",
     )
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
+    
     booking = relationship("Bookings", back_populates="rooms")
     room = relationship("Rooms", back_populates="booking_room_maps")
 

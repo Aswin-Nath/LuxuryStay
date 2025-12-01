@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy, ChangeDetectorRef, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterModule } from '@angular/router';
+import { Router, RouterModule, ActivatedRoute } from '@angular/router';
 import { BookingService, RoomLock, BookingSession, Room } from '../../services/booking.service';
 import { RoomCardComponent } from './room-card/room-card.component';
 import { Subject } from 'rxjs';
@@ -58,8 +58,17 @@ export class BookingComponent implements OnInit, OnDestroy {
   // Phases: dates | search-and-details | payment
   currentPhase: Phase = PHASES.DATES;
   
+  // Track if booking is started (to show date modal or full page)
+  bookingStarted: boolean = false;
+  
+  // Modal-specific flag for date picker
+  showDatePickerModal: boolean = false;
+  
   // Template visibility flags
   showSummary: boolean = false;
+  
+  // Track if booking was started from navbar (no dates provided)
+  private fromNavbar: boolean = false;
   
   // Tab for summary view
   summaryTab: 'overview' | 'selected-rooms' | 'breakdown' = 'overview';
@@ -121,6 +130,19 @@ export class BookingComponent implements OnInit, OnDestroy {
   // Guest Details per room (stored locally, NOT sent to backend yet)
   roomGuestDetails: { [lockId: number]: RoomGuestDetails } = {};
 
+  // Primary user details (for option to use in one room)
+  userDetails: {
+    name: string | null;
+    age: number | null;
+    hasDob: boolean;
+    usedInRoom: number | null;  // Track which room is using user details (null = none, only one room can use it)
+  } = {
+    name: null,
+    age: null,
+    hasDob: false,
+    usedInRoom: null
+  };
+
   // Summary state
   bookingSummary: any = null;
   isSummaryLoading = false;
@@ -144,10 +166,14 @@ export class BookingComponent implements OnInit, OnDestroy {
   constructor(
     public bookingService: BookingService,
     private router: Router,
+    private route: ActivatedRoute,
     private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
+    // Load user profile details for optional use in booking
+    this.loadUserDetails();
+
     // Load ALL room types from database (for dropdown - ALWAYS show all types)
     this.bookingService.getAllRoomTypes()
       .pipe(takeUntil(this.destroy$))
@@ -204,11 +230,81 @@ export class BookingComponent implements OnInit, OnDestroy {
     this.checkOut = tomorrow;
     this.previousCheckIn = today;
     this.previousCheckOut = tomorrow;
+
+    // Check if dates were passed from profile component via query params
+    this.route.queryParams.pipe(takeUntil(this.destroy$)).subscribe(params => {
+      if (params['checkIn'] && params['checkOut']) {
+        this.checkIn = params['checkIn'];
+        this.checkOut = params['checkOut'];
+        this.previousCheckIn = params['checkIn'];
+        this.previousCheckOut = params['checkOut'];
+        console.log('📅 Dates received from profile:', this.checkIn, this.checkOut);
+        // Directly proceed to search with provided dates
+        this.proceedFromDateModal();
+      } else {
+        // No dates provided - could be from navbar or direct navigation
+        this.fromNavbar = true;
+        // Show modal
+        this.openDatePickerModal();
+      }
+    });
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  // ===================================================
+  // DATE PICKER MODAL METHODS
+  // ===================================================
+  openDatePickerModal(): void {
+    this.showDatePickerModal = true;
+    this.bookingStarted = true;
+  }
+
+  closeeDatePickerModal(): void {
+    this.showDatePickerModal = false;
+    // If came from navbar and user clicks cancel, go back to home
+    if (this.fromNavbar) {
+      this.router.navigate(['/']);
+    }
+  }
+
+  proceedFromDateModal(): void {
+    if (!this.checkIn || !this.checkOut) {
+      this.searchError = 'Please select check-in and check-out dates';
+      return;
+    }
+
+    if (this.checkIn >= this.checkOut) {
+      this.searchError = 'Check-out date must be after check-in date';
+      return;
+    }
+
+    // Store current dates as previous dates
+    this.previousCheckIn = this.checkIn;
+    this.previousCheckOut = this.checkOut;
+    this.searchError = '';
+    this.datesSelected = true;
+
+    // Create booking session and go directly to search phase
+    this.bookingService.createBookingSession(this.checkIn, this.checkOut)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (session) => {
+          this.bookingSession = session;
+          this.searchError = '';
+          this.showDatePickerModal = false;
+          
+          // Move to search-and-details phase
+          this.currentPhase = PHASES.SEARCH_AND_DETAILS;
+          this.loadAvailableRoomTypesWithFilters();
+        },
+        error: (err) => {
+          this.searchError = 'Failed to create booking session: ' + err.error?.detail;
+        }
+      });
   }
 
   // ===================================================
@@ -552,6 +648,61 @@ export class BookingComponent implements OnInit, OnDestroy {
     }
   }
 
+  // Apply user's own details to a room (name and age from DOB)
+  applyUserDetailsToRoom(lockId: number): void {
+    // Can only use user details if DOB exists
+    if (!this.userDetails.hasDob || !this.userDetails.name || !this.userDetails.age) {
+      alert('❌ User details incomplete. DOB is required to use your profile details.');
+      return;
+    }
+
+    // Remove from previous room if it was used elsewhere
+    if (this.userDetails.usedInRoom !== null && this.userDetails.usedInRoom !== lockId) {
+      const previousRoom = this.roomGuestDetails[this.userDetails.usedInRoom];
+      if (previousRoom) {
+        previousRoom.adultName = '';
+        previousRoom.adultAge = 0;
+      }
+    }
+
+    // Apply user details to this room
+    this.updateGuestDetails(lockId, {
+      adultName: this.userDetails.name,
+      adultAge: this.userDetails.age
+    });
+
+    // Mark this room as using user details
+    this.userDetails.usedInRoom = lockId;
+    
+    // Trigger change detection to update completion counter
+    this.cdr.markForCheck();
+    
+    console.log(`✅ User details applied to room ${lockId}: ${this.userDetails.name}, Age ${this.userDetails.age}`);
+    console.log(`📊 Rooms completed: ${this.getCompletedRoomsCount()} / ${this.selectedLocks.length}`);
+  }
+
+  // Clear user details from a room
+  clearUserDetailsFromRoom(lockId: number): void {
+    if (this.userDetails.usedInRoom === lockId) {
+      this.updateGuestDetails(lockId, {
+        adultName: '',
+        adultAge: 0
+      });
+      this.userDetails.usedInRoom = null;
+      
+      // Trigger change detection to update completion counter
+      this.cdr.markForCheck();
+      
+      console.log(`✅ User details cleared from room ${lockId}`);
+      console.log(`📊 Rooms completed: ${this.getCompletedRoomsCount()} / ${this.selectedLocks.length}`);
+    }
+  }
+
+  // Check if a room is using user details
+  isRoomUsingUserDetails(lockId: number): boolean {
+    return this.userDetails.usedInRoom === lockId;
+  }
+
   // Validate and correct guest counts against room capacity
   validateAndCorrectGuestCounts(lockId: number): void {
     const roomDetails = this.roomGuestDetails[lockId];
@@ -627,6 +778,17 @@ export class BookingComponent implements OnInit, OnDestroy {
              details.adultAge >= 18 &&  // MUST be at least 18
              details.adultCount >= 1;
     });
+  }
+
+  // Count how many rooms have complete guest details
+  getCompletedRoomsCount(): number {
+    return this.selectedLocks.filter(lock => {
+      const details = this.roomGuestDetails[lock.lock_id];
+      return details && 
+             details.adultName.trim() !== '' && 
+             details.adultAge >= 18 &&  // MUST be at least 18
+             details.adultCount >= 1;
+    }).length;
   }
   
   // Get all guest details for submission
@@ -1345,55 +1507,73 @@ export class BookingComponent implements OnInit, OnDestroy {
     }
 
     this.isProcessingPayment = true;
-    const paymentData = {
-      method: this.selectedPaymentMethod,
-      upiId: this.selectedPaymentMethod === 'upi' ? this.upiId : undefined,
-      amount: this.getTotalAmount(),
-      locks: this.selectedLocks.map(lock => lock.lock_id),
-      guestDetails: this.roomGuestDetails,
-      bookingSession: this.bookingSession
+    this.bookingError = '';
+
+    // Map payment method to backend ID
+    const paymentMethodMap: { [key: string]: number } = {
+      card: 1,
+      upi: 2,
+      netbanking: 3
     };
 
-    console.log('💰 Processing payment:', paymentData);
+    const paymentMethodId = paymentMethodMap[this.selectedPaymentMethod!];
 
-    // Simulate payment processing based on method
-    setTimeout(() => {
-      this.processPaymentByMethod(this.selectedPaymentMethod!);
-    }, 1500);
-  }
+    // Build guest details array from roomGuestDetails
+    const roomsGuestDetails = this.selectedLocks.map(lock => ({
+      lock_id: lock.lock_id,
+      guest_name: this.roomGuestDetails[lock.lock_id]?.adultName || '',
+      guest_age: this.roomGuestDetails[lock.lock_id]?.adultAge || 0,
+      adult_count: this.roomGuestDetails[lock.lock_id]?.adultCount || 1,
+      child_count: this.roomGuestDetails[lock.lock_id]?.childCount || 0,
+      special_requests: this.roomGuestDetails[lock.lock_id]?.specialRequests || ''
+    }));
 
-  // Handle different payment methods
-  private processPaymentByMethod(method: 'card' | 'upi' | 'netbanking'): void {
-    let message = '';
-    
-    switch (method) {
-      case 'card':
-        message = '✅ Credit/Debit Card payment processed successfully!\n\nYour booking is confirmed.\nBooking ID: ' + this.generateBookingId() + '\n\nRedirecting to your bookings...';
-        break;
-      case 'upi':
-        message = '✅ UPI payment processed successfully!\n\nUPI ID: ' + this.upiId + '\nYour booking is confirmed.\nBooking ID: ' + this.generateBookingId() + '\n\nRedirecting to your bookings...';
-        break;
-      case 'netbanking':
-        message = '✅ Net Banking payment processed successfully!\n\nYour booking is confirmed.\nBooking ID: ' + this.generateBookingId() + '\n\nRedirecting to your bookings...';
-        break;
-    }
+    console.log('💰 Sending booking confirmation:', {
+      paymentMethodId,
+      roomsGuestDetails
+    });
 
-    alert(message);
-    this.isProcessingPayment = false;
+    // Call backend API to confirm booking and process payment
+    this.bookingService.confirmBooking(
+      paymentMethodId,
+      roomsGuestDetails,
+      this.selectedPaymentMethod === 'upi' ? this.upiId : undefined
+    )
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response) => {
+          console.log('✅ Booking confirmed successfully:', response);
+          this.isProcessingPayment = false;
 
-    // Reset and navigate
-    this.selectedPaymentMethod = null;
-    this.upiId = '';
-    this.roomGuestDetails = {};
-    this.selectedLocks = [];
-    
-    // Navigate to bookings dashboard
-    this.router.navigate(['/dashboard/bookings']);
-  }
+          // Show success message with booking details
+          const message = `✅ Booking Confirmed!\n\n` +
+            `Booking ID: ${response.booking_id}\n` +
+            `Transaction Ref: ${response.transaction_reference}\n` +
+            `Total Amount: ₹${response.total_amount.toFixed(2)}\n` +
+            `Rooms: ${response.room_count}\n\n` +
+            `Thank you for booking with LuxuryStay!`;
+          
+          alert(message);
 
-  // Generate booking ID
-  private generateBookingId(): string {
-    return 'LUX-' + Date.now().toString().slice(-8);
+          // Reset booking state
+          this.selectedPaymentMethod = null;
+          this.upiId = '';
+          this.roomGuestDetails = {};
+          this.selectedLocks = [];
+          this.bookingSummary = null;
+          this.currentPhase = PHASES.DATES;
+
+          // Navigate to bookings dashboard
+          this.router.navigate(['/dashboard/bookings']);
+        },
+        error: (err) => {
+          this.isProcessingPayment = false;
+          const errorMessage = err.error?.detail || 'Payment processing failed. Please try again.';
+          this.bookingError = '❌ ' + errorMessage;
+          console.error('Payment failed:', err);
+          alert('❌ ' + errorMessage);
+        }
+      });
   }
 
   // ===================================================
@@ -1442,11 +1622,41 @@ export class BookingComponent implements OnInit, OnDestroy {
     this.roomGuestDetails = {};
   }
 
+  // Stop booking and go back to home
+  stopBooking(): void {
+    // If no rooms selected, just navigate back
+    if (this.getTotalSelectedRooms() === 0) {
+      this.router.navigate(['/']);
+      return;
+    }
+
+    // If rooms are selected, confirm with alert
+    const confirmStop = confirm('⚠️ You have ' + this.getTotalSelectedRooms() + ' room(s) locked. Are you sure you want to stop booking?');
+    
+    if (confirmStop) {
+      // Release all locks before leaving
+      this.bookingService.releaseAllLocks().subscribe({
+        next: () => {
+          console.log('✅ All locks released');
+          this.resetBooking();
+          this.router.navigate(['/']);
+        },
+        error: (err) => {
+          console.error('Error releasing locks:', err);
+          // Still navigate even if lock release fails
+          this.resetBooking();
+          this.router.navigate(['/']);
+        }
+      });
+    }
+  }
+
   goBack(): void {
     if (this.currentPhase === PHASES.DATES) {
-      this.router.navigate(['/dashboard']);
+      this.router.navigate(['/']);
     } else if (this.currentPhase === PHASES.SEARCH_AND_DETAILS) {
-      this.currentPhase = PHASES.DATES;
+      // Go back to date picker modal
+      this.showDatePickerModal = true;
       this.showSummary = false;
     } else if (this.currentPhase === PHASES.PAYMENT) {
       // Go back to search-and-details from payment
@@ -1496,6 +1706,52 @@ export class BookingComponent implements OnInit, OnDestroy {
     const mins = Math.floor(totalSeconds / 60);
     const secs = totalSeconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  // Load user profile details for optional use in one room
+  loadUserDetails(): void {
+    try {
+      // Fetch user profile from API
+      this.bookingService.getUserProfile()
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: (userData) => {
+            // Extract name - try multiple field names
+            this.userDetails.name = userData.first_name || userData.full_name || userData.name || null;
+            
+            // Calculate age from DOB if available
+            if (userData.dob) {
+              try {
+                const dob = new Date(userData.dob);
+                const today = new Date();
+                let age = today.getFullYear() - dob.getFullYear();
+                const monthDiff = today.getMonth() - dob.getMonth();
+                
+                // Adjust if birthday hasn't occurred this year
+                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+                  age--;
+                }
+                
+                this.userDetails.age = age >= 18 ? age : null;  // Only valid if 18+
+                this.userDetails.hasDob = true;
+                
+                console.log(`👤 User details loaded: ${this.userDetails.name}, Age ${this.userDetails.age}`);
+              } catch (error) {
+                console.error('Error parsing DOB:', error);
+                this.userDetails.hasDob = false;
+              }
+            } else {
+              this.userDetails.hasDob = false;
+              console.log('⚠️ User DOB not available - cannot use user details in booking');
+            }
+          },
+          error: (error) => {
+            console.error('Error loading user profile:', error);
+          }
+        });
+    } catch (error) {
+      console.error('Error in loadUserDetails:', error);
+    }
   }
 
   goToDashboard(): void {

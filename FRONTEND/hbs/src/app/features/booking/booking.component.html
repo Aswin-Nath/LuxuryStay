@@ -42,62 +42,74 @@
     </div>
 
     <!-- ===================================================
-         PHASE 0: PLAN YOUR STAY (Dates Selection)
+         DATE PICKER MODAL (Overlay - Shows when booking starts)
          =================================================== -->
-    <div *ngIf="currentPhase === 0" class="max-w-2xl mx-auto animate-fadeIn">
-      <div class="bg-white rounded-2xl shadow-2xl p-12">
-        <h1 class="text-4xl font-bold text-center bg-linear-to-r from-yellow-600 to-red-600 bg-clip-text text-transparent mb-2">
-          📅 Plan Your Stay
-        </h1>
-        <p class="text-center text-gray-600 text-lg mb-12">Select your check-in and check-out dates to get started</p>
+    <div *ngIf="showDatePickerModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full animate-fadeIn">
+        <h2 class="text-2xl font-bold text-gray-800 mb-2 text-center">📅 Plan Your Stay</h2>
+        <p class="text-center text-gray-600 mb-6">Select your check-in and check-out dates</p>
 
-        <!-- IF DATES NOT SELECTED YET: Show date pickers -->
-        <div *ngIf="!datesSelected" class="space-y-8">
+        <div class="space-y-6">
           <!-- Check-in Date -->
           <div>
-            <label class="block text-xl font-bold text-gray-800 mb-4">Check-in Date</label>
+            <label class="block text-sm font-bold text-gray-700 mb-2">Check-in Date</label>
             <input 
               type="date" 
               [(ngModel)]="checkIn"
-              (change)="onDateChange()"
-              class="w-full px-6 py-4 text-lg border-3 border-gray-300 rounded-xl focus:border-yellow-600 focus:outline-none transition bg-white"
+              class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-yellow-600 focus:outline-none transition bg-white"
               style="color: black;">
-            <p class="text-sm text-gray-600 mt-2">When are you arriving?</p>
+            <p class="text-xs text-gray-600 mt-1">When are you arriving?</p>
           </div>
 
           <!-- Check-out Date -->
           <div>
-            <label class="block text-xl font-bold text-gray-800 mb-4">Check-out Date</label>
+            <label class="block text-sm font-bold text-gray-700 mb-2">Check-out Date</label>
             <input 
               type="date" 
               [(ngModel)]="checkOut"
-              (change)="onDateChange()"
-              class="w-full px-6 py-4 text-lg border-3 border-gray-300 rounded-xl focus:border-yellow-600 focus:outline-none transition bg-white"
+              class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-yellow-600 focus:outline-none transition bg-white"
               style="color: black;">
-            <p class="text-sm text-gray-600 mt-2">When are you leaving?</p>
-          </div>
-
-          <!-- Error Message -->
-          <div *ngIf="searchError" class="bg-red-50 border-l-4 border-red-500 p-6 rounded">
-            <p class="text-red-700 font-semibold">❌ {{ searchError }}</p>
+            <p class="text-xs text-gray-600 mt-1">When are you leaving?</p>
           </div>
 
           <!-- Duration Info -->
-          <div class="bg-linear-to-r from-yellow-50 to-orange-50 p-6 rounded-xl border border-yellow-300">
-            <p class="text-gray-800 font-semibold">
-              📍 Duration: <span class="text-yellow-700 text-lg">{{ calculateNumberOfNights() }} night(s)</span>
+          <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+            <p class="text-gray-700 font-semibold">
+              Duration: <span class="text-yellow-700">{{ calculateNumberOfNights() }} night(s)</span>
             </p>
           </div>
 
-          <!-- Search Button (Only) -->
-          <button 
-            (click)="proceedWithDates()"
-            class="w-full py-4 bg-linear-to-r from-yellow-600 to-red-600 text-white font-bold text-lg rounded-xl hover:from-yellow-700 hover:to-red-700 transition transform hover:scale-105 shadow-lg">
-            🔍 Search Available Rooms
-          </button>
+          <!-- Error Message -->
+          <div *ngIf="searchError" class="bg-red-50 border-l-4 border-red-500 p-4 rounded">
+            <p class="text-red-700 text-sm">❌ {{ searchError }}</p>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex flex-col gap-3">
+            <!-- Primary: Search Rooms -->
+            <button 
+              (click)="proceedFromDateModal()"
+              class="w-full py-2 bg-linear-to-r from-yellow-600 to-red-600 text-white font-bold rounded-lg hover:from-yellow-700 hover:to-red-700 transition">
+              🔍 Search Rooms
+            </button>
+
+            <!-- Secondary: Close -->
+            <button 
+              (click)="closeeDatePickerModal()"
+              class="w-full py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg transition">
+              ✖️ Cancel
+            </button>
+          </div>
         </div>
       </div>
     </div>
+
+    <!-- ===================================================
+         PHASE 0: PLAN YOUR STAY (Dates Selection) - HIDDEN
+         Kept for backward compatibility but not shown
+         =================================================== -->
+    <!-- <div *ngIf="false && currentPhase === 0" class="max-w-2xl mx-auto animate-fadeIn"> -->
+      <!-- HIDDEN -->
 
     <!-- ===================================================
          PHASE 2: SEARCH + GUEST DETAILS + SIDEBAR (Merged)
@@ -275,6 +287,21 @@
           </div>
         </div>
 
+        <!-- Stop Booking Section (Search Page) -->
+        <div class="bg-red-50 border-l-4 border-red-500 p-6 rounded-lg mb-8">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-red-700 font-semibold">🚪 Want to cancel?</p>
+              <p class="text-red-600 text-sm mt-2">Click the button to stop booking and go back to home.</p>
+            </div>
+            <button 
+              (click)="stopBooking()"
+              class="px-6 py-2 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition whitespace-nowrap">
+              🚪 Stop Booking
+            </button>
+          </div>
+        </div>
+
         <!-- GUEST DETAILS SECTION -->
         <div *ngIf="getTotalSelectedRooms() > 0" class="bg-white rounded-2xl shadow-lg p-8 mt-6">
           <h2 class="text-2xl font-bold text-gray-800 mb-6">👤 Guest Details (Per Room)</h2>
@@ -303,6 +330,33 @@
                     placeholder="Full name"
                     class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-white"
                     style="color: black;">
+                  
+                  <!-- Use My Details Button -->
+                  <div class="mt-3 flex gap-2">
+                    <button 
+                      *ngIf="userDetails.hasDob && !isRoomUsingUserDetails(lock.lock_id)"
+                      (click)="applyUserDetailsToRoom(lock.lock_id)"
+                      type="button"
+                      class="flex-1 px-3 py-2 bg-blue-500 text-white text-xs font-semibold rounded-lg hover:bg-blue-600 transition">
+                      👤 Use My Details
+                    </button>
+                    
+                    <button 
+                      *ngIf="!userDetails.hasDob"
+                      disabled
+                      type="button"
+                      class="flex-1 px-3 py-2 bg-gray-300 text-gray-600 text-xs font-semibold rounded-lg cursor-not-allowed">
+                      ⚠️ No DOB
+                    </button>
+                    
+                    <button 
+                      *ngIf="userDetails.hasDob && isRoomUsingUserDetails(lock.lock_id)"
+                      (click)="clearUserDetailsFromRoom(lock.lock_id)"
+                      type="button"
+                      class="flex-1 px-3 py-2 bg-yellow-500 text-white text-xs font-semibold rounded-lg hover:bg-yellow-600 transition">
+                      ✕ Clear
+                    </button>
+                  </div>
                 </div>
 
                 <!-- Adult Age -->
@@ -389,7 +443,7 @@
           <!-- Completion Notice -->
           <div class="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
             <p class="text-sm text-yellow-800">
-              <span class="font-bold">{{ areAllGuestDetailsFilled() ? selectedLocks.length : 0 }} / {{ selectedLocks.length }}</span> rooms completed
+              <span class="font-bold">{{ getCompletedRoomsCount() }} / {{ selectedLocks.length }}</span> rooms completed
             </p>
           </div>
         </div>
@@ -635,6 +689,23 @@
           </p>
         </div>
 
+        <!-- Stop Booking Section (Payment Page) -->
+        <div class="bg-red-50 border-l-4 border-red-500 p-6 rounded mb-8">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-red-700 font-semibold">🚪 Want to cancel?</p>
+              <p class="text-red-600 text-sm mt-2">
+                Click the button to stop booking. Your room locks will be released and you'll go back to home.
+              </p>
+            </div>
+            <button 
+              (click)="stopBooking()"
+              class="px-6 py-2 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition whitespace-nowrap">
+              🚪 Stop Booking
+            </button>
+          </div>
+        </div>
+
         <!-- Action Buttons -->
         <div class="flex gap-4">
           <button 
@@ -708,16 +779,26 @@
           </div>
 
           <!-- Action Buttons -->
-          <div class="flex gap-3">
-            <button 
-              (click)="closeChangeDatesModal()"
-              class="flex-1 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg transition">
-              ✖️ Cancel
-            </button>
+          <div class="flex flex-col gap-3">
+            <!-- Primary: Update Dates -->
             <button 
               (click)="confirmDateChange()"
-              class="flex-1 py-2 bg-linear-to-r from-blue-600 to-blue-700 text-white font-bold rounded-lg hover:from-blue-700 hover:to-blue-800 transition">
+              class="w-full py-2 bg-linear-to-r from-blue-600 to-blue-700 text-white font-bold rounded-lg hover:from-blue-700 hover:to-blue-800 transition">
               ✅ Update Dates
+            </button>
+
+            <!-- Secondary: Cancel -->
+            <button 
+              (click)="closeChangeDatesModal()"
+              class="w-full py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg transition">
+              ✖️ Cancel
+            </button>
+
+            <!-- Tertiary: Stop Booking -->
+            <button 
+              (click)="stopBooking()"
+              class="w-full py-2 bg-linear-to-r from-red-500 to-red-600 text-white font-semibold rounded-lg hover:from-red-600 hover:to-red-700 transition">
+              🚪 Stop Booking
             </button>
           </div>
         </div>

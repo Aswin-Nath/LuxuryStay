@@ -444,27 +444,47 @@ async def get_booking_summary(
 # ==========================================================
 # ✅ CONFIRM BOOKING (Make Payment / Create Booking)
 # ==========================================================
-@router.post("/booking/confirm")
+from app.schemas.pydantic_models.v2_booking_schemas import (
+    BookingConfirmRequest,
+    PaymentConfirmationResponse,
+    BookingRoomDetail
+)
+
+@router.post("/booking/confirm", response_model=PaymentConfirmationResponse)
 async def confirm_booking(
-    method_id: int = Body(...),  # 1=Card, 2=UPI
+    request: BookingConfirmRequest,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
 ):
     """
-    Confirm booking: Convert locks → Booking + BookingRoomMap entries + Payment record.
+    Confirm booking with guest details and process payment.
+    Accepts guest details for each locked room and creates comprehensive booking.
     
     Body:
     {
-      "method_id": 1  # 1=Card, 2=UPI
+      "payment_method_id": 1,  # 1=Card, 2=UPI, 3=NetBanking
+      "rooms_guest_details": [
+        {
+          "lock_id": 123,
+          "guest_name": "John Doe",
+          "guest_age": 28,
+          "adult_count": 2,
+          "child_count": 1,
+          "special_requests": "High floor"
+        }
+      ]
     }
     """
     now = datetime.utcnow()
-
-    # Step 1: Get all active locks
+    
+    # Step 1: Get all locks specified in request
+    lock_ids = [gd.lock_id for gd in request.rooms_guest_details]
+    
     result = await db.execute(
         select(RoomAvailabilityLocks, Rooms, RoomTypes)
         .join(Rooms, Rooms.room_id == RoomAvailabilityLocks.room_id)
         .join(RoomTypes, RoomTypes.room_type_id == Rooms.room_type_id)
+        .where(RoomAvailabilityLocks.lock_id.in_(lock_ids))
         .where(RoomAvailabilityLocks.user_id == current_user.user_id)
         .where(RoomAvailabilityLocks.expires_at > now)
     )
@@ -473,63 +493,150 @@ async def confirm_booking(
     if not rows:
         raise HTTPException(status_code=400, detail="No active rooms locked")
 
-    # Step 2: Create booking entry
+    if len(rows) != len(request.rooms_guest_details):
+        raise HTTPException(status_code=400, detail="Mismatch between locked rooms and guest details")
+
+    # Create mapping of lock_id to guest details for quick lookup
+    guest_details_map = {gd.lock_id: gd for gd in request.rooms_guest_details}
+
+    # Step 2: Get primary customer details from users table
+    user = current_user
+    
+    # Step 3: Create booking entry
+    # Get check_in and check_out from first lock
+    first_lock = rows[0][0]
     booking = Bookings(
         user_id=current_user.user_id,
+        room_count=len(rows),
+        check_in=first_lock.check_in,
+        check_out=first_lock.check_out,
+        total_price=0,  # Will update after calculating
+        status="Confirmed",
         created_at=now,
-        booking_status="CONFIRMED"
+        primary_customer_name=user.full_name if hasattr(user, 'full_name') else None,
+        primary_customer_phone_number=user.phone_number if hasattr(user, 'phone_number') else None,
+        primary_customer_dob=user.dob if hasattr(user, 'dob') else None
     )
     db.add(booking)
     await db.flush()
 
-    # Step 3: Map rooms → booking + Calculate total amount
-    total_amount = 0
+    # Step 4: Map rooms to booking with guest details + Calculate total amount
+    total_amount = 0.0
+    booking_rooms_details = []
+    
     for lock, room, room_type in rows:
+        guest_detail = guest_details_map.get(lock.lock_id)
+        if not guest_detail:
+            raise HTTPException(status_code=400, detail=f"Missing guest details for lock {lock.lock_id}")
+
         nights = (lock.check_out - lock.check_in).days
         price = float(room_type.price_per_night) * nights
         total_amount += price
 
+        # Create BookingRoomMap with guest details
         booking_room = BookingRoomMap(
             booking_id=booking.booking_id,
             room_id=room.room_id,
-            price_total=price,
-            check_in=lock.check_in,
-            check_out=lock.check_out
+            room_type_id=room_type.room_type_id,
+            guest_name=guest_detail.guest_name,
+            guest_age=guest_detail.guest_age,
+            special_requests=guest_detail.special_requests,
+            updated_at=now,
+            adults=guest_detail.adult_count,
+            children=guest_detail.child_count
         )
         db.add(booking_room)
 
-    # Step 4: Create payment record in payments table
+        # Store for response
+        booking_rooms_details.append({
+            "room_id": room.room_id,
+            "room_no": room.room_no,
+            "type_name": room_type.type_name,
+            "check_in": lock.check_in,
+            "check_out": lock.check_out,
+            "nights": nights,
+            "price_per_night": float(room_type.price_per_night),
+            "total_price": price,
+            "guest_name": guest_detail.guest_name,
+            "guest_age": guest_detail.guest_age,
+            "adult_count": guest_detail.adult_count,
+            "child_count": guest_detail.child_count,
+            "special_requests": guest_detail.special_requests
+        })
+
+    await db.flush()
+
+    # Update booking total_price before creating payment
+    booking.total_price = total_amount
+
+    # Step 5: Calculate GST (18%)
+    gst_amount = total_amount * 0.18
+    final_amount = total_amount + gst_amount
+
+    # Step 6: Create payment record
     transaction_reference = f"TXN_{booking.booking_id}_{uuid.uuid4().hex[:8].upper()}"
     payment = Payments(
         booking_id=booking.booking_id,
-        amount=total_amount,
-        method_id=method_id,
+        amount=final_amount,
+        method_id=request.payment_method_id,
         status="SUCCESS",
         transaction_reference=transaction_reference,
         user_id=current_user.user_id,
-        remarks=f"Payment for booking #{booking.booking_id}"
+        remarks=f"Payment for booking #{booking.booking_id} - {len(rows)} room(s)"
     )
     db.add(payment)
     await db.flush()
 
-    # Step 5: Delete locks
+    # Step 7: Delete locks
     await db.execute(
         delete(RoomAvailabilityLocks).where(
-            RoomAvailabilityLocks.user_id == current_user.user_id
+            RoomAvailabilityLocks.lock_id.in_(lock_ids)
         )
     )
 
     await db.commit()
 
-    return {
-        "booking_id": booking.booking_id,
-        "payment_id": payment.payment_id,
-        "total_amount": float(total_amount),
-        "method_id": method_id,
-        "transaction_reference": transaction_reference,
-        "status": "SUCCESS",
-        "message": "Booking confirmed and payment recorded successfully"
-    }
+    # Get payment method name
+    payment_methods = {1: "Credit/Debit Card", 2: "UPI", 3: "Net Banking"}
+    payment_method_name = payment_methods.get(request.payment_method_id, "Unknown")
+
+    # Return comprehensive confirmation
+    return PaymentConfirmationResponse(
+        booking_id=booking.booking_id,
+        user_id=current_user.user_id,
+        check_in=first_lock.check_in,
+        check_out=first_lock.check_out,
+        total_nights=sum((lock.check_out - lock.check_in).days for lock, _, _ in rows),
+        booking_status="CONFIRMED",
+        created_at=now,
+        rooms=[
+            BookingRoomDetail(
+                room_id=detail["room_id"],
+                room_no=detail["room_no"],
+                type_name=detail["type_name"],
+                check_in=detail["check_in"],
+                check_out=detail["check_out"],
+                nights=detail["nights"],
+                price_per_night=detail["price_per_night"],
+                total_price=detail["total_price"],
+                guest_name=detail["guest_name"],
+                guest_age=detail["guest_age"],
+                adult_count=detail["adult_count"],
+                child_count=detail["child_count"],
+                special_requests=detail["special_requests"]
+            )
+            for detail in booking_rooms_details
+        ],
+        room_count=len(rows),
+        subtotal=total_amount,
+        gst_18_percent=gst_amount,
+        total_amount=final_amount,
+        payment_id=payment.payment_id,
+        payment_status="SUCCESS",
+        payment_method=payment_method_name,
+        transaction_reference=transaction_reference,
+        transaction_date=now
+    )
 
 
 # ==========================================================

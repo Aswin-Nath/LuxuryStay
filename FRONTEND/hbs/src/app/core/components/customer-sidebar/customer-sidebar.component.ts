@@ -24,7 +24,7 @@ export class CustomerSidebarComponent implements OnInit {
   
   sidebarLinks: SidebarLink[] = [
     { label: 'Overview', route: '/dashboard', page: 'dashboard', icon: 'fa-home' },
-    { label: 'My Bookings', route: '/bookings', page: 'booking', icon: 'fa-calendar' },
+    { label: 'My Bookings', route: '/bookings', page: 'bookings', icon: 'fa-calendar' },
     { label: 'Wishlist', route: '/wishlist', page: 'wishlist', icon: 'fa-heart' },
     { label: 'My Issues', route: '/issues', page: 'issues', icon: 'fa-exclamation-circle' },
     { label: 'My Refunds', route: '/refunds', page: 'refunds', icon: 'fa-money-bill' },

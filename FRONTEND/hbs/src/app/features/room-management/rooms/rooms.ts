@@ -38,12 +38,11 @@ export class Rooms implements OnInit {
   pageSizeOptions = [5, 10, 25, 50];
 
   // Filter properties
-  selectedStatuses: string[] = []; // Changed to array for multiple selection
-  selectedRoomTypes: number[] = []; // Changed to array for multiple selection
   minPrice: number | null = null;
   maxPrice: number | null = null;
-  showStatusDropdown = false;
-  showRoomTypeDropdown = false;
+  filterStatus: string = 'All';
+  filterType: string | number = 'All';
+  availableRoomTypes: string[] = [];
 
   // Sorting properties
   sortColumn = 'room_id';
@@ -84,6 +83,8 @@ export class Rooms implements OnInit {
     this.roomsService.getRoomTypes().subscribe({
       next: (data) => {
         this.roomTypes = data;
+        // Extract unique room type names for the dropdown
+        this.availableRoomTypes = [...new Set(data.map(rt => rt.type_name))].sort();
       },
       error: (err) => {
         console.error('Failed to load room types', err);
@@ -108,13 +109,13 @@ export class Rooms implements OnInit {
     };
 
     // Add status filter if selected
-    if (this.selectedStatuses.length > 0) {
-      filters.status_filter = this.selectedStatuses.join(',');
+    if (this.filterStatus && this.filterStatus !== 'All') {
+      filters.status_filter = this.filterStatus;
     }
 
     // Add room type filter if selected
-    if (this.selectedRoomTypes.length > 0) {
-      filters.room_type_id = this.selectedRoomTypes[0]; // Backend accepts single room_type_id, so use first
+    if (this.filterType && this.filterType !== 'All') {
+      filters.room_type_id = Number(this.filterType);
     }
 
     this.roomsService.getRooms(filters).subscribe({
@@ -165,75 +166,14 @@ export class Rooms implements OnInit {
   }
 
   resetFilters(): void {
-    this.selectedStatuses = [];
-    this.selectedRoomTypes = [];
+    this.filterStatus = 'All';
+    this.filterType = 'All';
     this.minPrice = null;
     this.maxPrice = null;
     this.filteredRooms = this.allRooms;
     this.rooms = this.allRooms;
     this.currentPage = 1;
     this.loadRooms(1);
-  }
-
-  toggleStatusSelection(status: string): void {
-    const index = this.selectedStatuses.indexOf(status);
-    if (index > -1) {
-      this.selectedStatuses.splice(index, 1);
-    } else {
-      this.selectedStatuses.push(status);
-    }
-    this.applyFilters();
-  }
-
-  isStatusSelected(status: string): boolean {
-    return this.selectedStatuses.includes(status);
-  }
-
-  getSelectedStatusNames(): string {
-    if (this.selectedStatuses.length === 0) return 'All';
-    return this.selectedStatuses.join(', ');
-  }
-
-  toggleRoomTypeSelection(roomTypeId: number): void {
-    const index = this.selectedRoomTypes.indexOf(roomTypeId);
-    if (index > -1) {
-      this.selectedRoomTypes.splice(index, 1);
-    } else {
-      this.selectedRoomTypes.push(roomTypeId);
-    }
-    this.applyFilters();
-  }
-
-  isRoomTypeSelected(roomTypeId: number): boolean {
-    return this.selectedRoomTypes.includes(roomTypeId);
-  }
-
-  getSelectedRoomTypeNames(): string {
-    if (this.selectedRoomTypes.length === 0) return 'All';
-    const names = this.selectedRoomTypes.map(id => {
-      const type = this.roomTypes.find(t => t.room_type_id === id);
-      return type ? type.type_name : '';
-    }).filter(name => name);
-    return names.length > 0 ? names.join(', ') : 'All';
-  }
-
-  @HostListener('document:click', ['$event'])
-  onDocumentClick(event: MouseEvent): void {
-    const target = event.target as HTMLElement;
-    if (!target.closest('.dropdown-container')) {
-      this.showStatusDropdown = false;
-      this.showRoomTypeDropdown = false;
-    }
-  }
-
-  openStatusDropdown(): void {
-    this.showStatusDropdown = true;
-    this.showRoomTypeDropdown = false;
-  }
-
-  openRoomTypeDropdown(): void {
-    this.showRoomTypeDropdown = true;
-    this.showStatusDropdown = false;
   }
 
   validateMinPrice(): void {
