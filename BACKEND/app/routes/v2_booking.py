@@ -565,13 +565,11 @@ async def confirm_booking(
         })
 
     await db.flush()
-
-    # Update booking total_price before creating payment
-    booking.total_price = total_amount
-
-    # Step 5: Calculate GST (18%)
+        # Step 5: Calculate GST (18%)
     gst_amount = total_amount * 0.18
     final_amount = total_amount + gst_amount
+    # Update booking total_price before creating payment
+    booking.total_price = final_amount
 
     # Step 6: Create payment record
     transaction_reference = f"TXN_{booking.booking_id}_{uuid.uuid4().hex[:8].upper()}"

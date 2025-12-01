@@ -182,7 +182,9 @@ class BookingRoomMapResponse(BookingRoomMapCreate):
     is_room_active: Optional[bool] = True
     rating_given: Optional[int] = 0
     edit_suggested_rooms: Optional[Any] = None  # JSONB array of room_ids suggested by admin
-
+    guest_name:str
+    guest_age:int
+    special_requests:str
     model_config = {"from_attributes": True}
 
 

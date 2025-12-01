@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from app.crud.refunds import (
     fetch_booking_by_id,
     fetch_refund_by_id,
@@ -14,7 +14,8 @@ from app.crud.refunds import (
 )
 from app.crud.rooms import fetch_room_type_by_id
 from app.models.sqlalchemy_schemas.refunds import Refunds
-from app.models.sqlalchemy_schemas.rooms import RoomStatus
+from app.models.sqlalchemy_schemas.rooms import RoomStatus, RoomAvailabilityLocks
+from app.models.sqlalchemy_schemas.bookings import BookingRoomMap
 from app.models.sqlalchemy_schemas.payment_method import PaymentMethodUtility
 
 
@@ -23,7 +24,8 @@ async def cancel_booking_and_create_refund(db: AsyncSession, booking_id: int, cu
     Cancel booking completely and create full refund record (INITIATED status).
     
     Performs a FULL immediate cancellation of the entire booking:
-    - Releases ALL allocated rooms back to AVAILABLE status
+    - Deletes ALL booking room associations (BookingRoomMap)
+    - Removes ALL room availability locks for this booking
     - Creates refund record for 100% of booking amount with INITIATED status
     - Marks booking as CANCELLED
     - Calculates per-room refund amounts based on number of nights and room pricing
@@ -97,7 +99,7 @@ async def cancel_booking_and_create_refund(db: AsyncSession, booking_id: int, cu
 
     refund_record = await insert_refund_record(db, refund_record_data)
 
-    # ========== CREATE REFUND ROOM MAPPINGS & RELEASE ROOMS ==========
+    # ========== CREATE REFUND ROOM MAPPINGS ==========
     for room_id, refund_amount in per_room_refund_amounts.items():
         # Create refund room map record
         await insert_refund_room_map(
@@ -109,15 +111,16 @@ async def cancel_booking_and_create_refund(db: AsyncSession, booking_id: int, cu
                 "refund_amount": refund_amount,
             },
         )
-        
-        # Release room back to AVAILABLE status
-        room = await fetch_room_by_id(db, room_id)
-        if room:
-            room.room_status = RoomStatus.AVAILABLE
 
-    # ========== DEACTIVATE ALL BOOKING ROOM MAPPINGS ==========
-    for booking_room_map in booking_room_maps:
-        booking_room_map.is_room_active = False
+
+    # ========== DELETE ROOM AVAILABILITY LOCKS ==========
+    # Remove all RoomAvailabilityLocks for rooms in this booking
+    room_ids = [rm.room_id for rm in booking_room_maps]
+    if room_ids:
+        stmt_delete_locks = delete(RoomAvailabilityLocks).where(
+            RoomAvailabilityLocks.room_id.in_(room_ids)
+        ).where(RoomAvailabilityLocks.user_id == booking.user_id)
+        await db.execute(stmt_delete_locks)
 
     # ========== UPDATE BOOKING STATUS TO CANCELLED ==========
     booking.status = "Cancelled"

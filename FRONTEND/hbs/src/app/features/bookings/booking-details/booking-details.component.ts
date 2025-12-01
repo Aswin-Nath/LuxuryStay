@@ -1,5 +1,6 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { BookingsService, BookingResponse } from '../../../services/bookings.service';
 import { CustomerNavbarComponent } from '../../../core/components/customer-navbar/customer-navbar.component';
@@ -9,15 +10,35 @@ import { takeUntil } from 'rxjs/operators';
 @Component({
   selector: 'app-booking-details',
   standalone: true,
-  imports: [CommonModule, RouterModule, CustomerNavbarComponent],
+  imports: [CommonModule, FormsModule, RouterModule, CustomerNavbarComponent],
   templateUrl: './booking-details.component.html',
   styleUrls: ['./booking-details.component.css']
 })
 export class BookingDetailsComponent implements OnInit, OnDestroy {
   booking: BookingResponse | null = null;
+  roomTypes: Map<number, any> = new Map();
   isLoading = false;
   error: string = '';
   bookingId: number = 0;
+
+  // Review properties
+  selectedRating: number = 0;
+  reviewText: string = '';
+  ratingTexts: { [key: number]: string } = {
+    1: 'Poor - Not satisfied',
+    2: 'Fair - Below expectations',
+    3: 'Good - Satisfactory',
+    4: 'Very Good - Exceeded expectations',
+    5: 'Excellent - Outstanding experience'
+  };
+
+  // Issue properties
+  issueTitle: string = '';
+  issueDescription: string = '';
+  selectedImages: any[] = [];
+
+  // Cancel properties
+  cancellationReason: string = '';
 
   private destroy$ = new Subject<void>();
 
@@ -29,7 +50,6 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.route.params.pipe(takeUntil(this.destroy$)).subscribe((params) => {
-      // Handle both /bookings/details/:id and /booking/:booking_id routes
       this.bookingId = params['id'] || params['booking_id'];
       if (this.bookingId) {
         this.loadBookingDetails();
@@ -46,12 +66,41 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
     this.isLoading = true;
     this.error = '';
 
+    // Load room types first
+    this.bookingsService
+      .getRoomTypes()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (roomTypesData: any) => {
+          if (roomTypesData.results && Array.isArray(roomTypesData.results)) {
+            this.roomTypes = new Map(roomTypesData.results.map((rt: any) => [rt.room_type_id, rt]));
+          }
+          this.loadBookingWithDetails();
+        },
+        error: (err: any) => {
+          console.error('Error loading room types:', err);
+          this.loadBookingWithDetails();
+        }
+      });
+  }
+
+  private loadBookingWithDetails(): void {
     this.bookingsService
       .getBookingDetails(this.bookingId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (data: BookingResponse) => {
           this.booking = data;
+          // Populate room prices from cached roomTypes Map
+          if (this.booking.rooms) {
+            this.booking.rooms.forEach((room) => {
+              const roomTypePrice = this.getRoomTypePrice(room.room_type_id);
+              if (roomTypePrice !== null) {
+                room.price_per_night = roomTypePrice;
+              }
+            });
+          }
+          this.loadPayments();
           this.isLoading = false;
         },
         error: (err: any) => {
@@ -60,6 +109,59 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
           this.isLoading = false;
         }
       });
+  }
+
+  private loadPayments(): void {
+    if (!this.booking) return;
+
+    // Call the payments endpoint to get booking payments
+    this.bookingsService
+      .getPaymentsByBooking(this.bookingId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (payments: any[]) => {
+          if (this.booking) {
+            this.booking.payments = payments;
+          }
+        },
+        error: (err: any) => {
+          console.error('Error loading payments:', err);
+          if (this.booking) {
+            this.booking.payments = [];
+          }
+        }
+      });
+  }
+
+  private loadIssues(): void {
+    if (!this.booking) return;
+
+    this.bookingsService
+      .getIssuesByBooking(this.bookingId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (issues: any[]) => {
+          if (this.booking) {
+            this.booking.issues = issues;
+          }
+        },
+        error: (err: any) => {
+          console.error('Error loading issues:', err);
+          if (this.booking) {
+            this.booking.issues = [];
+          }
+        }
+      });
+  }
+
+  getRoomTypeName(roomTypeId: number): string | null {
+    const roomType = this.roomTypes.get(roomTypeId);
+    return roomType ? roomType.type_name : null;
+  }
+
+  getRoomTypePrice(roomTypeId: number): number | null {
+    const roomType = this.roomTypes.get(roomTypeId);
+    return roomType ? roomType.price_per_night : null;
   }
 
   goBack(): void {
@@ -110,16 +212,6 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
     });
   }
 
-  formatDateTime(dateString: string, timeString: string): string {
-    const date = new Date(dateString);
-    const formatted = date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-    return `${formatted} at ${timeString}`;
-  }
-
   calculateNights(): number {
     if (!this.booking) return 0;
     const checkIn = new Date(this.booking.check_in).getTime();
@@ -127,10 +219,63 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
     return Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
   }
 
-  getSubtotal(): number {
-    if (!this.booking) return 0;
-    const taxes = this.booking.taxes?.reduce((sum: number, tax) => sum + tax.tax_amount, 0) || 0;
-    return this.booking.total_price - taxes;
+  getTotalRoomPrice(): number {
+    if (!this.booking || !this.booking.rooms) return 0;
+    const nights = this.calculateNights();
+    return this.booking.rooms.reduce((sum, room) => sum + ((this.getRoomTypePrice(room.room_type_id) || 0) * nights), 0);
+  }
+
+  calculateGST(): number {
+    const subtotal = this.getTotalRoomPrice();
+    return Math.round(subtotal * 0.18 * 100) / 100;
+  }
+
+  getTotalAmount(): number {
+    const subtotal = this.getTotalRoomPrice();
+    const gst = this.calculateGST();
+    return Math.round((subtotal + gst) * 100) / 100;
+  }
+
+  isBookingStaying(): boolean {
+    return this.booking?.status.toLowerCase() === 'checked-in';
+  }
+
+  isBookingCheckedOut(): boolean {
+    return this.booking?.status.toLowerCase() === 'checked-out';
+  }
+
+  canShowReview(): boolean {
+    return this.isBookingStaying() || this.isBookingCheckedOut();
+  }
+
+  canShowIssueForm(): boolean {
+    return this.isBookingStaying();
+  }
+
+  canShowCancelButton(): boolean {
+    if (!this.booking) return false;
+    const status = this.booking.status.toLowerCase();
+    return status !== 'cancelled' && status !== 'checked-out';
+  }
+
+  getRoomNumbers(): string {
+    if (!this.booking || !this.booking.rooms || this.booking.rooms.length === 0) {
+      return 'N/A';
+    }
+    return this.booking.rooms.map(r => r.room_id).join(', ');
+  }
+
+  getPaymentMethodName(methodId: number): string {
+    const paymentMethods: { [key: number]: string } = {
+      1: 'Credit Card',
+      2: 'Debit Card',
+      3: 'Net Banking',
+      4: 'UPI',
+      5: 'Wallet',
+      6: 'Cash',
+      7: 'Check'
+    };
+    return paymentMethods[methodId] || `Method ID: ${methodId}`;
   }
 
   downloadInvoice(): void {
@@ -150,7 +295,7 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
     if (!this.booking) return '';
 
     const nights = this.calculateNights();
-    const baseAmount = this.booking.total_price - (this.booking.taxes?.reduce((sum: number, tax) => sum + tax.tax_amount, 0) || 0);
+    const baseAmount = this.getTotalRoomPrice();
 
     return `
       <!DOCTYPE html>
@@ -239,5 +384,201 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
       </body>
       </html>
     `;
+  }
+
+  // ✅ Review Methods
+  setRating(rating: number): void {
+    this.selectedRating = rating;
+  }
+
+  submitReview(): void {
+    if (this.selectedRating === 0 || !this.reviewText || this.reviewText.trim().length === 0) {
+      this.showToast('Please provide a rating and review text', 'error');
+      return;
+    }
+
+    console.log('Review submitted:', {
+      rating: this.selectedRating,
+      text: this.reviewText,
+      bookingId: this.booking?.booking_id
+    });
+
+    this.showToast('Review submitted successfully! Thank you for your feedback.', 'success');
+    this.resetReview();
+  }
+
+  resetReview(): void {
+    this.selectedRating = 0;
+    this.reviewText = '';
+  }
+
+  // ✅ Issue Modal Methods
+  openRaiseIssueModal(): void {
+    const modal = document.getElementById('raiseIssueModal');
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      document.body.style.overflow = 'hidden';
+    }
+  }
+
+  closeRaiseIssueModal(): void {
+    const modal = document.getElementById('raiseIssueModal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      document.body.style.overflow = '';
+    }
+    this.resetIssueForm();
+  }
+
+  resetIssueForm(): void {
+    this.issueTitle = '';
+    this.issueDescription = '';
+    this.selectedImages = [];
+  }
+
+  onImageSelect(event: any): void {
+    const files = Array.from(event.target.files) as File[];
+    files.forEach((file: File) => {
+      const reader = new FileReader();
+      reader.onload = (e: any) => {
+        this.selectedImages.push({
+          name: file.name,
+          preview: e.target.result
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  removeImage(index: number): void {
+    this.selectedImages.splice(index, 1);
+  }
+
+  submitIssue(): void {
+    if (!this.issueTitle || !this.issueDescription) {
+      this.showToast('Please fill in all required fields', 'error');
+      return;
+    }
+
+    console.log('Issue submitted:', {
+      title: this.issueTitle,
+      description: this.issueDescription,
+      images: this.selectedImages,
+      bookingId: this.booking?.booking_id
+    });
+
+    this.closeRaiseIssueModal();
+    this.showToast('Issue reported successfully! We will contact you soon.', 'success');
+  }
+
+  // ✅ Cancel Booking Methods
+  openCancelBookingModal(): void {
+    const policyModal = document.getElementById('cancelPolicyModal');
+    if (policyModal) {
+      policyModal.classList.remove('hidden');
+      policyModal.classList.add('flex');
+      document.body.style.overflow = 'hidden';
+    }
+  }
+
+  closeCancelPolicyModal(): void {
+    const policyModal = document.getElementById('cancelPolicyModal');
+    if (policyModal) {
+      policyModal.classList.add('hidden');
+      policyModal.classList.remove('flex');
+      document.body.style.overflow = '';
+    }
+  }
+
+  proceedToCancel(): void {
+    this.closeCancelPolicyModal();
+    setTimeout(() => {
+      const cancelModal = document.getElementById('unifiedCancelModal');
+      if (cancelModal) {
+        cancelModal.classList.remove('hidden');
+        cancelModal.classList.add('flex');
+        document.body.style.overflow = 'hidden';
+        this.cancellationReason = '';
+      }
+    }, 100);
+  }
+
+  closeUnifiedCancelModal(): void {
+    const cancelModal = document.getElementById('unifiedCancelModal');
+    if (cancelModal) {
+      cancelModal.classList.add('hidden');
+      cancelModal.classList.remove('flex');
+      document.body.style.overflow = '';
+    }
+    this.cancellationReason = '';
+  }
+
+  confirmCancel(): void {
+    if (!this.booking) {
+      this.showToast('Error: Booking not found', 'error');
+      return;
+    }
+
+    // Check if booking is checked-in and show no-refund warning
+    if (this.isBookingStaying()) {
+      const confirmed = confirm(
+        'IMPORTANT: Cancelling after check-in means NO REFUND will be issued. You will be charged for the entire stay.\n\nDo you want to proceed with the cancellation?'
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    this.closeUnifiedCancelModal();
+    
+    // Call the cancel booking API
+    this.bookingsService
+      .cancelBooking(this.booking.booking_id, this.cancellationReason || '')
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response: any) => {
+          this.showToast('Booking cancelled successfully. Rooms have been unlocked.', 'success');
+          // Update booking status locally
+          if (this.booking) {
+            this.booking.status = 'cancelled';
+          }
+          // Optionally redirect after 2 seconds
+          setTimeout(() => {
+            this.goBack();
+          }, 2000);
+        },
+        error: (err: any) => {
+          console.error('Error cancelling booking:', err);
+          this.showToast('Failed to cancel booking. Please try again.', 'error');
+        }
+      });
+  }
+
+  // ✅ Toast Notification
+  showToast(message: string, type: 'success' | 'error' = 'success'): void {
+    const toastContainer = document.getElementById('unifiedToast');
+    if (!toastContainer) return;
+
+    const toast = document.createElement('div');
+    const bgColor = type === 'error' ? 'bg-red-600' : 'bg-green-600';
+    toast.className = `${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3`;
+    toast.style.minWidth = '250px';
+    toast.innerHTML = `
+      <div class="flex-1 text-sm">${message}</div>
+      <button class="opacity-80 hover:opacity-100">✕</button>
+    `;
+
+    toast.querySelector('button')?.addEventListener('click', () => toast.remove());
+    toastContainer.appendChild(toast);
+
+    setTimeout(() => {
+      try {
+        toast.remove();
+      } catch (e) {
+        // Element already removed
+      }
+    }, 4000);
   }
 }

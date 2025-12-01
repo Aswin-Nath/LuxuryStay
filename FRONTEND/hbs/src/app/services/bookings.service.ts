@@ -3,7 +3,6 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 
-// Booking Response Interface
 export interface BookingResponse {
   booking_id: number;
   user_id: number;
@@ -23,6 +22,8 @@ export interface BookingResponse {
   primary_customer_dob?: string;
   rooms?: BookingRoomMapResponse[];
   taxes?: BookingTaxMapResponse[];
+  payments?: any[];
+  issues?: any[];
 }
 
 export interface BookingRoomMapResponse {
@@ -35,7 +36,21 @@ export interface BookingRoomMapResponse {
   is_post_edited_room?: boolean;
   is_room_active?: boolean;
   rating_given?: number;
+  guest_name?: string;
+  guest_age?: number;
+  special_requests?: string;
   edit_suggested_rooms?: any;
+  price_per_night?: number;
+}
+
+export interface RoomTypeResponse {
+  room_type_id: number;
+  type_name: string;
+  price_per_night: number;
+  max_adult_count: number;
+  max_child_count: number;
+  description?: string;
+  square_ft?: number;
 }
 
 export interface BookingTaxMapResponse {
@@ -106,5 +121,56 @@ export class BookingsService {
   // API: GET /bookings/statuses
   getBookingStatuses(): Observable<string[]> {
     return this.http.get<string[]>(`${this.bookingApiUrl}/statuses`);
+  }
+
+  // Get room types
+  // API: GET /v2/rooms/room-types
+  getRoomTypes(): Observable<{ total: number; results: RoomTypeResponse[] }> {
+    return this.http.get<{ total: number; results: RoomTypeResponse[] }>(
+      `${environment.apiUrl}/v2/rooms/room-types`
+    );
+  }
+
+  // Get payments by booking ID (from payments.py)
+  // API: GET /payments/booking/{booking_id}
+  getPaymentsByBooking(bookingId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${environment.apiUrl}/payments/booking/${bookingId}`);
+  }
+
+  // Get issues by booking ID
+  // API: GET /bookings/{booking_id}/issues
+  getIssuesByBooking(bookingId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.bookingApiUrl}/${bookingId}/issues`);
+  }
+
+  // Submit a review for a booking
+  // API: POST /bookings/{booking_id}/reviews
+  submitReview(bookingId: number, rating: number, reviewText: string): Observable<any> {
+    return this.http.post<any>(`${this.bookingApiUrl}/${bookingId}/reviews`, {
+      rating,
+      review_text: reviewText
+    });
+  }
+
+  // Submit an issue for a booking
+  // API: POST /bookings/{booking_id}/issues
+  submitIssue(bookingId: number, title: string, description: string, images?: File[]): Observable<any> {
+    const formData = new FormData();
+    formData.append('title', title);
+    formData.append('description', description);
+    
+    if (images && images.length > 0) {
+      images.forEach((image) => {
+        formData.append('images', image);
+      });
+    }
+
+    return this.http.post<any>(`${this.bookingApiUrl}/${bookingId}/issues`, formData);
+  }
+
+  // Cancel a booking and create refund
+  // API: POST /bookings/{booking_id}/cancel
+  cancelBooking(bookingId: number, reason?: string): Observable<any> {
+    return this.http.post<any>(`${this.bookingApiUrl}/${bookingId}/cancel`, {});
   }
 }
