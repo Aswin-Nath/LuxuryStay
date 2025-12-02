@@ -1,0 +1,208 @@
+<div class="min-h-screen bg-gray-50">
+  <!-- Navbar -->
+  <app-customer-navbar></app-customer-navbar>
+
+  <!-- Hero Section -->
+  <section class="px-4 sm:px-6 max-w-7xl mx-auto pt-24 pb-8 text-center">
+    <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-4">Exclusive Offers</h1>
+    <p class="text-gray-600 text-base sm:text-lg max-w-2xl mx-auto">
+      Discover amazing deals and special packages for your perfect stay
+    </p>
+  </section>
+
+  <!-- Filter Section -->
+  <!-- Unified Search/Filter Section -->
+  <section class="px-4 sm:px-6 max-w-7xl mx-auto mb-8">
+    <app-customer-search 
+      searchType="offers"
+      (filtersChanged)="onSearchFiltersChanged($event)">
+    </app-customer-search>
+  </section>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="flex justify-center items-center h-96">
+    <div class="text-center">
+      <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-600"></div>
+      <p class="text-gray-600 mt-4">Loading offers...</p>
+    </div>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error && !loading" class="max-w-7xl mx-auto px-4 sm:px-6 mb-8">
+    <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+      {{ error }}
+    </div>
+  </div>
+
+  <!-- Offers Grid -->
+  <section class="px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12 pb-16" *ngIf="!loading && filteredOffers.length > 0">
+    <div *ngFor="let offer of filteredOffers" class="bg-white rounded-3xl shadow-lg hover:shadow-2xl transition overflow-hidden">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-0">
+        <!-- Image Section -->
+        <div class="h-48 sm:h-64 md:h-80 bg-gray-200 flex items-center justify-center relative overflow-hidden">
+          <img 
+            *ngIf="offerImages.get(offer.offer_id)" 
+            [src]="offerImages.get(offer.offer_id)" 
+            [alt]="offer.offer_name"
+            class="w-full h-full object-cover hover:scale-105 transition duration-300"
+          />
+          <span *ngIf="!offerImages.get(offer.offer_id)" class="material-icons text-6xl sm:text-8xl text-gray-400">local_offer</span>
+        </div>
+
+        <!-- Content Section -->
+        <div class="p-6 sm:p-8 lg:p-10 flex flex-col justify-between">
+          <div>
+            <h3 class="text-xl sm:text-2xl lg:text-3xl font-bold text-yellow-700 mb-2">{{ offer.offer_name }}</h3>
+            <div class="flex items-center gap-2 text-yellow-600 mb-4">
+              <span class="material-icons text-sm">local_offer</span>
+              <span class="text-sm sm:text-base font-semibold">{{ offer.discount_percent }}% OFF</span>
+            </div>
+
+            <p class="text-gray-700 text-sm sm:text-base mb-4">{{ offer.description }}</p>
+
+            <!-- Offer Details -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm text-gray-600">
+              <div class="flex items-start gap-2">
+                <span class="material-icons text-yellow-600 text-base shrink-0">hotel</span>
+                <div>
+                  <p class="font-medium text-gray-800">Room Types</p>
+                  <p>{{ getRoomTypesText(offer) }}</p>
+                </div>
+              </div>
+              <div class="flex items-start gap-2">
+                <span class="material-icons text-yellow-600 text-base shrink-0">calendar_today</span>
+                <div>
+                  <p class="font-medium text-gray-800">Valid Until</p>
+                  <p>{{ offer.valid_to | date: 'MMM dd, yyyy' }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex flex-col sm:flex-row gap-3 mt-6">
+            <button
+              (click)="openBookingModal(offer)"
+              class="flex-1 px-4 py-2 sm:py-3 bg-yellow-600 text-white font-semibold rounded-lg hover:bg-yellow-700 transition text-sm sm:text-base"
+            >
+              <span class="material-icons text-sm align-middle mr-1">shopping_cart</span>
+              Book Now
+            </button>
+            <button
+              (click)="saveToWishlist(offer)"
+              class="px-4 py-2 sm:py-3 border border-yellow-600 text-yellow-600 font-semibold rounded-lg hover:bg-yellow-50 transition text-sm sm:text-base"
+            >
+              <span class="material-icons text-sm align-middle">favorite</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- No Results -->
+  <div *ngIf="!loading && filteredOffers.length === 0" class="max-w-7xl mx-auto px-4 sm:px-6 text-center py-16">
+    <span class="material-icons text-6xl text-gray-300 inline-block mb-4">search_off</span>
+    <p class="text-gray-600 text-lg">No offers found matching your filters</p>
+  </div>
+
+  <!-- Booking Modal -->
+  <div
+    *ngIf="bookingModalOpen"
+    class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+  >
+    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 relative">
+      <button
+        (click)="closeBookingModal()"
+        class="absolute top-4 right-4 text-gray-500 hover:text-black text-2xl"
+      >
+        &times;
+      </button>
+
+      <h2 class="text-2xl sm:text-3xl font-bold text-yellow-700 mb-4">{{ selectedOffer?.offer_name }}</h2>
+      <p class="text-gray-600 mb-6">Select room configuration for your stay</p>
+
+      <!-- Room Selection -->
+      <div class="space-y-4 mb-6">
+        <div *ngFor="let room of selectedRooms; let i = index" class="border border-gray-200 rounded-lg p-4">
+          <div class="flex justify-between items-center mb-4">
+            <h4 class="font-semibold text-gray-800">Room {{ i + 1 }}</h4>
+            <button
+              *ngIf="selectedRooms.length > 1"
+              (click)="removeRoom(i)"
+              class="text-red-600 hover:text-red-700 text-sm font-medium"
+            >
+              Remove
+            </button>
+          </div>
+
+          <!-- Adults Counter -->
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-gray-700">Adults:</span>
+            <div class="flex items-center gap-2">
+              <button
+                (click)="decreaseCounter(i, 'adults')"
+                class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+              >
+                -
+              </button>
+              <span class="w-8 text-center">{{ room.adults }}</span>
+              <button
+                (click)="increaseCounter(i, 'adults')"
+                class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          <!-- Children Counter -->
+          <div class="flex items-center justify-between">
+            <span class="text-gray-700">Children:</span>
+            <div class="flex items-center gap-2">
+              <button
+                (click)="decreaseCounter(i, 'children')"
+                class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+              >
+                -
+              </button>
+              <span class="w-8 text-center">{{ room.children }}</span>
+              <button
+                (click)="increaseCounter(i, 'children')"
+                class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+              >
+                +
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add Room Button -->
+      <button
+        (click)="addRoom()"
+        *ngIf="selectedRooms.length < 4"
+        class="w-full mb-6 px-4 py-2 border border-dashed border-yellow-600 text-yellow-600 font-medium rounded-lg hover:bg-yellow-50"
+      >
+        + Add Another Room
+      </button>
+
+      <!-- Action Buttons -->
+      <div class="flex gap-3">
+        <button
+          (click)="proceedToBooking()"
+          class="flex-1 px-4 py-3 bg-yellow-600 text-white font-semibold rounded-lg hover:bg-yellow-700"
+        >
+          Proceed to Booking
+        </button>
+        <button
+          (click)="closeBookingModal()"
+          class="flex-1 px-4 py-3 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+

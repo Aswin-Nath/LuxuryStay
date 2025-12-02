@@ -1,0 +1,375 @@
+<app-admin-navbar></app-admin-navbar>
+
+<div class="bg-gray-50 min-h-screen">
+  <div class="flex flex-col lg:flex-row flex-1 w-full mt-16 md:mt-20">
+    <!-- Sidebar -->
+    <div class="w-full lg:w-64 px-4 md:px-6 lg:px-8 py-4 shrink-0">
+      <app-admin-sidebar></app-admin-sidebar>
+    </div>
+
+    <!-- Main Content -->
+    <main class="flex-1 w-full px-4 md:px-6 lg:px-8 py-4 space-y-4">
+      <!-- Header -->
+      <div class="relative rounded-lg p-[3px] bg-linear-to-r from-yellow-600 to-red-700 shadow">
+        <div class="bg-[#fdfaf4] rounded-lg py-4 md:py-6 px-6">
+          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h2 class="text-2xl md:text-3xl text-gray-800 font-bold">Create New Offer</h2>
+              <p class="text-gray-600 text-xs md:text-sm mt-1">Add a new offer with images and room types</p>
+            </div>
+            <button (click)="cancel()" class="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition font-medium">
+              <span class="material-icons">arrow_back</span> Back
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="create-offer-page">
+        <div class="individual-offer-form">
+          <!-- Success/Error Messages -->
+          <div *ngIf="successMessage" class="alert alert-success">
+            {{ successMessage }}
+          </div>
+          <div *ngIf="error" class="alert alert-error">
+            {{ error }}
+          </div>
+
+          <!-- Loading State -->
+          <div *ngIf="loading" class="loading-state">
+            <div class="spinner"></div>
+            <p>Processing...</p>
+          </div>
+
+          <form [formGroup]="form" (ngSubmit)="onSubmit()" *ngIf="!loading">
+      <!-- Basic Information Section -->
+      <div class="form-section">
+        <h3>Offer Information</h3>
+
+        <div class="form-group">
+          <label for="offer_name">Offer Name *</label>
+          <input
+            id="offer_name"
+            type="text"
+            formControlName="offer_name"
+            placeholder="e.g., Summer Promotion 2024"
+            class="form-control"
+          />
+          <small *ngIf="form.get('offer_name')?.hasError('required')" class="error-text">
+            Offer name is required
+          </small>
+          <small *ngIf="form.get('offer_name')?.hasError('minlength')" class="error-text">
+            Offer name must be at least 3 characters
+          </small>
+        </div>
+
+        <div class="form-group">
+          <label for="description">Description</label>
+          <textarea
+            id="description"
+            formControlName="description"
+            placeholder="Describe the offer benefits and details..."
+            rows="4"
+            class="form-control"
+          ></textarea>
+          <small *ngIf="form.get('description')?.hasError('minlength')" class="error-text">
+            Description must be at least 10 characters
+          </small>
+        </div>
+      </div>
+
+      <!-- Validity Period Section (MOVED TO TOP) -->
+      <div class="form-section">
+        <h3>Offer Validity Period</h3>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="valid_from">Valid From *</label>
+            <input
+              id="valid_from"
+              type="date"
+              formControlName="valid_from"
+              class="form-control"
+            />
+            <small *ngIf="form.get('valid_from')?.hasError('required')" class="error-text">
+              Start date is required
+            </small>
+          </div>
+
+          <div class="form-group">
+            <label for="valid_to">Valid To *</label>
+            <input
+              id="valid_to"
+              type="date"
+              formControlName="valid_to"
+              class="form-control"
+            />
+            <small *ngIf="form.get('valid_to')?.hasError('required')" class="error-text">
+              End date is required
+            </small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Discount Configuration Section -->
+      <div class="form-section">
+        <h3>Discount Configuration</h3>
+
+        <div class="discount-mode-selector">
+          <label class="discount-mode-option">
+            <input
+              type="radio"
+              [(ngModel)]="discountMode"
+              value="same"
+              (change)="onDiscountModeChange()"
+              [ngModelOptions]="{ standalone: true }"
+            />
+            <span class="radio-label">Same Discount for All Room Types</span>
+          </label>
+
+          <label class="discount-mode-option">
+            <input
+              type="radio"
+              [(ngModel)]="discountMode"
+              value="per-room"
+              (change)="onDiscountModeChange()"
+              [ngModelOptions]="{ standalone: true }"
+            />
+            <span class="radio-label">Different Discount per Room Type</span>
+          </label>
+        </div>
+
+        <div class="form-group" *ngIf="discountMode === 'same'">
+          <label for="discount_percent">Base Discount Percentage (%) *</label>
+          <div class="input-with-unit">
+            <input
+              id="discount_percent"
+              type="number"
+              formControlName="discount_percent"
+              min="0"
+              max="100"
+              (change)="onBasicDiscountChange()"
+              class="form-control"
+            />
+            <span class="unit">%</span>
+          </div>
+          <small *ngIf="form.get('discount_percent')?.hasError('required')" class="error-text">
+            Discount is required
+          </small>
+          <small *ngIf="form.get('discount_percent')?.hasError('min')" class="error-text">
+            Discount must be at least 0%
+          </small>
+          <small *ngIf="form.get('discount_percent')?.hasError('max')" class="error-text">
+            Discount cannot exceed 100%
+          </small>
+        </div>
+      </div>
+
+      <!-- Room Type Selection Section -->
+      <div class="form-section">
+        <h3>Room Types & Availability</h3>
+
+        <!-- Total Rooms Counter -->
+        <div class="rooms-counter-banner" [class.limit-reached]="!canAddMoreRooms">
+          <div class="counter-info">
+            <span class="counter-label">Total Rooms Selected:</span>
+            <span class="counter-value">{{ totalSelectedRooms }} / {{ 5 }}</span>
+          </div>
+          <div class="counter-status" [class.warning]="totalSelectedRooms >= 5">
+            {{ totalSelectedRooms >= 5 ? '⚠️ Limit Reached' : '✓ Available' }}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="roomTypeSelect">Select Room Type to Add</label>
+          <div class="room-type-selector">
+            <select
+              id="roomTypeSelect"
+              #roomTypeSelect
+              class="form-control"
+            >
+              <option value="">-- Choose a room type --</option>
+              <option
+                *ngFor="let rt of roomTypes"
+                [value]="rt.room_type_id"
+                [disabled]="isRoomTypeSelected(rt.room_type_id) || !canAddMoreRooms"
+              >
+                {{ rt.type_name }} ({{ rt.total_count }} available)
+              </option>
+            </select>
+            <button
+              type="button"
+              class="btn-add"
+              (click)="addRoomType(+roomTypeSelect.value)"
+              [disabled]="!canAddMoreRooms"
+            >
+              <span class="material-icons">add</span> Add Room Type
+            </button>
+          </div>
+        </div>
+
+        <!-- Selected Room Types Table -->
+        <div *ngIf="selectedRoomTypes.length > 0" class="selected-rooms-table">
+          <h4>Selected Room Types</h4>
+          <table>
+            <thead>
+              <tr>
+                <th>Room Type</th>
+                <th>Total in Hotel</th>
+                <th>Selected Count</th>
+                <th *ngIf="discountMode === 'per-room'">Discount %</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let rt of selectedRoomTypes">
+                <td>{{ rt.room_type_name }}</td>
+                <td class="text-center">{{ rt.total_available }}</td>
+                <td class="text-center">
+                  <input
+                    type="number"
+                    [(ngModel)]="rt.selected_count"
+                    [ngModelOptions]="{ standalone: true }"
+                    min="1"
+                    [max]="rt.total_available"
+                    class="input-small"
+                    (change)="validateRoomCount()"
+                  />
+                </td>
+                <td *ngIf="discountMode === 'per-room'" class="text-center">
+                  <div class="input-with-unit">
+                    <input
+                      type="number"
+                      [(ngModel)]="rt.discount_percent"
+                      [ngModelOptions]="{ standalone: true }"
+                      min="0"
+                      max="100"
+                      class="input-small"
+                    />
+                    <span class="unit">%</span>
+                  </div>
+                </td>
+                <td class="text-center">
+                  <button
+                    type="button"
+                    class="btn-remove"
+                    (click)="removeRoomType(rt.room_type_id)"
+                    title="Remove room type"
+                  >
+                    <span class="material-icons">delete</span>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <small *ngIf="selectedRoomTypes.length === 0" class="info-text">
+          No room types added yet. Select a room type to add (maximum 5 rooms total).
+        </small>
+        <small *ngIf="selectedRoomTypes.length > 0 && totalSelectedRooms >= 5" class="warning-text">
+          ⚠️ You have reached the maximum of 5 rooms. Remove a room type to add another.
+        </small>
+      </div>
+
+      <!-- Maximum Uses Section -->
+      <div class="form-section">
+        <h3>Usage Limits</h3>
+
+        <div class="form-group">
+          <label for="max_uses">Maximum Uses (Leave empty for unlimited)</label>
+          <input
+            id="max_uses"
+            type="number"
+            formControlName="max_uses"
+            min="1"
+            placeholder="e.g., 100"
+            class="form-control"
+          />
+          <small class="info-text">Set a limit on how many times this offer can be used</small>
+        </div>
+      </div>
+
+      <!-- Image Upload Section (AT BOTTOM) -->
+      <div class="form-section">
+        <h3>Offer Images</h3>
+        <p class="section-description">Upload multiple images for this offer. If no primary image is selected, the first uploaded image will be set as primary.</p>
+
+        <div class="form-group">
+          <label for="imageInput" class="image-label">Select Images to Upload</label>
+          <input
+            #imageInput
+            id="imageInput"
+            type="file"
+            multiple
+            accept="image/*"
+            (change)="onImageSelected($event)"
+            class="hidden-input"
+          />
+          <button type="button" class="btn-upload" (click)="imageInput.click()">
+            <span class="material-icons">image</span> Choose Images
+          </button>
+        </div>
+
+        <!-- Image Previews -->
+        <div *ngIf="imagePreviews.length > 0" class="image-previews-grid">
+          <h4 class="mt-4">Selected Images ({{ imagePreviews.length }})</h4>
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mt-3">
+            <div *ngFor="let preview of imagePreviews; let i = index" class="image-preview-card">
+              <div class="image-preview-container">
+                <img [src]="preview" alt="Preview" class="preview-img" />
+                <div class="preview-overlay">
+                  <button
+                    type="button"
+                    class="btn-icon btn-primary-icon"
+                    (click)="setImageAsPrimary(i)"
+                    [title]="primaryImageIndex === i ? 'Remove as primary' : 'Set as primary'"
+                  >
+                    <span class="material-icons">{{ primaryImageIndex === i ? 'star' : 'star_outline' }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-icon btn-delete-icon"
+                    (click)="removeImagePreview(i)"
+                    title="Remove image"
+                  >
+                    <span class="material-icons">close</span>
+                  </button>
+                </div>
+              </div>
+              <small class="block text-center text-xs mt-1" [class.text-yellow-600]="primaryImageIndex === i">
+                {{ primaryImageIndex === i ? '⭐ Primary' : 'Secondary' }}
+              </small>
+            </div>
+          </div>
+        </div>
+
+        <small *ngIf="imagePreviews.length === 0" class="info-text">
+          No images selected. You can upload images after creating the offer, or select them now.
+        </small>
+      </div>
+
+      <!-- Form Actions -->
+      <div class="form-actions">
+        <button
+          type="submit"
+          class="btn-primary"
+          [disabled]="loading || uploadingImages || !form.valid"
+        >
+          <span class="material-icons">{{ uploadingImages ? 'cloud_upload' : 'save' }}</span>
+          {{ uploadingImages ? 'Uploading Images...' : 'Create Offer' }}
+        </button>
+        <button
+          type="button"
+          class="btn-secondary"
+          (click)="cancel()"
+          [disabled]="loading || uploadingImages"
+        >
+          <span class="material-icons">cancel</span> Cancel
+        </button>
+      </div>
+    </form>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>

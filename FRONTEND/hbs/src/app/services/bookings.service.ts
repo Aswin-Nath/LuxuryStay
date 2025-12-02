@@ -143,6 +143,12 @@ export class BookingsService {
     return this.http.get<any[]>(`${this.bookingApiUrl}/${bookingId}/issues`);
   }
 
+  // Get reviews by booking ID
+  // API: GET /bookings/{booking_id}/reviews
+  getReviewsByBooking(bookingId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.bookingApiUrl}/${bookingId}/reviews`);
+  }
+
   // Submit a review for a booking
   // API: POST /bookings/{booking_id}/reviews
   submitReview(bookingId: number, rating: number, reviewText: string): Observable<any> {
@@ -172,5 +178,55 @@ export class BookingsService {
   // API: POST /bookings/{booking_id}/cancel
   cancelBooking(bookingId: number, reason?: string): Observable<any> {
     return this.http.post<any>(`${this.bookingApiUrl}/${bookingId}/cancel`, {});
+  }
+
+  // Get all bookings for admin (including all users)
+  // API: GET /bookings/admin/list (new admin endpoint)
+  getAdminBookings(
+    status?: string,
+    limit: number = 20,
+    offset: number = 0,
+    minPrice?: number,
+    maxPrice?: number,
+    roomTypeId?: string,
+    checkInDate?: string,
+    checkOutDate?: string,
+  ): Observable<any> {
+    let params = new HttpParams()
+      .set('limit', limit.toString())
+      .set('offset', offset.toString());
+
+    if (status) {
+      params = params.set('status', status);
+    }
+
+    if (minPrice !== undefined && minPrice !== null) {
+      params = params.set('min_price', minPrice.toString());
+    }
+
+    if (maxPrice !== undefined && maxPrice !== null) {
+      params = params.set('max_price', maxPrice.toString());
+    }
+
+    if (roomTypeId) {
+      params = params.set('room_type_id', roomTypeId);
+    }
+
+    if (checkInDate) {
+      params = params.set('check_in_date', checkInDate);
+    }
+
+    if (checkOutDate) {
+      params = params.set('check_out_date', checkOutDate);
+    }
+
+
+    return this.http.get<any>(`${this.bookingApiUrl}/admin`, { params });
+  }
+
+  // Get admin booking details with full information
+  // API: GET /bookings/admin/{booking_id}
+  getAdminBookingDetails(bookingId: number): Observable<BookingResponse> {
+    return this.http.get<BookingResponse>(`${this.bookingApiUrl}/admin/${bookingId}`);
   }
 }

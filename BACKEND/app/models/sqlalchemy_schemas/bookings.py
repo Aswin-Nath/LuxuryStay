@@ -41,9 +41,13 @@ class Bookings(Base):
     is_post_edit_done = Column(Boolean, server_default="false", nullable=True)
     is_pre_edit_done = Column(Boolean, server_default="false", nullable=True)
     
+    # ✅ NEW: Offer reference (optional)
+    offer_id = Column(Integer, ForeignKey("offers.offer_id", ondelete="SET NULL"), nullable=True, index=True, comment="Applied offer for this booking")
+    
     # relationships
     rooms = relationship("BookingRoomMap", back_populates="booking", cascade="all, delete-orphan")
     taxes = relationship("BookingTaxMap", backref="booking", cascade="all, delete-orphan")
+    offer = relationship("Offers")
 
 
 class BookingRoomMap(Base):

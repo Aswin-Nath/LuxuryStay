@@ -9,6 +9,7 @@ from app.dependencies.authentication import get_current_user,check_permission
 from app.models.sqlalchemy_schemas.users import Users
 from app.core.cache import get_cached, set_cached, invalidate_pattern
 from app.utils.audit_util import log_audit
+from app.crud.wishlist import get_wishlist_by_user_and_item
 
 
 router = APIRouter(prefix="/wishlist", tags=["WISHLIST"])
@@ -25,11 +26,12 @@ async def add_wishlist(
     token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"])
 ):
     """
-    Add a room to user's wishlist.
+    Add a room or offer to user's wishlist.
     
-    Allows customers to save rooms for later consideration. Each user can wishlist
-    multiple rooms. Duplicate wishlists for same room are prevented (upsert behavior). Useful for
-    price tracking and future booking reminders.
+    Allows customers to save rooms or offers for later consideration. Each user can wishlist
+    multiple items. Duplicate wishlists for same item are prevented. Supports:
+    - room_type_id: Save specific room type
+    - offer_id: Save specific offer
     
     **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role.
     
@@ -131,4 +133,57 @@ async def delete_wishlist(wishlist_id: int, db: AsyncSession = Depends(get_db), 
     """
     # invalidate this user's wishlist cache
     await invalidate_pattern(f"wishlist:user:{current_user.user_id}:*")
-    return {"message":"wishlist deleted successfully"}
+    return await svc_remove(db, wishlist_id, current_user.user_id)
+
+
+# ============================================================================
+# 🔹 CHECK - Verify if item is in wishlist
+# ============================================================================
+@router.get("/check", response_model=dict)
+async def check_wishlist(
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    room_type_id: int = None,
+    offer_id: int = None
+):
+    """
+    Check if a specific room or offer is in user's wishlist.
+    
+    Returns boolean indicating if the item exists in the user's wishlist.
+    """
+    if not room_type_id and not offer_id:
+        return {"in_wishlist": False}
+    
+    cache_key = f"wishlist:user:{current_user.user_id}:check:{room_type_id or offer_id}"
+    cached = await get_cached(cache_key)
+    if cached is not None:
+        return {"in_wishlist": cached}
+
+    existing = await get_wishlist_by_user_and_item(db, current_user.user_id, room_type_id, offer_id)
+    in_wishlist = existing is not None
+    
+    await set_cached(cache_key, in_wishlist, ttl=60)
+    return {"in_wishlist": in_wishlist}
+
+
+# ============================================================================
+# 🔹 CLEAR - Remove all items from user's wishlist
+# ============================================================================
+@router.delete("/", status_code=status.HTTP_200_OK)
+async def clear_wishlist(
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"])
+):
+    """
+    Clear all items from user's wishlist.
+    
+    Removes all wishlisted items for the current user.
+    """
+    # Import CRUD function for clear_user_wishlist
+    from app.crud.wishlist import clear_user_wishlist
+    
+    await clear_user_wishlist(db, current_user.user_id)
+    await invalidate_pattern(f"wishlist:user:{current_user.user_id}:*")
+    
+    return {"message": "Wishlist cleared successfully"}

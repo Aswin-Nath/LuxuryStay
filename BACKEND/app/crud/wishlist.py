@@ -10,9 +10,10 @@ from app.models.sqlalchemy_schemas.wishlist import Wishlist
 # ==========================================================
 
 async def create_wishlist_entry(
-    db: AsyncSession, user_id: int, room_type_id: int) -> Wishlist:
+    db: AsyncSession, user_id: int, room_type_id: Optional[int] = None, offer_id: Optional[int] = None) -> Wishlist:
 
-    wishlist_record = Wishlist(user_id=user_id, room_type_id=room_type_id)
+    wishlist_type = "room" if room_type_id else "offer"
+    wishlist_record = Wishlist(user_id=user_id, room_type_id=room_type_id, offer_id=offer_id, wishlist_type=wishlist_type)
     db.add(wishlist_record)
     await db.flush()
     await db.refresh(wishlist_record)
@@ -26,12 +27,18 @@ async def create_wishlist_entry(
 async def get_wishlist_by_user_and_item(
     db: AsyncSession,
     user_id: int,
-    room_type_id: int,
+    room_type_id: Optional[int] = None,
+    offer_id: Optional[int] = None,
 ) -> Optional[Wishlist]:
 
-    stmt = select(Wishlist).where(Wishlist.user_id == user_id, Wishlist.is_deleted == False)
+    stmt = select(Wishlist).where(
+        Wishlist.user_id == user_id,
+        Wishlist.is_deleted == False
+    )
     if room_type_id:
         stmt = stmt.where(Wishlist.room_type_id == room_type_id)
+    if offer_id:
+        stmt = stmt.where(Wishlist.offer_id == offer_id)
 
     query_result = await db.execute(stmt)
     return query_result.scalars().first()
@@ -102,3 +109,30 @@ async def soft_delete_wishlist_entry(db: AsyncSession, wishlist_obj: Wishlist) -
     await db.flush()
     await db.refresh(wishlist_obj)
     return wishlist_obj
+
+
+# ==========================================================
+# 🔹 CLEAR ALL USER WISHLIST
+# ==========================================================
+
+async def clear_user_wishlist(db: AsyncSession, user_id: int) -> int:
+    """
+    Soft-delete all wishlist entries for a user.
+    
+    Clears the entire wishlist for a user by marking all entries as deleted.
+    
+    Args:
+        db (AsyncSession): Database session for executing the query.
+        user_id (int): The user ID whose wishlist should be cleared.
+    
+    Returns:
+        int: Number of wishlist items cleared.
+    """
+    stmt = update(Wishlist).where(
+        Wishlist.user_id == user_id,
+        Wishlist.is_deleted == False
+    ).values(is_deleted=True)
+    
+    result = await db.execute(stmt)
+    await db.flush()
+    return result.rowcount

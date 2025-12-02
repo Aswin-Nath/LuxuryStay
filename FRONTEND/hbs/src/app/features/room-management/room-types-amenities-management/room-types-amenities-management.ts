@@ -1,8 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClientModule } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import { RoomsService } from '../../../core/services/rooms/rooms.service';
 import { AdminNavbarComponent } from '../../../core/components/admin-navbar/admin-navbar.component';
 import { AdminSidebarComponent } from '../../../core/components/admin-sidebar/admin-sidebar.component';
@@ -20,7 +22,7 @@ import { AddRoomTypeComponent } from '../add-room-type/add-room-type';
   styleUrl: './room-types-amenities-management.css',
   providers: [RoomsService]
 })
-export class RoomTypesAmenitiesManagementComponent implements OnInit {
+export class RoomTypesAmenitiesManagementComponent implements OnInit, OnDestroy {
   activeTab: 'room-types' | 'amenities' = 'room-types';
   
   // Room Types
@@ -56,12 +58,20 @@ export class RoomTypesAmenitiesManagementComponent implements OnInit {
   showAddRoomModal = false;
   showAddRoomTypeModal = false;
 
+  // RxJS Cleanup
+  private destroy$ = new Subject<void>();
+
   constructor(private roomsService: RoomsService, private router: Router) {}
 
   ngOnInit(): void {
     this.loadRoomTypes();
     this.loadAmenities();
     this.calculateRoomTypeKpis();
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   setActiveTab(tab: 'room-types' | 'amenities'): void {
@@ -149,25 +159,29 @@ export class RoomTypesAmenitiesManagementComponent implements OnInit {
 
   loadRoomTypes(): void {
     this.loadingRoomTypes = true;
-    this.roomsService.getRoomTypesWithStats().subscribe(
-      (data) => {
-        this.roomTypes = data;
-        this.loadingRoomTypes = false;
-      },
-      (error) => {
-        this.errorRoomTypes = 'Failed to load room types';
-        this.loadingRoomTypes = false;
-      }
-    );
+    this.roomsService.getRoomTypesWithStats()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(
+        (data) => {
+          this.roomTypes = data;
+          this.loadingRoomTypes = false;
+        },
+        (error) => {
+          this.errorRoomTypes = 'Failed to load room types';
+          this.loadingRoomTypes = false;
+        }
+      );
   }
 
   loadAmenities(): void {
     this.loadingAmenities = true;
-    this.roomsService.getAmenitiesWithRoomCount().subscribe(
-      (data) => {
-        this.amenities = data;
-        this.loadingAmenities = false;
-      },
+    this.roomsService.getAmenitiesWithRoomCount()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(
+        (data) => {
+          this.amenities = data;
+          this.loadingAmenities = false;
+        },
       (error) => {
         this.errorAmenities = 'Failed to load amenities';
         this.loadingAmenities = false;
@@ -176,14 +190,16 @@ export class RoomTypesAmenitiesManagementComponent implements OnInit {
   }
 
   calculateRoomTypeKpis(): void {
-    this.roomsService.getRoomKpis().subscribe(
-      (data) => {
-        this.roomTypeKpis = {
-          totalTypes: data.total_types || 0,
-          activeRooms: data.active_rooms || 0,
-          frozenRooms: data.frozen_rooms || 0,
-          availableRooms: data.available_rooms || 0,
-          totalRevenue: data.total_revenue || 0
+    this.roomsService.getRoomKpis()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(
+        (data) => {
+          this.roomTypeKpis = {
+            totalTypes: data.total_types || 0,
+            activeRooms: data.active_rooms || 0,
+            frozenRooms: data.frozen_rooms || 0,
+            availableRooms: data.available_rooms || 0,
+            totalRevenue: data.total_revenue || 0
         };
       },
       (error) => {
@@ -194,15 +210,17 @@ export class RoomTypesAmenitiesManagementComponent implements OnInit {
 
   showAmenityRooms(amenity: any): void {
     this.selectedAmenityForRooms = amenity;
-    this.roomsService.getRoomsForAmenity(amenity.amenity_id).subscribe(
-      (rooms) => {
-        this.amenityRooms = rooms;
-      },
-      (error) => {
-        console.error('Failed to load rooms for amenity', error);
-        this.amenityRooms = [];
-      }
-    );
+    this.roomsService.getRoomsForAmenity(amenity.amenity_id)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(
+        (rooms) => {
+          this.amenityRooms = rooms;
+        },
+        (error) => {
+          console.error('Failed to load rooms for amenity', error);
+          this.amenityRooms = [];
+        }
+      );
   }
 
   closeAmenityRooms(): void {
@@ -212,16 +230,18 @@ export class RoomTypesAmenitiesManagementComponent implements OnInit {
 
   unmapAmenity(amenityId: number, roomId: number): void {
     if (confirm('Are you sure you want to unmap this amenity from this room?')) {
-      this.roomsService.unmapAmenity(roomId, amenityId).subscribe(
-        () => {
-          // Remove the room from the list
-          this.amenityRooms = this.amenityRooms.filter(r => r.room_id !== roomId);
-          // Update the room count
-          if (this.selectedAmenityForRooms) {
-            this.selectedAmenityForRooms.roomCount = this.amenityRooms.length;
-          }
-        },
-        (error: any) => {
+      this.roomsService.unmapAmenity(roomId, amenityId)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe(
+          () => {
+            // Remove the room from the list
+            this.amenityRooms = this.amenityRooms.filter(r => r.room_id !== roomId);
+            // Update the room count
+            if (this.selectedAmenityForRooms) {
+              this.selectedAmenityForRooms.roomCount = this.amenityRooms.length;
+            }
+          },
+          (error: any) => {
           console.error('Failed to unmap amenity', error);
           alert('Failed to unmap amenity');
         }
@@ -231,13 +251,15 @@ export class RoomTypesAmenitiesManagementComponent implements OnInit {
 
   deleteAmenity(amenityId: number): void {
     if (confirm('Are you sure you want to delete this amenity? It will be unmapped from all rooms.')) {
-      this.roomsService.deleteAmenity(amenityId).subscribe(
-        () => {
-          // Reload amenities
-          this.loadAmenities();
-          this.closeAmenityRooms();
-        },
-        (error: any) => {
+      this.roomsService.deleteAmenity(amenityId)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe(
+          () => {
+            // Reload amenities
+            this.loadAmenities();
+            this.closeAmenityRooms();
+          },
+          (error: any) => {
           console.error('Failed to delete amenity', error);
           alert('Failed to delete amenity');
         }

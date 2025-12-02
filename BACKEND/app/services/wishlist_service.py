@@ -23,18 +23,23 @@ async def add_to_wishlist(db: AsyncSession, payload, current_user) -> Wishlist:
     wishlist_data = payload.model_dump()
     user_id = current_user.user_id
     room_type_id = wishlist_data.get("room_type_id")
+    offer_id = wishlist_data.get("offer_id")
 
-    # Normalize optional FKs (0 → None)
-    room_type_id = None if room_type_id == 0 else room_type_id
-
-    if not room_type_id:
+    # Validate that exactly one is provided
+    if not room_type_id and not offer_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="room_type_id must be provided",
+            detail="Either room_type_id or offer_id must be provided",
+        )
+    
+    if room_type_id and offer_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot provide both room_type_id and offer_id",
         )
 
     # Check uniqueness
-    existing_item = await get_wishlist_by_user_and_item(db, user_id, room_type_id)
+    existing_item = await get_wishlist_by_user_and_item(db, user_id, room_type_id, offer_id)
     if existing_item:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -42,7 +47,7 @@ async def add_to_wishlist(db: AsyncSession, payload, current_user) -> Wishlist:
         )
 
     # Create entry
-    wishlist_entry = await create_wishlist_entry(db, user_id, room_type_id)
+    wishlist_entry = await create_wishlist_entry(db, user_id, room_type_id, offer_id)
     await db.commit()
     return wishlist_entry
 

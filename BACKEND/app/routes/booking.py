@@ -31,7 +31,6 @@ from app.schemas.pydantic_models.refunds import RefundResponse
 # ⚙️ Services
 # ==========================================================
 from app.services.bookings_service import (
-    create_booking as svc_create_booking,
     get_booking as svc_get_booking,
     list_bookings as svc_list_bookings,
     query_bookings as svc_query_bookings,
@@ -47,27 +46,6 @@ from app.services.refunds_service import (
 router = APIRouter(prefix="/bookings", tags=["BOOKINGS"])
 
 
-# ==========================================================
-# 🔹 CREATE - Create a new booking
-# ==========================================================
-@router.post("/", response_model=BookingResponse, status_code=status.HTTP_201_CREATED)
-async def create_booking(
-    payload: BookingCreate,
-    db: AsyncSession = Depends(get_db),
-    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"]),
-    current_user: Users = Depends(get_current_user),
-):
-    booking_record = await svc_create_booking(db, payload, user_id=current_user.user_id)
-
-    try:
-        new_val = BookingResponse.model_validate(booking_record).model_dump(exclude={"created_at"})
-        entity_id = f"booking:{booking_record.booking_id}"
-        await log_audit(entity="booking", entity_id=entity_id, action="INSERT", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
-    except Exception:
-        pass
-
-    await invalidate_pattern("bookings:*")
-    return BookingResponse.model_validate(booking_record).model_dump(exclude={"created_at"})
 
 
 # ==========================================================
@@ -159,17 +137,7 @@ async def get_customer_bookings(
         GET /bookings/customer?status=CONFIRMED&min_price=100&max_price=500
         GET /bookings/customer?room_type_id=1,2&check_in_date=2025-12-01
     """
-    # Parse room_type_id from comma-separated string
-    room_type_list = None
-    if room_type_id:
-        try:
-            room_type_list = [int(rt.strip()) for rt in room_type_id.split(',')]
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="room_type_id must be comma-separated integers (e.g., '1,2,3')"
-            )
-    
+
     # Parse dates
     check_in_date_parsed = None
     check_out_date_parsed = None
@@ -203,7 +171,7 @@ async def get_customer_bookings(
         status=status,
         min_price=min_price_decimal,
         max_price=max_price_decimal,
-        room_types=room_type_list,
+        room_type_id=room_type_id,
         check_in_date=check_in_date_parsed,
         check_out_date=check_out_date_parsed,
     )
@@ -216,6 +184,11 @@ async def get_customer_bookings(
 # ==========================================================
 @router.get("/admin", response_model=List[BookingResponse])
 async def get_admin_bookings(
+    min_price:Optional[int]=Query(None),
+    max_price:Optional[int]=Query(None),
+    room_type_id:Optional[int]=Query(None),
+    check_in_date:Optional[str]=Query(None),
+    check_out_date:Optional[str]=Query(None),
     status: Optional[str] = Query(None),
     limit: int = Query(20, ge=1, le=200),
     offset: int = Query(0, ge=0),
@@ -223,11 +196,7 @@ async def get_admin_bookings(
     current_user: Users = Depends(get_current_user),
     token_payload: dict = Security(check_permission, scopes=["BOOKING:READ", "ADMIN"]),
 ):
-    if status:
-        items = await svc_query_bookings(db, user_id=None, status=status)
-    else:
-        items = await svc_list_bookings(db, limit=limit, offset=offset)
-
+    items = await svc_query_bookings(db,room_type_id=room_type_id,status=status,min_price=min_price,max_price=max_price,check_in_date=check_in_date,check_out_date=check_out_date)
     return [BookingResponse.model_validate(i).model_dump(exclude={"created_at"}) for i in items]
 
 

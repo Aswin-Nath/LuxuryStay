@@ -23,6 +23,7 @@ export class AdminSidebarComponent implements OnInit {
   sidebarLinks: SidebarLink[] = [
     { label: 'Dashboard', route: '/admin/dashboard', icon: 'fa-tachometer-alt' },
     { label: 'Bookings', route: '/admin/bookings', icon: 'fa-calendar-check' },
+        { label: 'Offer', route: '/admin/offers', icon: 'fa-tag' },
     { label: 'Rooms', route: '/admin/rooms', icon: 'fa-bed' },
     { label: 'Room Types & Amenities', route: '/admin/room-types-amenities', icon: 'fa-layer-group' },
     { label: 'Guests', route: '/admin/guests', icon: 'fa-users' },
@@ -33,8 +34,7 @@ export class AdminSidebarComponent implements OnInit {
     { label: 'Refunds', route: '/admin/refunds', icon: 'fa-money-bill-wave' },
     { label: 'Content', route: '/admin/content', icon: 'fa-file-alt' },
     { label: 'Profile', route: '/admin/profile', icon: 'fa-bell' },
-    { label: 'Settings', route: '/admin/settings', icon: 'fa-cog' }
-  ];
+    { label: 'Settings', route: '/admin/settings', icon: 'fa-cog' }  ];
 
   currentRoute: string = '';
 

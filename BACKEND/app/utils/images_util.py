@@ -108,6 +108,19 @@ async def get_images_for_entity(db: AsyncSession, entity_type: str, entity_id: i
     return items
 
 
+async def get_images_for_offer(db: AsyncSession, offer_id: int) -> List[Images]:
+    """Return images attached to an offer."""
+    stmt = (
+        select(Images)
+        .where(Images.entity_type == "offer")
+        .where(Images.entity_id == offer_id)
+        .where(Images.is_deleted == False)
+    )
+    query_result = await db.execute(stmt)
+    items = query_result.scalars().all()
+    return items
+
+
 async def hard_delete_image(db: AsyncSession, image_id: int, requester_id: int | None = None) -> None:
     """Permanently delete an image row. Only the uploader or users with ROOM_MANAGEMENT:WRITE may delete.
 
@@ -142,13 +155,34 @@ async def hard_delete_image(db: AsyncSession, image_id: int, requester_id: int |
     await db.commit()
 
 
-async def set_image_primary(db: AsyncSession, image_id: int, requester_id: int | None = None) -> None:
+async def set_image_primary(db: AsyncSession, image_id: Optional[int] = None, requester_id: int | None = None, offer_id: Optional[int] = None) -> None:
     """Mark the given image as primary for its entity (unset others).
 
     Only uploader or users with ROOM_MANAGEMENT:WRITE may perform this.
     Permission validation is handled at the route level via Security dependency.
     This function handles the database logic.
+    
+    Args:
+        db: AsyncSession
+        image_id: ID of image to mark as primary (optional if unsetting for offer)
+        requester_id: User ID of requester
+        offer_id: If provided without image_id, unsets all primary for this offer
     """
+    if image_id is None and offer_id is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Either image_id or offer_id must be provided")
+    
+    # If only offer_id provided, unset all primary images for this offer
+    if image_id is None and offer_id is not None:
+        await db.execute(
+            update(Images)
+            .where(Images.entity_type == "offer")
+            .where(Images.entity_id == offer_id)
+            .values(is_primary=False)
+        )
+        await db.commit()
+        return
+
+    # Normal behavior: mark specific image as primary
     query = await db.execute(select(Images).where(Images.image_id == image_id))
     image_record = query.scalars().first()
     if not image_record:

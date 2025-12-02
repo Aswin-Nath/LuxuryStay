@@ -1,5 +1,5 @@
-from typing import List, Optional
-from sqlalchemy import select, update, delete
+from typing import List, Optional, Dict
+from sqlalchemy import select, update, delete, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,6 +37,19 @@ async def fetch_all_room_types(db: AsyncSession) -> List[RoomTypes]:
     stmt = select(RoomTypes).where(RoomTypes.is_deleted.is_(False))
     res = await db.execute(stmt)
     return res.scalars().all()
+
+
+async def get_room_type_counts(db: AsyncSession) -> Dict[int, int]:
+    """
+    Get total count of rooms for each room type.
+    Returns dict mapping room_type_id -> total_room_count
+    """
+    stmt = select(Rooms.room_type_id, func.count(Rooms.room_id).label('total_count')).where(
+        Rooms.is_deleted.is_(False)
+    ).group_by(Rooms.room_type_id)
+    res = await db.execute(stmt)
+    rows = res.all()
+    return {row[0]: row[1] for row in rows}
 
 
 async def update_room_type_by_id(db: AsyncSession, room_type_id: int, updates: dict) -> None:

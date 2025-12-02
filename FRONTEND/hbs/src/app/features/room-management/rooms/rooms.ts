@@ -1,8 +1,10 @@
-import { Component, OnInit, HostListener } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClientModule } from '@angular/common/http';
 import { RouterModule, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import { RoomsService, Room, RoomType, PaginatedRoomsResponse, RoomsFilterParams } from '../../../core/services/rooms/rooms.service';
 import { AdminNavbarComponent } from '../../../core/components/admin-navbar/admin-navbar.component';
 import { AdminSidebarComponent } from '../../../core/components/admin-sidebar/admin-sidebar.component';
@@ -19,7 +21,7 @@ import { BulkUploadComponent } from '../bulk-upload/bulk-upload.component';
   styleUrl: './rooms.css',
   providers: [RoomsService]
 })
-export class Rooms implements OnInit {
+export class Rooms implements OnInit, OnDestroy {
   rooms: Room[] = [];
   filteredRooms: Room[] = [];
   roomTypes: RoomType[] = [];
@@ -72,6 +74,9 @@ export class Rooms implements OnInit {
 
   statusOptions = ['AVAILABLE', 'BOOKED', 'MAINTENANCE', 'FROZEN'];
 
+  // RxJS Cleanup
+  private destroy$ = new Subject<void>();
+
   constructor(private roomsService: RoomsService, private router: Router) {}
 
   ngOnInit(): void {
@@ -79,17 +84,24 @@ export class Rooms implements OnInit {
     this.loadRooms();
   }
 
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
   loadRoomTypes(): void {
-    this.roomsService.getRoomTypes().subscribe({
-      next: (data) => {
-        this.roomTypes = data;
-        // Extract unique room type names for the dropdown
-        this.availableRoomTypes = [...new Set(data.map(rt => rt.type_name))].sort();
-      },
-      error: (err) => {
-        console.error('Failed to load room types', err);
-      }
-    });
+    this.roomsService.getRoomTypes()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (data) => {
+          this.roomTypes = data;
+          // Extract unique room type names for the dropdown
+          this.availableRoomTypes = [...new Set(data.map(rt => rt.type_name))].sort();
+        },
+        error: (err) => {
+          console.error('Failed to load room types', err);
+        }
+      });
   }
 
   loadRooms(page: number = 1): void {
@@ -118,24 +130,26 @@ export class Rooms implements OnInit {
       filters.room_type_id = Number(this.filterType);
     }
 
-    this.roomsService.getRooms(filters).subscribe({
-      next: (response: PaginatedRoomsResponse) => {
-        this.rooms = response.data;
-        this.totalRecords = response.total;
-        this.totalPages = response.total_pages;
-        this.allRooms = response.data;
-        
-        // Apply client-side price filters to the fetched data
-        this.applyClientSideFilters();
-        
-        this.loading = false;
-      },
-      error: (err) => {
-        this.error = 'Failed to load rooms';
-        this.loading = false;
-        console.error(err);
-      }
-    });
+    this.roomsService.getRooms(filters)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response: PaginatedRoomsResponse) => {
+          this.rooms = response.data;
+          this.totalRecords = response.total;
+          this.totalPages = response.total_pages;
+          this.allRooms = response.data;
+          
+          // Apply client-side price filters to the fetched data
+          this.applyClientSideFilters();
+          
+          this.loading = false;
+        },
+        error: (err) => {
+          this.error = 'Failed to load rooms';
+          this.loading = false;
+          console.error(err);
+        }
+      });
   }
 
   applyFilters(): void {
@@ -308,34 +322,38 @@ export class Rooms implements OnInit {
     
     if (isFrozen) {
       // Unfreeze - call delete API (which unfreezes)
-      this.roomsService.unfreezeRoom(roomId).subscribe({
-        next: (response: any) => {
-          console.log('Room unfrozen successfully:', response);
-          this.loadRooms(this.currentPage);
-          this.closeFreezeModal();
-          this.freezing = false;
-        },
-        error: (err: any) => {
-          console.error('Failed to unfreeze room', err);
-          this.error = err?.error?.detail || 'Failed to unfreeze room';
-          this.freezing = false;
-        }
-      });
+      this.roomsService.unfreezeRoom(roomId)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: (response: any) => {
+            console.log('Room unfrozen successfully:', response);
+            this.loadRooms(this.currentPage);
+            this.closeFreezeModal();
+            this.freezing = false;
+          },
+          error: (err: any) => {
+            console.error('Failed to unfreeze room', err);
+            this.error = err?.error?.detail || 'Failed to unfreeze room';
+            this.freezing = false;
+          }
+        });
     } else {
       // Freeze - call freeze API with reason
-      this.roomsService.freezeRoom(roomId, this.freezeReason).subscribe({
-        next: (response: any) => {
-          console.log('Room frozen successfully:', response);
-          this.loadRooms(this.currentPage);
-          this.closeFreezeModal();
-          this.freezing = false;
-        },
-        error: (err: any) => {
-          console.error('Failed to freeze room', err);
-          this.error = err?.error?.detail || 'Failed to freeze room';
-          this.freezing = false;
-        }
-      });
+      this.roomsService.freezeRoom(roomId, this.freezeReason)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: (response: any) => {
+            console.log('Room frozen successfully:', response);
+            this.loadRooms(this.currentPage);
+            this.closeFreezeModal();
+            this.freezing = false;
+          },
+          error: (err: any) => {
+            console.error('Failed to freeze room', err);
+            this.error = err?.error?.detail || 'Failed to freeze room';
+            this.freezing = false;
+          }
+        });
     }
   }
 
