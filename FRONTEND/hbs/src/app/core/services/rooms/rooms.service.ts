@@ -3,19 +3,22 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 
-export interface RoomType {
-  room_type_id: number;
-  type_name: string;
-  price_per_night: number;
-  max_adult_count: number;
-  max_child_count: number;
-  square_ft: number;
+export interface RoomType{
+    room_type_id: Number,
+    is_deleted: boolean,
+    created_at: string,
+    updated_at: string,
+    description:string,
+    price_per_night:number;
+    square_ft:Number;
+    max_adult_count:Number;
+    max_child_count:Number
+    type_name:string,
 }
-
 export interface Room {
   room_id: number;
   room_no: string;
-  room_type_id: number;
+  room_type_id: Number;
   room_type: RoomType;
   room_status: string;
   freeze_reason?: string;
@@ -109,6 +112,50 @@ export class RoomsService {
 
   getRoomTypes(withDetails?: boolean): Observable<RoomType[]> {
     return this.http.get<RoomType[]>(`${this.apiUrl}/room-types`);
+  }
+
+  // Get room types with customer filters (price range, occupancy, square footage)
+  getRoomTypesCustomer(filters?: {
+    room_type_id?: number | null;
+    price_min?: number | null;
+    price_max?: number | null;
+    adult_count?: number | null;
+    child_count?: number | null;
+    square_ft_min?: number | null;
+    square_ft_max?: number | null;
+  }): Observable<RoomType[]> {
+    let params = new HttpParams();
+    
+    if (filters) {
+      if (filters.room_type_id !== undefined && filters.room_type_id !== null) {
+        params = params.set('room_type_id', filters.room_type_id.toString());
+      }
+      if (filters.price_min !== undefined && filters.price_min !== null) {
+        params = params.set('price_min', filters.price_min.toString());
+      }
+      if (filters.price_max !== undefined && filters.price_max !== null) {
+        params = params.set('price_max', filters.price_max.toString());
+      }
+      if (filters.adult_count !== undefined && filters.adult_count !== null) {
+        params = params.set('adult_count', filters.adult_count.toString());
+      }
+      if (filters.child_count !== undefined && filters.child_count !== null) {
+        params = params.set('child_count', filters.child_count.toString());
+      }
+      if (filters.square_ft_min !== undefined && filters.square_ft_min !== null) {
+        params = params.set('square_ft_min', filters.square_ft_min.toString());
+      }
+      if (filters.square_ft_max !== undefined && filters.square_ft_max !== null) {
+        params = params.set('square_ft_max', filters.square_ft_max.toString());
+      }
+    }
+    
+    return this.http.get<RoomType[]>(`${this.apiUrl}/room-types/`, { params });
+  }
+
+  // Get images and reviews for all room types in a single call
+  getRoomMedias(): Observable<{ [room_type_id: number]: { images: any[]; reviews: any[] } }> {
+    return this.http.get<{ [room_type_id: number]: { images: any[]; reviews: any[] } }>(`${this.apiUrl}/room-medias`);
   }
 
   getRoomType(id: number): Observable<any> {

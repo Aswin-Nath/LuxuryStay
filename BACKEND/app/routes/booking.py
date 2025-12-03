@@ -111,7 +111,7 @@ async def get_customer_bookings(
     status: Optional[str] = Query(None, description="Filter by booking status (CONFIRMED, PENDING, CANCELLED, CHECKED_IN, CHECKED_OUT)"),
     min_price: Optional[float] = Query(None, description="Filter bookings with total_price >= min_price"),
     max_price: Optional[float] = Query(None, description="Filter bookings with total_price <= max_price"),
-    room_type_id: Optional[str] = Query(None, description="Comma-separated room type IDs to filter by (e.g., 1,2,3)"),
+    room_type_id: Optional[int] = Query(None, description="Comma-separated room type IDs to filter by (e.g., 1,2,3)"),
     check_in_date: Optional[str] = Query(None, description="Filter bookings with check_in >= this date (YYYY-MM-DD format)"),
     check_out_date: Optional[str] = Query(None, description="Filter bookings with check_out <= this date (YYYY-MM-DD format)"),
     limit: int = Query(20, ge=1, le=200),

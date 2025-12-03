@@ -193,9 +193,10 @@
           <p class="text-sm text-gray-500">No issues reported for this booking.</p>
         </div>
 
+
         <!-- Customer Review -->
         <div class="bg-white rounded-lg shadow border border-gray-200 p-6">
-          <h3 class="text-lg font-semibold text-gray-800 mb-4">Customer Review</h3>
+          <h3 class="text-lg font-semibold text-gray-800 mb-4">Customer Review & Response</h3>
           
           <!-- Loading State -->
           <div *ngIf="reviewsLoading" class="text-center py-8">
@@ -203,37 +204,134 @@
             <p class="text-gray-600 mt-2">Loading reviews...</p>
           </div>
 
-          <!-- Reviews Display -->
-          <div *ngIf="!reviewsLoading && reviews && reviews.length > 0" class="space-y-4">
-            <div *ngFor="let review of reviews" class="border rounded-xl p-4 bg-gray-50">
-              <!-- Rating -->
-              <div class="flex items-center gap-2 mb-4">
-                <span class="text-lg font-semibold text-gray-800">Rating:</span>
-                <div class="flex gap-0.5">
-                  <span *ngFor="let star of [1,2,3,4,5]" 
-                        class="material-icons text-sm"
-                        [ngClass]="star <= review.rating ? 'text-yellow-400' : 'text-gray-300'">
-                    star
-                  </span>
+          <!-- Review Display (Google-style) -->
+          <div *ngIf="!reviewsLoading && bookingReview" class="space-y-4">
+            <!-- Customer Review Card -->
+            <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+              <div class="flex items-start justify-between mb-3">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center font-bold text-white">
+                    {{ (bookingReview.user?.full_name || 'C')[0].toUpperCase() }}
+                  </div>
+                  <div>
+                    <p class="font-semibold text-gray-800">{{ bookingReview.user?.full_name || 'Customer' }}</p>
+                    <p class="text-xs text-gray-500">{{ bookingReview.created_at | date: 'short' }}</p>
+                  </div>
                 </div>
-                <span class="text-sm text-gray-600 ml-2">({{ review.rating }}/5)</span>
+                <div class="flex gap-1">
+                  <span *ngFor="let i of [1,2,3,4,5]" class="text-lg" [ngClass]="i <= bookingReview.rating ? 'text-yellow-400' : 'text-gray-300'">★</span>
+                </div>
               </div>
-              
-              <!-- Review Text -->
-              <div class="bg-white rounded-lg p-3 border border-gray-200">
-                <p class="text-gray-700 text-sm leading-relaxed">{{ review.review_text || review.comment || '-' }}</p>
-              </div>
+              <p class="text-gray-700 mb-3">{{ bookingReview.comment }}</p>
 
-              <!-- Review Metadata -->
-              <div class="text-xs text-gray-500 mt-3">
-                <p>Reviewed on: {{ formatDate(review.created_at) }}</p>
-                <p *ngIf="review.reviewer_name">By: {{ review.reviewer_name }}</p>
+              <!-- Customer Review Images -->
+              <div *ngIf="bookingReview.images && bookingReview.images.length > 0" class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+                <div *ngFor="let image of bookingReview.images" class="relative group">
+                  <img [src]="image.image_url" alt="Review image" class="w-full h-24 object-cover rounded-lg">
+                </div>
               </div>
+            </div>
+
+            <!-- Admin Response Card (if exists) -->
+            <div *ngIf="bookingReview.admin_response" class="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-500">
+              <div class="flex items-start gap-3 mb-3">
+                <div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center font-bold text-white">
+                  A
+                </div>
+                <div>
+                  <p class="font-semibold text-blue-800">Admin Response</p>
+                  <p class="text-xs text-blue-600">{{ bookingReview.responded_at | date: 'short' }}</p>
+                </div>
+              </div>
+              <p class="text-gray-700 mb-3">{{ bookingReview.admin_response }}</p>
+
+              <!-- Admin Response Images -->
+              <div *ngIf="bookingReview.admin_response_images && bookingReview.admin_response_images.length > 0" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div *ngFor="let image of bookingReview.admin_response_images" class="relative group">
+                  <img [src]="image.image_url" alt="Admin response image" class="w-full h-24 object-cover rounded-lg">
+                </div>
+              </div>
+            </div>
+
+            <!-- Admin Response Form (only show if not already responded) -->
+            <div *ngIf="canAddAdminResponse()" class="bg-blue-50 rounded-lg p-4 border border-blue-300">
+              <h4 class="font-semibold text-blue-800 mb-4">Add Your Response</h4>
+              <form (ngSubmit)="submitAdminResponse()" #adminResponseForm="ngForm" class="space-y-4">
+                <!-- Response Text -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Your Response</label>
+                  <textarea
+                    [(ngModel)]="adminResponseText"
+                    name="adminResponseText"
+                    maxlength="500"
+                    rows="3"
+                    placeholder="Write your response to the customer review (max 500 characters)"
+                    class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                  ></textarea>
+                  <p class="text-sm text-gray-500 text-right mt-1">
+                    {{ (adminResponseText || '').length }}/500
+                  </p>
+                </div>
+
+                <!-- Image Upload -->
+                <div class="space-y-2">
+                  <label class="block text-sm font-medium text-gray-700">Upload Images (Optional)</label>
+                  <label class="block">
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      (change)="onAdminImageSelect($event)"
+                      class="hidden"
+                    />
+                    <div class="border-2 border-dashed border-blue-300 rounded-lg p-4 text-center cursor-pointer hover:bg-blue-50 transition">
+                      <span class="material-icons text-3xl text-blue-600 block mb-2">image</span>
+                      <p class="text-sm font-medium text-gray-700">Click to upload images</p>
+                      <p class="text-xs text-gray-500">Max 5 images, 5MB each</p>
+                    </div>
+                  </label>
+
+                  <!-- Image Previews -->
+                  <div *ngIf="adminImagePreviews.length > 0" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div *ngFor="let preview of adminImagePreviews; let i = index" class="relative group">
+                      <img [src]="preview" alt="Preview" class="w-full h-24 object-cover rounded-lg">
+                      <button
+                        type="button"
+                        (click)="removeAdminImage(i)"
+                        class="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
+                      >
+                        <span class="material-icons text-sm">close</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    (click)="resetAdminResponse()"
+                    class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg shadow"
+                  >
+                    Reset
+                  </button>
+                  <button
+                    type="submit"
+                    [disabled]="!adminResponseText || adminResponseText.trim().length === 0 || isSubmittingAdminResponse"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg shadow disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <span *ngIf="!isSubmittingAdminResponse">Submit Response</span>
+                    <span *ngIf="isSubmittingAdminResponse" class="flex items-center gap-2">
+                      <span class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                      Submitting...
+                    </span>
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
 
           <!-- No Reviews State -->
-          <div *ngIf="!reviewsLoading && (!reviews || reviews.length === 0)" class="text-center py-8">
+          <div *ngIf="!reviewsLoading && !bookingReview" class="text-center py-8">
             <span class="material-icons text-4xl text-gray-300 mb-2 block">rate_review</span>
             <p class="text-gray-500">No reviews submitted for this booking yet.</p>
           </div>
@@ -242,3 +340,6 @@
     </main>
   </div>
 </div>
+
+<!-- Toast Container -->
+<div id="adminToast" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>

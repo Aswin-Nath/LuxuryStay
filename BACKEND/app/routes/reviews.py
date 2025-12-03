@@ -94,7 +94,7 @@ async def create_review(
 @router.get("/", response_model=List[ReviewResponse])
 async def list_reviews(
     booking_id: Optional[int] = None,
-    room_id: Optional[int] = None,
+    room_type_id: Optional[int] = None,
     user_id: Optional[int] = None,
     limit: int = 20,
     offset: int = 0,
@@ -125,12 +125,12 @@ async def list_reviews(
         GET /reviews/?booking_id=5 → Reviews for booking 5
         GET /reviews/?room_id=10&limit=50 → First 50 reviews for room 10
     """
-    cache_key = f"reviews:list:booking:{booking_id}:room:{room_id}:user:{user_id}:limit:{limit}:offset:{offset}"
+    cache_key = f"reviews:list:booking:{booking_id}:room:{room_type_id}:user:{user_id}:limit:{limit}:offset:{offset}"
     cached = await get_cached(cache_key)
     if cached is not None:
         return cached
 
-    items = await svc_list_reviews(db, booking_id=booking_id, room_id=room_id, user_id=user_id)
+    items = await svc_list_reviews(db, booking_id=booking_id, room_type_id=room_type_id,user_id=user_id)
     # Apply pagination
     items = items[offset:offset+limit]
     out = [ReviewResponse.model_validate(i) for i in items]
@@ -218,54 +218,6 @@ async def respond_review(
     return ReviewResponse.model_validate(review_record)
 
 
-# ============================================================================
-# 🔹 UPDATE - Modify user's own review (rating/comment)
-# ============================================================================
-@router.put("/{review_id}", response_model=ReviewResponse)
-async def update_review(
-    review_id: int,
-    payload: ReviewUpdate,
-    db: AsyncSession = Depends(get_db),
-    current_user: Users = Depends(get_current_user),
-    _permissions: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"]),
-):
-    """
-    Update user's own review (rating and/or comment).
-    
-    Allows the reviewer to modify their rating or comment after submission. Only the review
-    owner can edit. Admin response (if any) remains unchanged. Changes are timestamped for
-    auditing. Useful for correcting typos or adjusting ratings after reflection.
-    
-    **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role. User must own the review.
-    
-    Args:
-        review_id (int): The review ID to update (must own).
-        payload (ReviewUpdate): Updated rating and/or comment.
-        db (AsyncSession): Database session dependency.
-        current_user (Users): Authenticated user (review owner).
-    
-    Returns:
-        ReviewResponse: Updated review with new rating/comment and updated_at timestamp.
-    
-    Raises:
-        HTTPException (403): If user doesn't own the review.
-        HTTPException (404): If review_id not found.
-    
-    Side Effects:
-        - Invalidates reviews cache pattern ("reviews:*").
-        - Creates audit log entry.
-        - Updates updated_at timestamp.
-    """
-    review_record = await svc_update_review(db, review_id, payload, current_user)
-    await invalidate_pattern("reviews:*")
-    # audit user update
-    try:
-        new_val = ReviewResponse.model_validate(review_record).model_dump()
-        entity_id = f"review:{getattr(review_record, 'review_id', None)}"
-        await log_audit(entity="review", entity_id=entity_id, action="UPDATE", new_value=new_val, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
-    except Exception:
-        pass
-    return ReviewResponse.model_validate(review_record)
 
 
 # ============================================================================
@@ -355,52 +307,3 @@ async def list_review_images(review_id: int, db: AsyncSession = Depends(get_db))
     items = await get_images_for_review(db, review_id)
     return [ImageResponse.model_validate(i) for i in items]
 
-
-# ============================================================================
-# 🔹 DELETE - Remove images from review
-# ============================================================================
-@router.delete("/{review_id}/images")
-async def delete_review_images(
-    review_id: int,
-    image_ids: List[int],
-    db: AsyncSession = Depends(get_db),
-    current_user: Users = Depends(get_current_user),
-    _permissions: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"]),
-):
-    """
-    Delete images from a review.
-    
-    Removes specified images from a review. Only the review owner (CUSTOMER) or admins can delete images. 
-    Images are permanently removed from storage and database.
-    
-    **Authorization:** Requires CONTENT_MANAGEMENT:DELETE permission AND CUSTOMER role (or ADMIN).
-    
-    Args:
-        review_id (int): The review containing images.
-        image_ids (List[int]): JSON body with list of image_ids to delete.
-        db (AsyncSession): Database session dependency.
-        current_user (Users): Authenticated user.
-        _permissions (dict): CONTENT_MANAGEMENT:DELETE permission check.
-    
-    Returns:
-        dict: Confirmation with list of deleted image_ids and success message.
-    
-    Raises:
-        HTTPException (400): If image_ids list is empty.
-        HTTPException (403): If user lacks CONTENT_MANAGEMENT:DELETE permission.
-        HTTPException (404): If image_id not found.
-    
-    Side Effects:
-        - Removes images from external storage.
-        - Invalidates review cache.
-        - Creates audit log entry per deletion.
-    """
-    if not image_ids:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="image_ids is required")
-    deleted = []
-    for img_id in image_ids:
-        await hard_delete_image(db, img_id, requester_id=current_user.user_id)
-        deleted.append(img_id)
-    # invalidate caches for this review
-    await invalidate_pattern(f"reviews:*{review_id}*")
-    return {"deleted": deleted, "message": "Images deleted"}

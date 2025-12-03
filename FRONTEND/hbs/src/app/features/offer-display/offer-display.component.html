@@ -1,23 +1,123 @@
-<div class="min-h-screen bg-gray-50">
+<div class="px-4 sm:px-6 max-w-7xl mx-auto space-y-12 sm:space-y-16 py-6">
   <!-- Navbar -->
   <app-customer-navbar></app-customer-navbar>
 
   <!-- Hero Section -->
-  <section class="px-4 sm:px-6 max-w-7xl mx-auto pt-24 pb-8 text-center">
-    <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-4">Exclusive Offers</h1>
-    <p class="text-gray-600 text-base sm:text-lg max-w-2xl mx-auto">
-      Discover amazing deals and special packages for your perfect stay
-    </p>
-  </section>
+    <!-- Header -->
+    <header class="relative rounded-3xl bg-linear-to-r mb-8 from-yellow-400 via-red-400 to-red-500 py-12 sm:py-20 text-center text-white shadow-md sm:mt-20 overflow-hidden">
+      <div class="relative z-10">
+        <h1 class="text-3xl sm:text-5xl font-extrabold drop-shadow-lg">Exclusive Offers</h1>
+        <p class="text-base sm:text-lg mt-3 opacity-95">Special packages curated just for you</p>
 
-  <!-- Filter Section -->
-  <!-- Unified Search/Filter Section -->
-  <section class="px-4 sm:px-6 max-w-7xl mx-auto mb-8">
-    <app-customer-search 
-      searchType="offers"
-      (filtersChanged)="onSearchFiltersChanged($event)">
-    </app-customer-search>
-  </section>
+        <div class="mt-6 flex flex-wrap justify-center gap-3 sm:space-x-4">
+          <span class="bg-white text-yellow-600 px-4 py-2 rounded-full text-xs sm:text-sm font-medium shadow">✨ Limited Time</span>
+          <span class="bg-white text-red-600 px-4 py-2 rounded-full text-xs sm:text-sm font-medium shadow">🔥 Best Deals</span>
+        </div>
+      </div>
+    </header>
+  <!-- Filters & Search -->
+  <div class="advanced-filters bg-white rounded-lg border border-gray-200 p-4 mb-4">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-sm font-semibold text-gray-700">Advanced Filters</h3>
+      <button (click)="resetFilters()" class="text-xs text-yellow-600 hover:text-yellow-700 underline">
+        Reset All
+      </button>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+      <!-- Status Filter -->
+      <div class="filter-group">
+        <label class="block text-xs font-medium text-gray-600 mb-1">Status</label>
+        <select [(ngModel)]="filterActive" class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs">
+          <option value="all">All</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+
+      <!-- Min Discount -->
+      <div class="filter-group">
+        <label class="block text-xs font-medium text-gray-600 mb-1">Min %</label>
+        <input
+          type="number"
+          min="0"
+          max="100"
+          placeholder="0"
+          [(ngModel)]="minDiscount"
+          class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+        />
+      </div>
+
+      <!-- Max Discount -->
+      <div class="filter-group">
+        <label class="block text-xs font-medium text-gray-600 mb-1">Max %</label>
+        <input
+          type="number"
+          min="0"
+          max="100"
+          placeholder="100"
+          [(ngModel)]="maxDiscount"
+          class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+        />
+      </div>
+
+      <!-- Start Date -->
+      <div class="filter-group">
+        <label class="block text-xs font-medium text-gray-600 mb-1">From</label>
+        <input
+          type="date"
+          [(ngModel)]="startDate"
+          class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+        />
+      </div>
+
+      <!-- End Date -->
+      <div class="filter-group">
+        <label class="block text-xs font-medium text-gray-600 mb-1">To</label>
+        <input
+          type="date"
+          [(ngModel)]="endDate"
+          class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+        />
+      </div>
+
+      <!-- Room Type Filter -->
+      <div class="filter-group">
+        <label class="block text-xs font-medium text-gray-600 mb-1">Room Type</label>
+        <select
+          [(ngModel)]="selectedRoomTypeId"
+          class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+          [disabled]="loadingRoomTypes"
+        >
+          <option [ngValue]="null">All</option>
+          <option *ngFor="let rt of roomTypes" [ngValue]="rt.room_type_id">
+            {{ rt.type_name }}
+          </option>
+        </select>
+      </div>
+
+      <!-- Sort Control -->
+      <div class="filter-group">
+        <label class="block text-xs font-medium text-gray-600 mb-1">Sort by</label>
+        <select [(ngModel)]="sortBy" class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs">
+          <option value="date">Newest</option>
+          <option value="name">Name</option>
+          <option value="discount">Discount</option>
+        </select>
+      </div>
+
+      <!-- Search Button -->
+      <div class="filter-group flex items-end">
+        <button
+          (click)="onFilterChange()"
+          class="w-full px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-xs font-medium transition flex items-center justify-center gap-1"
+        >
+          <span class="material-icons text-sm">search</span>
+          Search
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Loading State -->
   <div *ngIf="loading" class="flex justify-center items-center h-96">
@@ -82,17 +182,25 @@
           <!-- Action Buttons -->
           <div class="flex flex-col sm:flex-row gap-3 mt-6">
             <button
-              (click)="openBookingModal(offer)"
-              class="flex-1 px-4 py-2 sm:py-3 bg-yellow-600 text-white font-semibold rounded-lg hover:bg-yellow-700 transition text-sm sm:text-base"
+              (click)="viewOfferDetails(offer)"
+              class="flex-1 px-4 py-2 sm:py-3 bg-linear-to-r from-red-600 to-red-700 text-white font-semibold rounded-lg hover:from-red-700 hover:to-red-800 transition text-sm sm:text-base flex items-center justify-center gap-2"
             >
-              <span class="material-icons text-sm align-middle mr-1">shopping_cart</span>
+              <span class="material-icons text-sm">open_in_new</span>
+              View Details
+            </button>
+            <button
+              (click)="openBookingModal(offer)"
+              class="flex-1 px-4 py-2 sm:py-3 bg-yellow-600 text-white font-semibold rounded-lg hover:bg-yellow-700 transition text-sm sm:text-base flex items-center justify-center gap-2"
+            >
+              <span class="material-icons text-sm">shopping_cart</span>
               Book Now
             </button>
             <button
               (click)="saveToWishlist(offer)"
-              class="px-4 py-2 sm:py-3 border border-yellow-600 text-yellow-600 font-semibold rounded-lg hover:bg-yellow-50 transition text-sm sm:text-base"
+              [class.bg-red-50]="offer.is_saved_to_wishlist"
+              class="px-4 py-2 sm:py-3 border border-yellow-600 text-yellow-600 font-semibold rounded-lg hover:bg-yellow-50 transition text-sm sm:text-base flex items-center justify-center"
             >
-              <span class="material-icons text-sm align-middle">favorite</span>
+              <span class="material-icons text-sm align-middle" [style.color]="offer.is_saved_to_wishlist ? '#ef4444' : 'currentColor'">{{ offer.is_saved_to_wishlist ? 'favorite' : 'favorite_border' }}</span>
             </button>
           </div>
         </div>

@@ -3,7 +3,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.sqlalchemy_schemas.reviews import Reviews
 from app.models.sqlalchemy_schemas.bookings import Bookings, BookingRoomMap
-
+from app.models.sqlalchemy_schemas.images import Images
+from sqlalchemy.orm import selectinload
 
 # ==========================================================
 # CREATE
@@ -48,14 +49,22 @@ async def fetch_reviews_by_user(db: AsyncSession, booking_id: int, user_id: int)
 async def fetch_reviews_filtered(
     db: AsyncSession,
     booking_id: Optional[int] = None,
-    room_id: Optional[int] = None,
     user_id: Optional[int] = None,
+    room_type_id:Optional[int]=None
 ) -> List[Reviews]:
-    stmt = select(Reviews)
+    stmt = (
+        select(Reviews)
+        .options(
+            selectinload(Reviews.images),
+            selectinload(Reviews.admin_response_images)
+        )
+    )
     if booking_id is not None:
         stmt = stmt.where(Reviews.booking_id == booking_id)
     if user_id is not None:
         stmt = stmt.where(Reviews.user_id == user_id)
+    if room_type_id is not None:
+        stmt=stmt.where(Reviews.room_type_id==room_type_id)
     query_result = await db.execute(stmt)
     return query_result.scalars().all()
 

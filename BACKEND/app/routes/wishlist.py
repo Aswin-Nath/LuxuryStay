@@ -3,8 +3,8 @@ from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.postgres_connection import get_db
-from app.schemas.pydantic_models.wishlist import WishlistCreate, WishlistResponse
-from app.services.wishlist_service import add_to_wishlist as svc_add, list_user_wishlist as svc_list, remove_wishlist as svc_remove
+from app.schemas.pydantic_models.wishlist import WishlistCreate, WishlistResponse, WishlistRoomResponse, WishlistOfferResponse
+from app.services.wishlist_service import add_to_wishlist as svc_add, list_user_wishlist as svc_list, remove_wishlist as svc_remove, list_user_wishlist_rooms as svc_list_rooms, list_user_wishlist_offers as svc_list_offers
 from app.dependencies.authentication import get_current_user,check_permission
 from app.models.sqlalchemy_schemas.users import Users
 from app.core.cache import get_cached, set_cached, invalidate_pattern
@@ -39,7 +39,6 @@ async def add_wishlist(
         payload (WishlistCreate): Request with room_id to add.
         db (AsyncSession): Database session dependency.
         current_user (Users): Authenticated user (must be basic user/customer).
-        _basic_user_check (bool): Ensure only basic users can add to wishlist.
     
     Returns:
         WishlistResponse: Created wishlist entry with wishlist_id and timestamps.
@@ -67,15 +66,12 @@ async def add_wishlist(
 
 
 # ============================================================================
-# 🔹 READ - Fetch user's wishlist items
+# 🔹 READ - Fetch user's ALL wishlist items (backward compatibility)
 # ============================================================================
 @router.get("/", response_model=List[WishlistResponse])
 async def list_wishlist(db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user),    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"])):
     """
-    Retrieve authenticated user's complete wishlist.
-    
-    Fetches all rooms saved to the user's wishlist. Results are cached for 120 seconds.
-    Returns room details, prices, and wishlist timestamps. Empty list if no wishlisted rooms.
+    Retrieve authenticated user's complete wishlist (all items).
     
     **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role.
     
@@ -84,7 +80,7 @@ async def list_wishlist(db: AsyncSession = Depends(get_db), current_user: Users 
         current_user (Users): Authenticated user (wishlist owner).
     
     Returns:
-        List[WishlistResponse]: List of wishlisted room items with details.
+        List[WishlistResponse]: List of wishlisted items.
     
     Side Effects:
         - Uses Redis cache with TTL of 120 seconds (key: "wishlist:user:{user_id}").
@@ -98,6 +94,85 @@ async def list_wishlist(db: AsyncSession = Depends(get_db), current_user: Users 
     response_list = [WishlistResponse.model_validate(i).model_dump() for i in items]
     await set_cached(cache_key, response_list, ttl=120)
     return response_list
+
+
+# ============================================================================
+# 🔹 READ - Fetch user's wishlist ROOMS with full details
+# ============================================================================
+@router.get("/rooms", response_model=List[dict])
+async def list_wishlist_rooms(
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"])
+):
+    """
+    Retrieve authenticated user's wishlist rooms with full details.
+    
+    Returns detailed information about each wishlisted room type including:
+    - Room type name, price per night, description
+    - Amenities list
+    - Occupancy limits (adults/children)
+    - Square footage
+    
+    **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role.
+    
+    Args:
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user.
+    
+    Returns:
+        List[dict]: List of wishlisted rooms with full details.
+    
+    Side Effects:
+        - Uses Redis cache with TTL of 120 seconds.
+    """
+    cache_key = f"wishlist:user:{current_user.user_id}:rooms"
+    cached = await get_cached(cache_key)
+    if cached is not None:
+        return cached
+
+    rooms_data = await svc_list_rooms(db, current_user.user_id)
+    await set_cached(cache_key, rooms_data, ttl=120)
+    return rooms_data
+
+
+# ============================================================================
+# 🔹 READ - Fetch user's wishlist OFFERS with full details
+# ============================================================================
+@router.get("/offers", response_model=List[dict])
+async def list_wishlist_offers(
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"])
+):
+    """
+    Retrieve authenticated user's wishlist offers with full details.
+    
+    Returns detailed information about each wishlisted offer including:
+    - Offer name, description, discount percentage
+    - Room types included in the offer
+    - Valid from/to dates
+    
+    **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role.
+    
+    Args:
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user.
+    
+    Returns:
+        List[dict]: List of wishlisted offers with full details.
+    
+    Side Effects:
+        - Uses Redis cache with TTL of 120 seconds.
+    """
+    cache_key = f"wishlist:user:{current_user.user_id}:offers"
+    cached = await get_cached(cache_key)
+    if cached is not None:
+        return cached
+
+    offers_data = await svc_list_offers(db, current_user.user_id)
+    await set_cached(cache_key, offers_data, ttl=120)
+    return offers_data
 
 
 
@@ -164,26 +239,3 @@ async def check_wishlist(
     
     await set_cached(cache_key, in_wishlist, ttl=60)
     return {"in_wishlist": in_wishlist}
-
-
-# ============================================================================
-# 🔹 CLEAR - Remove all items from user's wishlist
-# ============================================================================
-@router.delete("/", status_code=status.HTTP_200_OK)
-async def clear_wishlist(
-    db: AsyncSession = Depends(get_db),
-    current_user: Users = Depends(get_current_user),
-    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"])
-):
-    """
-    Clear all items from user's wishlist.
-    
-    Removes all wishlisted items for the current user.
-    """
-    # Import CRUD function for clear_user_wishlist
-    from app.crud.wishlist import clear_user_wishlist
-    
-    await clear_user_wishlist(db, current_user.user_id)
-    await invalidate_pattern(f"wishlist:user:{current_user.user_id}:*")
-    
-    return {"message": "Wishlist cleared successfully"}

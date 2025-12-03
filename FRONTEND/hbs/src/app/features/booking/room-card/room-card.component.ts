@@ -1,6 +1,7 @@
 import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy, ChangeDetectorRef, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { BookingService, RoomLock } from '../../../services/booking.service';
 import { takeUntil } from 'rxjs/operators';
 import { Subject } from 'rxjs';
@@ -72,7 +73,8 @@ export class RoomCardComponent implements OnInit {
   constructor(
     private bookingService: BookingService,
     private http: HttpClient,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private router: Router
   ) {}
 
   ngOnInit() {
@@ -99,6 +101,8 @@ export class RoomCardComponent implements OnInit {
     this.showDetailsModal = false;
     this.cdr.markForCheck();
   }
+
+
 
   // Open Reviews Modal
   openReviewsModal() {

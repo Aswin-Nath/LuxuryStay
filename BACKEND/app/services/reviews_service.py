@@ -90,7 +90,7 @@ async def get_review(db: AsyncSession, review_id: int) -> Reviews:
     return review_record
 
 
-async def list_reviews(db: AsyncSession, booking_id=None, room_id=None, user_id=None):
+async def list_reviews(db: AsyncSession, booking_id=None, room_type_id=None, user_id=None):
     """
     List reviews with optional filters.
     
@@ -108,16 +108,9 @@ async def list_reviews(db: AsyncSession, booking_id=None, room_id=None, user_id=
     Raises:
         HTTPException (400): If room_id is provided without booking_id.
     """
-    if room_id is not None and booking_id is None:
-        raise HTTPException(status_code=400, detail="booking_id required when filtering by room_id")
 
-    if room_id is not None:
-        booking_room_mapping = await fetch_booking_room_map(db, booking_id, room_id=room_id)
-        if not booking_room_mapping:
-            return []
-        return await fetch_reviews_filtered(db, booking_id=booking_id, user_id=user_id)
 
-    return await fetch_reviews_filtered(db, booking_id=booking_id, user_id=user_id)
+    return await fetch_reviews_filtered(db, booking_id=booking_id,room_type_id=room_type_id, user_id=user_id)
 
 
 async def admin_respond_review(db: AsyncSession, review_id: int, admin_user, admin_response: str) -> Reviews:

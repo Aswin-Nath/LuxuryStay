@@ -163,6 +163,7 @@ async def list_offers(
         valid_from=valid_from,
         valid_to=valid_to,
         room_type_id=room_type_id,
+        user_id=current_user.user_id,
     )
     return [
         OfferListResponse(
@@ -175,9 +176,67 @@ async def list_offers(
             valid_to=o.valid_to,
             current_uses=o.current_uses,
             max_uses=o.max_uses,
+            is_saved_to_wishlist=o.is_saved_to_wishlist,
         )
         for o in offers
     ]
+
+
+# ============================================================
+# 📸 OFFER MEDIAS (Images for all offers)
+# ============================================================
+@router.get("/medias", response_model=dict)
+async def get_offer_medias(
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    is_active: bool = Query(True),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+):
+    """
+    Get images for all active offers in a single optimized call.
+    
+    Returns a dictionary mapping offer_id to their images.
+    This endpoint optimizes the N+1 problem by fetching all offer images in one call
+    instead of calling /images/{offer_id}/images separately for each offer.
+    
+    Returns:
+        {
+            "offer_id": {
+                "images": [...]
+            }
+        }
+    """
+    from app.utils.images_util import get_images_for_entity
+    
+    # Get all active offers with filters
+    offers = await svc_list_offers(
+        db,
+        skip=skip,
+        limit=limit,
+        is_active=is_active,
+        user_id=current_user.user_id,
+    )
+    
+    medias = {}
+    
+    # For each offer, fetch images
+    for offer in offers:
+        images = await get_images_for_entity(db, entity_type="offer", entity_id=offer.offer_id)
+        
+        medias[offer.offer_id] = {
+            "images": [
+                {
+                    "image_id": img.image_id,
+                    "image_url": img.image_url,
+                    "is_primary": img.is_primary,
+                    "caption": img.caption,
+                }
+                for img in images
+            ]
+        }
+    
+    return medias
 
 
 @router.get("/{offer_id}", response_model=OfferResponse)
@@ -186,8 +245,8 @@ async def get_offer(
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
 ):
-    """Get offer details by ID"""
-    return await svc_get_offer(db, offer_id)
+    """Get offer details by ID with wishlist status"""
+    return await svc_get_offer(db, offer_id, user_id=current_user.user_id)
 
 
 @router.get("/{offer_id}/images", response_model=list)

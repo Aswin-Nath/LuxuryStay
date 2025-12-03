@@ -38,3 +38,21 @@ class Reviews(Base):
     user = relationship("Users", foreign_keys=[user_id])
     admin = relationship("Users", foreign_keys=[admin_id])
     room_type = relationship("RoomTypes")
+
+    images = relationship(
+        "Images",
+        primaryjoin="and_(Reviews.review_id == foreign(Images.entity_id), "
+                    "Images.entity_type == 'review', "
+                    "Images.is_deleted == False)",
+        viewonly=True,
+        lazy="selectin"
+    )
+
+    admin_response_images = relationship(
+        "Images",
+        primaryjoin="and_(Reviews.review_id == foreign(Images.entity_id), "
+                    "Images.entity_type == 'admin_response', "
+                    "Images.is_deleted == False)",
+        viewonly=True,
+        lazy="selectin"
+    )

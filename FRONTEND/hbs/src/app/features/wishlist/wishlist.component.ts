@@ -7,55 +7,67 @@ import { takeUntil } from 'rxjs/operators';
 import { WishlistService } from '../../services/wishlist.service';
 import { CustomerNavbarComponent } from '../../core/components/customer-navbar/customer-navbar.component';
 import { CustomerSidebarComponent } from '../../core/components/customer-sidebar/customer-sidebar.component';
-import { CustomerSearchComponent, SearchFilters } from '../customer-search/customer-search.component';
 
-interface WishlistItem {
-  id: string;
-  type: 'room' | 'offer';
-  name: string;
-  image?: string;
-  price: number;
-  originalPrice?: number;
-  discount?: string;
-  description?: string;
-  rating?: number;
-  reviews?: number;
-  dateAdded: string;
-  available?: boolean;
+interface WishlistRoom {
+  wishlist_id: number;
+  room_type_id: number;
+  type_name: string;
+  price_per_night: number;
+  description: string;
+  square_ft: number;
+  max_adult_count: number;
+  max_child_count: number;
+  amenities: string[];
+  added_at: string;
+  primary_image: string | null;
+}
+
+interface WishlistOffer {
+  wishlist_id: number;
+  offer_id: number;
+  offer_name: string;
+  description: string;
+  discount_percent: number;
+  valid_from: string;
+  valid_to: string;
+  room_types: any[];
+  added_at: string;
+  primary_image: string | null;
 }
 
 @Component({
   selector: 'app-wishlist',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, CustomerNavbarComponent, CustomerSearchComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, CustomerNavbarComponent, CustomerSidebarComponent],
   templateUrl: './wishlist.component.html',
   styleUrl: './wishlist.component.css',
 })
 export class WishlistComponent implements OnInit, OnDestroy {
-  wishlistItems: WishlistItem[] = [];
-  filteredItems: WishlistItem[] = [];
-  currentTab: 'all' | 'rooms' | 'offers' = 'all';
+  currentTab: 'rooms' | 'offers' = 'rooms';
   loading = true;
   error = '';
 
-  // Filter properties
-  minPriceFilter = 0;
-  maxPriceFilter = 50000;
-  availabilityFilter = 'all';
+  // Data arrays
+  wishlistRooms: WishlistRoom[] = [];
+  wishlistOffers: WishlistOffer[] = [];
 
-  // Details modal
+
+
+  // Modal properties
   showDetailsModal = false;
-  selectedItem: WishlistItem | null = null;
+  selectedRoom: WishlistRoom | null = null;
+  showOfferModal = false;
+  selectedOffer: WishlistOffer | null = null;
 
   private destroy$ = new Subject<void>();
 
   constructor(
-    private router: Router,
+    public router: Router,
     private wishlistService: WishlistService
   ) {}
 
   ngOnInit(): void {
-    this.loadWishlist();
+    this.loadWishlistData();
   }
 
   ngOnDestroy(): void {
@@ -63,223 +75,164 @@ export class WishlistComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  loadWishlist(): void {
+  // ============================================================================
+  // 🔹 LOAD WISHLIST DATA
+  // ============================================================================
+
+  loadWishlistData(): void {
     this.loading = true;
-    this.wishlistService.getWishlist()
+    this.error = '';
+
+    // Load rooms and offers in parallel
+    this.wishlistService.getWishlistRooms()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (items: any[]) => {
-          this.wishlistItems = items.map((item: any) => ({
-            id: item.wishlist_id?.toString() || `${item.item_type}${item.room_type_id || item.offer_id}`,
-            type: item.item_type,
-            name: item.name,
-            image: item.image || '/assets/placeholder.jpg',
-            price: item.price,
-            originalPrice: item.original_price,
-            discount: item.discount ? `${item.discount}% OFF` : undefined,
-            rating: item.rating,
-            reviews: item.review_count,
-            description: item.description,
-            dateAdded: item.created_at,
-            available: item.available !== false,
-          }));
-          this.filterItems();
-          this.loading = false;
+        next: (rooms: WishlistRoom[]) => {
+          this.wishlistRooms = rooms;
+          this.loadOffers();
         },
         error: (err) => {
-          console.error('Error loading wishlist:', err);
-          // Load fallback dummy data
-          this.wishlistItems = [
-            {
-              id: 'room1',
-              type: 'room',
-              name: 'Deluxe Room',
-              image: '/assets/room1.jpg',
-              price: 4500,
-              rating: 4.8,
-              reviews: 124,
-              description: 'Spacious deluxe room with sea view',
-              dateAdded: '2024-01-15',
-              available: true,
-            },
-            {
-              id: 'offer1',
-              type: 'offer',
-              name: 'Weekend Getaway Package',
-              image: '/assets/hotel_luxury.jpg',
-              price: 12000,
-              originalPrice: 15000,
-              discount: '20% OFF',
-              description: '2 nights stay + breakfast + spa access',
-              dateAdded: '2024-01-12',
-            },
-            {
-              id: 'room2',
-              type: 'room',
-              name: 'Executive Suite',
-              image: '/assets/room3.jpg',
-              price: 8500,
-              rating: 4.9,
-              reviews: 89,
-              description: 'Luxurious suite with premium amenities',
-              dateAdded: '2024-01-10',
-              available: true,
-            },
-          ];
-          this.filterItems();
+          console.error('Error loading wishlist rooms:', err);
+          this.wishlistRooms = [];
           this.loading = false;
+          this.error = 'Failed to load wishlist';
         }
       });
   }
 
-  switchTab(tab: 'all' | 'rooms' | 'offers'): void {
+  private loadOffers(): void {
+    this.wishlistService.getWishlistOffers()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (offers: WishlistOffer[]) => {
+          this.wishlistOffers = offers;
+          this.loading = false;
+        },
+        error: (err) => {
+          console.error('Error loading wishlist offers:', err);
+          this.wishlistOffers = [];
+          this.loading = false;
+          this.error = 'Failed to load offers';
+        }
+      });
+  }
+
+  // ============================================================================
+  // 🔹 TAB SWITCHING
+  // ============================================================================
+
+  switchTab(tab: 'rooms' | 'offers'): void {
     this.currentTab = tab;
-    this.filterItems();
   }
 
-  filterItems(): void {
-    let filtered = this.wishlistItems;
 
-    // Filter by tab
-    if (this.currentTab === 'rooms') {
-      filtered = filtered.filter((item) => item.type === 'room');
-    } else if (this.currentTab === 'offers') {
-      filtered = filtered.filter((item) => item.type === 'offer');
-    }
+  
 
-    // Filter by price
-    filtered = filtered.filter((item) => item.price >= this.minPriceFilter && item.price <= this.maxPriceFilter);
 
-    // Filter by availability
-    if (this.availabilityFilter === 'available' && this.currentTab === 'rooms') {
-      filtered = filtered.filter((item) => item.available);
-    }
 
-    this.filteredItems = filtered;
-  }
 
-  onSearchFiltersChanged(filters: SearchFilters): void {
-    let filtered = this.wishlistItems;
 
-    // Text search - search in item name and description
-    if (filters.searchText && filters.searchText.trim()) {
-      const searchTerm = filters.searchText.toLowerCase();
-      filtered = filtered.filter(item =>
-        item.name.toLowerCase().includes(searchTerm) ||
-        (item.description && item.description.toLowerCase().includes(searchTerm))
-      );
-    }
 
-    // Price filter
-    if (filters.priceMin !== undefined && filters.priceMin !== null) {
-      filtered = filtered.filter(item => item.price >= filters.priceMin!);
-    }
 
-    if (filters.priceMax !== undefined && filters.priceMax !== null) {
-      filtered = filtered.filter(item => item.price <= filters.priceMax!);
-    }
 
-    // Sort
-    if (filters.sortBy) {
-      filtered.sort((a, b) => {
-        switch (filters.sortBy) {
-          case 'price-low':
-            return a.price - b.price;
-          case 'price-high':
-            return b.price - a.price;
-          default:
-            return 0;
-        }
-      });
-    }
+  // ============================================================================
+  // 🔹 MODAL ACTIONS
+  // ============================================================================
 
-    this.filteredItems = filtered;
-  }
-
-  removeFromWishlist(itemId: string): void {
-    const item = this.wishlistItems.find((i) => i.id === itemId);
-    if (!item) return;
-
-    this.wishlistService.removeFromWishlist(parseInt(itemId))
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: () => {
-          const index = this.wishlistItems.findIndex((i) => i.id === itemId);
-          if (index > -1) {
-            this.wishlistItems.splice(index, 1);
-            this.filterItems();
-            alert('Item removed from wishlist');
-          }
-        },
-        error: (err) => {
-          console.error('Error removing from wishlist:', err);
-          // Still remove locally on error
-          const index = this.wishlistItems.findIndex((i) => i.id === itemId);
-          if (index > -1) {
-            this.wishlistItems.splice(index, 1);
-            this.filterItems();
-          }
-        }
-      });
-  }
-
-  viewDetails(item: WishlistItem): void {
-    this.selectedItem = item;
+  openRoomDetails(room: WishlistRoom): void {
+    this.selectedRoom = room;
     this.showDetailsModal = true;
   }
 
-  closeDetailsModal(): void {
+  closeRoomModal(): void {
     this.showDetailsModal = false;
-    this.selectedItem = null;
+    this.selectedRoom = null;
   }
 
-  bookNow(item: WishlistItem): void {
-    if (item.type === 'room') {
-      this.router.navigate(['/booking'], {
-        queryParams: { room_type_id: item.id },
+  openOfferDetails(offer: WishlistOffer): void {
+    this.selectedOffer = offer;
+    this.showOfferModal = true;
+  }
+
+  closeOfferModal(): void {
+    this.showOfferModal = false;
+    this.selectedOffer = null;
+  }
+
+  // ============================================================================
+  // 🔹 WISHLIST ACTIONS
+  // ============================================================================
+
+  removeFromWishlist(wishlistId: number): void {
+    if (!confirm('Remove this item from your wishlist?')) return;
+
+    this.wishlistService.removeFromWishlist(wishlistId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          // Remove from local arrays
+          this.wishlistRooms = this.wishlistRooms.filter(r => r.wishlist_id !== wishlistId);
+          this.wishlistOffers = this.wishlistOffers.filter(o => o.wishlist_id !== wishlistId);
+          alert('Item removed from wishlist');
+        },
+        error: (err) => {
+          console.error('Error removing from wishlist:', err);
+          alert('Failed to remove item');
+        }
       });
-    } else if (item.type === 'offer') {
-      this.router.navigate(['/booking'], {
-        queryParams: { offer_id: item.id },
-      });
-    }
   }
 
-  claimOffer(item: WishlistItem): void {
-    alert(`Claim offer: ${item.name}`);
-    this.bookNow(item);
+  bookRoom(room: WishlistRoom): void {
+    this.router.navigate(['/booking'], {
+      queryParams: { room_type_id: room.room_type_id },
+      state: { from: '/wishlist' }
+    });
   }
 
-  clearAllFilters(): void {
-    this.minPriceFilter = 0;
-    this.maxPriceFilter = 50000;
-    this.availabilityFilter = 'all';
-    this.filterItems();
+  bookOffer(offer: WishlistOffer): void {
+    this.router.navigate(['/booking'], {
+      queryParams: { offer_id: offer.offer_id },
+      state: { from: '/wishlist' }
+    });
   }
 
-  applyFilters(): void {
-    this.filterItems();
+  viewRoomDetails(roomTypeId: number): void {
+    this.router.navigate(['/room-details', roomTypeId], { state: { from: 'wishlist' } });
   }
 
-  getRoomCard(item: WishlistItem): string {
-    if (!item.rating) return 'No rating';
-    return `${item.rating}/5 (${item.reviews} reviews)`;
+  viewOfferDetails(offerId: number): void {
+    this.router.navigate(['/offer-details', offerId], { state: { from: 'wishlist' } });
   }
 
-  getDiscountBadge(item: WishlistItem): string {
-    if (item.discount) return item.discount;
-    if (item.originalPrice && item.price) {
-      const discount = Math.round(((item.originalPrice - item.price) / item.originalPrice) * 100);
-      return `${discount}% OFF`;
-    }
-    return '';
-  }
+  // ============================================================================
+  // 🔹 COUNTERS
+  // ============================================================================
 
   getRoomCount(): number {
-    return this.wishlistItems.filter((item) => item.type === 'room').length;
+    return this.wishlistRooms.length;
   }
 
   getOfferCount(): number {
-    return this.wishlistItems.filter((item) => item.type === 'offer').length;
+    return this.wishlistOffers.length;
+  }
+
+  getTotalCount(): number {
+    return this.getRoomCount() + this.getOfferCount();
+  }
+
+  // ============================================================================
+  // 🔹 HELPER METHODS
+  // ============================================================================
+
+  isOfferExpired(offer: WishlistOffer): boolean {
+    const today = new Date();
+    return new Date(offer.valid_to) < today;
+  }
+
+  getRoomTypesText(offer: WishlistOffer): string {
+    if (!offer.room_types || offer.room_types.length === 0) {
+      return 'Various rooms';
+    }
+    return offer.room_types.map((rt: any) => `Room ${rt.room_type_id}`).join(', ');
   }
 }

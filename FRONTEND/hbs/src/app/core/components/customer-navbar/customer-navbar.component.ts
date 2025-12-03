@@ -175,7 +175,8 @@ export class CustomerNavbarComponent implements OnInit, OnDestroy {
       queryParams: {
         checkIn: this.checkIn,
         checkOut: this.checkOut
-      }
+      },
+      state: { from: this.router.url }
     });
   }
 

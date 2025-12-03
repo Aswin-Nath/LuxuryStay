@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -6,23 +6,24 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { RoomsService } from '../../core/services/rooms/rooms.service';
 import { WishlistService } from '../../services/wishlist.service';
-import { ImageService } from '../../services/image.service';
 import { CustomerNavbarComponent } from '../../core/components/customer-navbar/customer-navbar.component';
 import { CustomerSidebarComponent } from '../../core/components/customer-sidebar/customer-sidebar.component';
-import { CustomerSearchComponent, SearchFilters } from '../customer-search/customer-search.component';
 
-interface RoomType {
+export interface RoomType {
   room_type_id: number;
   type_name: string;
   description: string;
   price_per_night: number;
   max_adult_count: number;
   max_child_count: number;
+  square_ft?: number;
   total_count?: number;
   image_url?: string;
+  is_saved_to_wishlist?: boolean;
+  wishlist_id?: number;  // ID to use for removing from wishlist
 }
 
-interface Review {
+export interface Review {
   reviewer_name: string;
   rating: number;
   comment: string;
@@ -32,36 +33,34 @@ interface Review {
 @Component({
   selector: 'app-room-display',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, CustomerNavbarComponent, CustomerSearchComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, CustomerNavbarComponent],
   templateUrl: './room-display.component.html',
   styleUrl: './room-display.component.css',
 })
 export class RoomDisplayComponent implements OnInit, OnDestroy {
+  @ViewChild(CustomerNavbarComponent) navbarComponent!: CustomerNavbarComponent;
   roomTypes: RoomType[] = [];
   filteredRoomTypes: RoomType[] = [];
   loading = true;
+  loadingRoomTypes = false;
   error = '';
 
-  // Unified search filters
-  searchFilters: SearchFilters = {
-    searchText: '',
-    priceMin: undefined,
-    priceMax: undefined,
-    sortBy: 'newest',
-  };
-
-  // Deprecated filters (kept for compatibility with existing filter logic)
-  priceRangeFilter: string = 'all';
-  roomTypeFilter: string = 'all';
-  occupancyFilter: string = 'all';
-  amenitiesFilter: string = 'all';
-  sortByFilter: string = 'newest';
+  // Advanced filter properties
+  selectedRoomTypeId: number | null = null;
+  minPrice: number | null = null;
+  maxPrice: number | null = null;
+  minAdults: number | null = null;
+  minChildren: number | null = null;
+  minSquareFt: number | null = null;
+  maxSquareFt: number | null = null;
 
   // Details modal
   showDetailsModal = false;
   selectedRoom: RoomType | null = null;
   selectedRoomDetails: any = null;
-
+  viewRoomDetails(Room: RoomType): void {
+    this.router.navigate(['/room-details', Room.room_type_id], { state: { from: 'rooms' } });
+  }
   // Reviews modal
   showReviewsModal = false;
   reviews: Review[] = [
@@ -97,6 +96,7 @@ export class RoomDisplayComponent implements OnInit, OnDestroy {
 
   // Image loading
   roomImages = new Map<number, string>(); // room_type_id -> image_url
+  roomReviews = new Map<number, { rating: number; count: number }>(); // room_type_id -> {rating, count}
 
   private destroy$ = new Subject<void>();
 
@@ -104,8 +104,7 @@ export class RoomDisplayComponent implements OnInit, OnDestroy {
     private router: Router,
     private route: ActivatedRoute,
     private roomsService: RoomsService,
-    private wishlistService: WishlistService,
-    private imageService: ImageService
+    private wishlistService: WishlistService
   ) {}
 
   ngOnInit(): void {
@@ -118,8 +117,25 @@ export class RoomDisplayComponent implements OnInit, OnDestroy {
   }
 
   loadRoomTypes(): void {
+    this.loadingRoomTypes = true;
+    this.applyFilters();
+  }
+
+  applyFilters(): void {
     this.loading = true;
-    this.roomsService.getRoomTypes()
+    
+    // Build filter parameters
+    const filters = {
+      room_type_id: this.selectedRoomTypeId,
+      price_min: this.minPrice,
+      price_max: this.maxPrice,
+      adult_count: this.minAdults,
+      child_count: this.minChildren,
+      square_ft_min: this.minSquareFt,
+      square_ft_max: this.maxSquareFt,
+    };
+
+    this.roomsService.getRoomTypesCustomer(filters)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (roomTypes: any[]) => {
@@ -131,163 +147,81 @@ export class RoomDisplayComponent implements OnInit, OnDestroy {
             max_adult_count: rt.max_adult_count,
             max_child_count: rt.max_child_count,
             total_count: rt.total_count,
+            square_ft: rt.square_ft,
+            is_saved_to_wishlist: rt.is_saved_to_wishlist || false,
+            wishlist_id: rt.wishlist_id,
           }));
           
-          // Load images for each room type
-          this.roomTypes.forEach(room => {
-            this.imageService.getPrimaryRoomTypeImageUrl(room.room_type_id)
-              .pipe(takeUntil(this.destroy$))
-              .subscribe({
-                next: (imageUrl: string | null) => {
-                  if (imageUrl) {
-                    this.roomImages.set(room.room_type_id, imageUrl);
+          // Fetch all images and reviews in a single call (optimization)
+          this.roomsService.getRoomMedias()
+            .pipe(takeUntil(this.destroy$))
+            .subscribe({
+              next: (medias: any) => {
+                // Process images and reviews for all room types
+                for (const [roomTypeId, mediaData] of Object.entries(medias)) {
+                  const id = parseInt(roomTypeId, 10);
+                  const media = mediaData as any;
+                  
+                  // Process images - get primary image URL
+                  if (media.images && media.images.length > 0) {
+                    const primaryImage = media.images.find((img: any) => img.is_primary);
+                    const imageUrl = primaryImage?.image_url || media.images[0]?.image_url;
+                    if (imageUrl) {
+                      this.roomImages.set(id, imageUrl);
+                    }
                   }
-                },
-                error: (err) => {
-                  console.warn(`Failed to load image for room ${room.room_type_id}:`, err);
-                  // Set default placeholder if image load fails
-                  this.roomImages.set(room.room_type_id, 'assets/images/placeholder-room.jpg');
+                  
+                  // Process reviews - calculate average rating
+                  if (media.reviews && media.reviews.length > 0) {
+                    const avgRating = media.reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / media.reviews.length;
+                    this.roomReviews.set(id, {
+                      rating: Math.round(avgRating * 10) / 10,
+                      count: media.reviews.length
+                    });
+                  } else {
+                    this.roomReviews.set(id, { rating: 0, count: 0 });
+                  }
                 }
-              });
-          });
-          
-          this.applyFilters();
-          this.loading = false;
+                
+                this.filteredRoomTypes = this.roomTypes;
+                this.loading = false;
+                this.loadingRoomTypes = false;
+              },
+              error: (err) => {
+                console.warn('Failed to load room medias:', err);
+                // Set defaults if medias fail to load
+                this.roomTypes.forEach(room => {
+                  this.roomImages.set(room.room_type_id, 'assets/images/placeholder-room.jpg');
+                  this.roomReviews.set(room.room_type_id, { rating: 0, count: 0 });
+                });
+                this.filteredRoomTypes = this.roomTypes;
+                this.loading = false;
+                this.loadingRoomTypes = false;
+              }
+            });
         },
         error: (err) => {
           console.error('Error loading room types:', err);
-          // Load fallback dummy data
-          this.roomTypes = [
-            {
-              room_type_id: 1,
-              type_name: 'Deluxe Room',
-              description: 'Spacious deluxe room with sea view, queen-size bed, and modern decor.',
-              price_per_night: 4500,
-              max_adult_count: 2,
-              max_child_count: 1,
-            },
-            {
-              room_type_id: 2,
-              type_name: 'Executive Suite',
-              description: 'Luxurious suite with premium amenities, sitting area, and balcony.',
-              price_per_night: 8500,
-              max_adult_count: 4,
-              max_child_count: 2,
-            },
-            {
-              room_type_id: 3,
-              type_name: 'Presidential Suite',
-              description: 'Ultra-premium suite with dedicated concierge, spa bath, and panoramic views.',
-              price_per_night: 15000,
-              max_adult_count: 4,
-              max_child_count: 3,
-            },
-          ];
-          this.applyFilters();
+          // Fall back to client-side filtering with existing data
           this.loading = false;
+          this.loadingRoomTypes = false;
         }
       });
-  }
-
-  applyFilters(): void {
-    let filtered = [...this.roomTypes];
-
-    // Price range filter
-    if (this.priceRangeFilter !== 'all') {
-      filtered = filtered.filter((room) => {
-        const price = room.price_per_night;
-        switch (this.priceRangeFilter) {
-          case 'budget':
-            return price < 5000;
-          case 'moderate':
-            return price >= 5000 && price < 10000;
-          case 'luxury':
-            return price >= 10000;
-          default:
-            return true;
-        }
-      });
-    }
-
-    // Occupancy filter
-    if (this.occupancyFilter !== 'all') {
-      filtered = filtered.filter((room) => {
-        const occupancy = parseInt(this.occupancyFilter);
-        return room.max_adult_count >= occupancy;
-      });
-    }
-
-    // Sort
-    filtered.sort((a, b) => {
-      switch (this.sortByFilter) {
-        case 'price-low':
-          return a.price_per_night - b.price_per_night;
-        case 'price-high':
-          return b.price_per_night - a.price_per_night;
-        default:
-          return 0;
-      }
-    });
-
-    this.filteredRoomTypes = filtered;
   }
 
   resetFilters(): void {
-    this.priceRangeFilter = 'all';
-    this.roomTypeFilter = 'all';
-    this.occupancyFilter = 'all';
-    this.amenitiesFilter = 'all';
-    this.sortByFilter = 'newest';
-    this.searchFilters = {
-      searchText: '',
-      priceMin: undefined,
-      priceMax: undefined,
-      sortBy: 'newest',
-    };
+    this.selectedRoomTypeId = null;
+    this.minPrice = null;
+    this.maxPrice = null;
+    this.minAdults = null;
+    this.minChildren = null;
+    this.minSquareFt = null;
+    this.maxSquareFt = null;
     this.applyFilters();
   }
 
-  onSearchFiltersChanged(filters: SearchFilters): void {
-    this.searchFilters = filters;
-    this.applyUnifiedFilters();
-  }
-
-  applyUnifiedFilters(): void {
-    let filtered = [...this.roomTypes];
-
-    // Text search - search in room name and description
-    if (this.searchFilters.searchText && this.searchFilters.searchText.trim()) {
-      const searchTerm = this.searchFilters.searchText.toLowerCase();
-      filtered = filtered.filter(room =>
-        room.type_name.toLowerCase().includes(searchTerm) ||
-        room.description.toLowerCase().includes(searchTerm)
-      );
-    }
-
-    // Price filter
-    if (this.searchFilters.priceMin !== undefined && this.searchFilters.priceMin !== null) {
-      filtered = filtered.filter(room => room.price_per_night >= this.searchFilters.priceMin!);
-    }
-
-    if (this.searchFilters.priceMax !== undefined && this.searchFilters.priceMax !== null) {
-      filtered = filtered.filter(room => room.price_per_night <= this.searchFilters.priceMax!);
-    }
-
-    // Sort
-    if (this.searchFilters.sortBy) {
-      filtered.sort((a, b) => {
-        switch (this.searchFilters.sortBy) {
-          case 'price-low':
-            return a.price_per_night - b.price_per_night;
-          case 'price-high':
-            return b.price_per_night - a.price_per_night;
-          default:
-            return 0;
-        }
-      });
-    }
-
-    this.filteredRoomTypes = filtered;
+  onFilterChange(): void {
+    this.applyFilters();
   }
 
   openDetailsModal(room: RoomType): void {
@@ -324,28 +258,41 @@ export class RoomDisplayComponent implements OnInit, OnDestroy {
   }
 
   saveRoom(room: RoomType): void {
-    this.wishlistService.addRoomToWishlist(room.room_type_id)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: (res) => {
-          alert(`${room.type_name} saved to wishlist!`);
-        },
-        error: (err) => {
-          console.error('Error saving to wishlist:', err);
-          alert(`${room.type_name} saved to wishlist!`);
-        }
-      });
+    if (room.is_saved_to_wishlist && room.wishlist_id) {
+      // Remove from wishlist using wishlist_id
+      this.wishlistService.removeFromWishlist(room.wishlist_id)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: () => {
+            room.is_saved_to_wishlist = false;
+            room.wishlist_id = undefined;
+          },
+          error: (err: any) => {
+            console.error('Error removing from wishlist:', err);
+          }
+        });
+    } else {
+      // Add to wishlist
+      this.wishlistService.addRoomToWishlist(room.room_type_id)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: (res: any) => {
+            room.is_saved_to_wishlist = true;
+            room.wishlist_id = res.wishlist_id;
+          },
+          error: (err: any) => {
+            console.error('Error saving to wishlist:', err);
+          }
+        });
+    }
   }
 
   openBookingModal(room: RoomType): void {
-    this.selectedRoom = room;
-    this.bookingModalOpen = true;
-    this.selectedRoomsForBooking = [{ room_index: 0, adults: 1, children: 0 }];
+    this.navbarComponent?.openBookingModal();
   }
 
   closeBookingModal(): void {
-    this.bookingModalOpen = false;
-    this.selectedRoom = null;
+    this.navbarComponent?.closeBookingModal();
   }
 
   addRoomToBooking(): void {
@@ -382,6 +329,7 @@ export class RoomDisplayComponent implements OnInit, OnDestroy {
     if (!this.selectedRoom) return;
     this.router.navigate(['/booking'], {
       queryParams: { room_type_id: this.selectedRoom.room_type_id },
+      state: { from: '/rooms' }
     });
   }
 

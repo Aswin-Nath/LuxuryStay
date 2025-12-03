@@ -71,7 +71,14 @@ class RoomTypeResponse(RoomTypeCreate):
     is_deleted: bool
     created_at: datetime
     updated_at: datetime
-
+    description:str
+    price_per_night:float
+    square_ft:int
+    max_adult_count:int
+    max_child_count:int
+    type_name:str
+    is_saved_to_wishlist: bool = False  # Whether current user has saved this to wishlist
+    wishlist_id: Optional[int] = None  # Wishlist entry ID if user has saved this to wishlist
     model_config = {
         "from_attributes": True,
         "extra": "ignore"  # Ignore extra attributes from ORM (like amenities relationship)

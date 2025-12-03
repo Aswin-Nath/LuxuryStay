@@ -4,6 +4,8 @@
 # ==============================================================
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+from sqlalchemy import select
 from app.crud.offers import (
     insert_offer,
     fetch_offer_by_id,
@@ -27,9 +29,33 @@ from app.core.exceptions import (
     ForbiddenException,
 )
 from app.schemas.pydantic_models.offers import OfferCreate, OfferUpdate, OfferResponse
+from app.models.sqlalchemy_schemas.rooms import RoomTypes
 from datetime import date
 from typing import Optional, List
 from decimal import Decimal
+
+
+# ============================================================
+# HELPER FUNCTIONS
+# ============================================================
+async def _enrich_offer_room_types(db: AsyncSession, offer) -> None:
+    """Enrich offer's room_types with pricing and names from database"""
+    if offer.room_types:
+        for room_type_config in offer.room_types:
+            room_type_id = room_type_config.get('room_type_id')
+            
+            # Fetch room type details
+            stmt = select(RoomTypes).where(
+                (RoomTypes.room_type_id == room_type_id) &
+                (RoomTypes.is_deleted.is_(False))
+            )
+            result = await db.execute(stmt)
+            room_type = result.scalars().first()
+            
+            if room_type:
+                # Add type_name and price_per_night to room_type_config
+                room_type_config['type_name'] = room_type.type_name
+                room_type_config['price_per_night'] = float(room_type.price_per_night)
 
 
 # ============================================================
@@ -85,13 +111,32 @@ async def svc_create_offer(db: AsyncSession, payload: OfferCreate) -> OfferRespo
 # ============================================================
 # READ
 # ============================================================
-async def svc_get_offer(db: AsyncSession, offer_id: int) -> OfferResponse:
-    """Get offer by ID"""
+async def svc_get_offer(db: AsyncSession, offer_id: int, user_id: Optional[int] = None) -> OfferResponse:
+    """Get offer by ID with enriched room type details and wishlist status"""
+    from app.crud.wishlist import get_wishlist_by_user_and_item
+    
     offer = await fetch_offer_by_id(db, offer_id)
     if not offer:
         raise NotFoundException(f"Offer {offer_id} not found")
     
-    return OfferResponse.model_validate(offer)
+    # Enrich room_types with pricing and names
+    await _enrich_offer_room_types(db, offer)
+    
+    # Check wishlist status if user_id provided
+    is_saved = False
+    if user_id:
+        wishlist_entry = await get_wishlist_by_user_and_item(
+            db,
+            user_id=user_id,
+            offer_id=offer_id
+        )
+        is_saved = wishlist_entry is not None
+    
+    # Convert to response and add wishlist status
+    response = OfferResponse.model_validate(offer)
+    response.is_saved_to_wishlist = is_saved
+    
+    return response
 
 
 async def svc_list_offers(
@@ -104,8 +149,11 @@ async def svc_list_offers(
     valid_from: Optional[date] = None,
     valid_to: Optional[date] = None,
     room_type_id: Optional[int] = None,
+    user_id: Optional[int] = None,
 ) -> List[OfferResponse]:
-    """List offers with advanced filtering (AND-based)"""
+    """List offers with advanced filtering (AND-based) and wishlist status"""
+    from app.crud.wishlist import get_wishlist_by_user_and_item
+    
     offers = await fetch_all_offers(
         db,
         skip=skip,
@@ -117,19 +165,74 @@ async def svc_list_offers(
         valid_to=valid_to,
         room_type_id=room_type_id,
     )
-    return [OfferResponse.model_validate(offer) for offer in offers]
+    # Enrich all offers with room type details
+    response_list = []
+    for offer in offers:
+        await _enrich_offer_room_types(db, offer)
+        response = OfferResponse.model_validate(offer)
+        
+        # Check wishlist status if user_id provided
+        if user_id:
+            wishlist_entry = await get_wishlist_by_user_and_item(
+                db,
+                user_id=user_id,
+                offer_id=offer.offer_id
+            )
+            response.is_saved_to_wishlist = wishlist_entry is not None
+            if wishlist_entry:
+                response.wishlist_id = wishlist_entry.wishlist_id
+        
+        response_list.append(response)
+    
+    return response_list
 
 
-async def svc_get_active_offers_for_date(db: AsyncSession, check_date: date) -> List[OfferResponse]:
-    """Get all offers active on a specific date"""
+async def svc_get_active_offers_for_date(db: AsyncSession, check_date: date, user_id: Optional[int] = None) -> List[OfferResponse]:
+    """Get all offers active on a specific date with wishlist status"""
+    from app.crud.wishlist import get_wishlist_by_user_and_item
+    
     offers = await fetch_active_offers_for_date(db, check_date)
-    return [OfferResponse.model_validate(offer) for offer in offers]
+    response_list = []
+    for offer in offers:
+        await _enrich_offer_room_types(db, offer)
+        response = OfferResponse.model_validate(offer)
+        
+        # Check wishlist status if user_id provided
+        if user_id:
+            wishlist_entry = await get_wishlist_by_user_and_item(
+                db,
+                user_id=user_id,
+                offer_id=offer.offer_id
+            )
+            response.is_saved_to_wishlist = wishlist_entry is not None
+        
+        response_list.append(response)
+    
+    return response_list
 
 
-async def svc_get_offers_for_room_type(db: AsyncSession, room_type_id: int) -> List[OfferResponse]:
-    """Get all active offers for a specific room type"""
+async def svc_get_offers_for_room_type(db: AsyncSession, room_type_id: int, user_id: Optional[int] = None) -> List[OfferResponse]:
+    """Get all active offers for a specific room type with wishlist status"""
+    from app.crud.wishlist import get_wishlist_by_user_and_item
+    
     offers = await fetch_offers_by_room_type(db, room_type_id)
-    return [OfferResponse.model_validate(offer) for offer in offers]
+    response_list = []
+    for offer in offers:
+        await _enrich_offer_room_types(db, offer)
+        response = OfferResponse.model_validate(offer)
+        
+        # Check wishlist status if user_id provided
+        if user_id:
+            wishlist_entry = await get_wishlist_by_user_and_item(
+                db,
+                user_id=user_id,
+                offer_id=offer.offer_id
+            )
+            response.is_saved_to_wishlist = wishlist_entry is not None
+        
+        response_list.append(response)
+    
+    return response_list
 
 
 # ============================================================

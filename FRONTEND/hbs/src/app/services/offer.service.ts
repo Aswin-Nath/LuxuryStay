@@ -172,11 +172,13 @@ export class OfferService {
     limit: number = 100,
     filters?: {
       searchTerm?: string;
+      isActive?: boolean;
       minDiscount?: number;
       maxDiscount?: number;
       startDate?: string;
       endDate?: string;
       roomTypeId?: number;
+      sortBy?: string;
     }
   ): Observable<OfferListItem[]> {
     let params = new HttpParams()
@@ -187,6 +189,9 @@ export class OfferService {
     if (filters) {
       if (filters.searchTerm) {
         params = params.set('search', filters.searchTerm);
+      }
+      if (filters.isActive !== undefined) {
+        params = params.set('is_active', filters.isActive.toString());
       }
       if (filters.minDiscount !== undefined) {
         params = params.set('min_discount', filters.minDiscount.toString());
@@ -202,6 +207,9 @@ export class OfferService {
       }
       if (filters.roomTypeId) {
         params = params.set('room_type_id', filters.roomTypeId.toString());
+      }
+      if (filters.sortBy) {
+        params = params.set('sort_by', filters.sortBy);
       }
     }
 
@@ -240,6 +248,27 @@ export class OfferService {
   getAvailableRoomsForType(roomTypeId: number): Observable<{ available_count: number }> {
     return this.http.get<{ available_count: number }>(
       `${environment.apiUrl}/room-management/room-types/${roomTypeId}/available`
+    );
+  }
+
+  // ===============================================
+  // MEDIA OPERATIONS (Optimized batch fetch)
+  // ===============================================
+
+  /**
+   * Get images for all offers in a single optimized call.
+   * This fetches all offer images at once instead of calling getOfferImages() for each offer.
+   * 
+   * Returns:
+   * {
+   *   "offer_id": {
+   *     "images": [...]
+   *   }
+   * }
+   */
+  getOfferMedias(): Observable<{ [offer_id: number]: { images: any[] } }> {
+    return this.http.get<{ [offer_id: number]: { images: any[] } }>(
+      `${this.apiUrl}/medias`
     );
   }
 

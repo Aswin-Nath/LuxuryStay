@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -6,10 +6,9 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { OfferService } from '../../services/offer.service';
 import { WishlistService } from '../../services/wishlist.service';
-import { ImageService } from '../../services/image.service';
+import { RoomsService } from '../../core/services/rooms/rooms.service';
 import { CustomerNavbarComponent } from '../../core/components/customer-navbar/customer-navbar.component';
 import { CustomerSidebarComponent } from '../../core/components/customer-sidebar/customer-sidebar.component';
-import { CustomerSearchComponent, SearchFilters } from '../customer-search/customer-search.component';
 
 interface Offer {
   offer_id: number;
@@ -23,36 +22,43 @@ interface Offer {
   current_uses: number;
   room_types?: Array<any>;
   image_url?: string;
+  is_saved_to_wishlist?: boolean;
+  wishlist_id?: number;  // ID to use for removing from wishlist
+}
+
+export interface RoomType {
+  room_type_id: number;
+  type_name: string;
+  description?: string;
+  price_per_night?: number;
+  max_adult_count?: number;
+  max_child_count?: number;
 }
 
 @Component({
   selector: 'app-offer-display',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, CustomerNavbarComponent, CustomerSearchComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, CustomerNavbarComponent],
   templateUrl: './offer-display.component.html',
   styleUrl: './offer-display.component.css',
 })
 export class OfferDisplayComponent implements OnInit, OnDestroy {
+  @ViewChild(CustomerNavbarComponent) navbarComponent!: CustomerNavbarComponent;
   offers: Offer[] = [];
   filteredOffers: Offer[] = [];
   loading = true;
+  loadingRoomTypes = false;
   error = '';
+  roomTypes: RoomType[] = [];
   
-  // Unified search filters
-  searchFilters: SearchFilters = {
-    searchText: '',
-    priceMin: undefined,
-    priceMax: undefined,
-    discountMin: undefined,
-    discountMax: undefined,
-    sortBy: 'newest',
-  };
-
-  // Deprecated filter properties (kept for compatibility)
-  packageTypeFilter: string = 'all';
-  priceRangeFilter: string = 'all';
-  durationFilter: string = 'all';
-  sortByFilter: string = 'newest';
+  // Advanced filter properties
+  filterActive: string = 'all';
+  minDiscount: number | null = null;
+  maxDiscount: number | null = null;
+  startDate: string | null = null;
+  endDate: string | null = null;
+  selectedRoomTypeId: number | null = null;
+  sortBy: string = 'date';
 
   // Booking modal
   bookingModalOpen = false;
@@ -67,12 +73,13 @@ export class OfferDisplayComponent implements OnInit, OnDestroy {
   constructor(
     private offerService: OfferService,
     private wishlistService: WishlistService,
-    private imageService: ImageService,
+    private roomsService: RoomsService,
     private router: Router,
     private route: ActivatedRoute
   ) {}
 
   ngOnInit(): void {
+    this.loadRoomTypes();
     this.loadOffers();
   }
 
@@ -81,10 +88,62 @@ export class OfferDisplayComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  loadOffers(): void {
+  loadRoomTypes(): void {
+    this.loadingRoomTypes = true;
+    this.roomsService.getRoomTypes()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (roomTypes: any[]) => {
+          this.roomTypes = roomTypes;
+          this.loadingRoomTypes = false;
+        },
+        error: (err: any) => {
+          console.error('Error loading room types:', err);
+          this.loadingRoomTypes = false;
+        }
+      });
+  }
+
+  loadOffers(skip: number = 0, limit: number = 100): void {
     this.loading = true;
+    
+    // Build filter object from advanced filter criteria
+    const filters: any = {};
+    
+    // Active filter
+    if (this.filterActive !== 'all') {
+      filters.isActive = this.filterActive === 'active';
+    }
+    
+    // Discount range
+    if (this.minDiscount !== null && this.minDiscount !== undefined) {
+      filters.minDiscount = this.minDiscount;
+    }
+    if (this.maxDiscount !== null && this.maxDiscount !== undefined) {
+      filters.maxDiscount = this.maxDiscount;
+    }
+    
+    // Date range
+    if (this.startDate) {
+      filters.startDate = this.startDate;
+    }
+    if (this.endDate) {
+      filters.endDate = this.endDate;
+    }
+    
+    // Room type filter
+    if (this.selectedRoomTypeId !== null && this.selectedRoomTypeId !== undefined) {
+      filters.roomTypeId = this.selectedRoomTypeId;
+    }
+    
+    // Sort
+    if (this.sortBy) {
+      filters.sortBy = this.sortBy;
+    }
+    
+    // Call backend with filters
     this.offerService
-      .listOffers(0, 100)
+      .listOffersCustomer(skip, limit, filters)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (offersList: any) => {
@@ -94,28 +153,39 @@ export class OfferDisplayComponent implements OnInit, OnDestroy {
             room_types: o.room_types || [],
           }));
           
-          // Load images for each offer
-          this.offers.forEach(offer => {
-            this.imageService.getPrimaryOfferImageUrl(offer.offer_id)
-              .pipe(takeUntil(this.destroy$))
-              .subscribe({
-                next: (imageUrl: string | null) => {
-                  if (imageUrl) {
-                    this.offerImages.set(offer.offer_id, imageUrl);
-                  }
-                },
-                error: (err) => {
-                  console.warn(`Failed to load image for offer ${offer.offer_id}:`, err);
-                  // Set default placeholder if image load fails
-                  this.offerImages.set(offer.offer_id, 'assets/images/placeholder-offer.jpg');
-                }
-              });
-          });
+          this.filteredOffers = [...this.offers];
           
-          this.applyFilters();
+          // Load all offer medias in a single optimized call
+          this.offerService.getOfferMedias()
+            .pipe(takeUntil(this.destroy$))
+            .subscribe({
+              next: (medias: any) => {
+                // Process medias: extract primary image for each offer
+                for (const offer of this.offers) {
+                  const offerMedias = medias[offer.offer_id];
+                  if (offerMedias && offerMedias.images && offerMedias.images.length > 0) {
+                    // Find primary image or use first one
+                    const primaryImage = offerMedias.images.find((img: any) => img.is_primary);
+                    const imageUrl = (primaryImage || offerMedias.images[0]).image_url;
+                    this.offerImages.set(offer.offer_id, imageUrl);
+                  } else {
+                    // Fallback to placeholder
+                    this.offerImages.set(offer.offer_id, 'assets/images/placeholder-offer.jpg');
+                  }
+                }
+              },
+              error: (err: any) => {
+                console.warn('Failed to load offer medias:', err);
+                // Fallback: set placeholders for all offers
+                this.offers.forEach(offer => {
+                  this.offerImages.set(offer.offer_id, 'assets/images/placeholder-offer.jpg');
+                });
+              }
+            });
+          
           this.loading = false;
         },
-        error: (err) => {
+        error: (err: any) => {
           this.error = 'Failed to load offers';
           console.error(err);
           this.loading = false;
@@ -123,118 +193,27 @@ export class OfferDisplayComponent implements OnInit, OnDestroy {
       });
   }
 
-  applyFilters(): void {
-    let filtered = [...this.offers];
-
-    // Package type filter
-    if (this.packageTypeFilter !== 'all') {
-      filtered = filtered.filter(
-        (o) => o.offer_name.toLowerCase().includes(this.packageTypeFilter.toLowerCase())
-      );
-    }
-
-    // Price range filter
-    if (this.priceRangeFilter !== 'all') {
-      filtered = filtered.filter((o) => {
-        const basePrice = o.discount_percent;
-        switch (this.priceRangeFilter) {
-          case 'low':
-            return basePrice < 10;
-          case 'medium':
-            return basePrice >= 10 && basePrice < 20;
-          case 'high':
-            return basePrice >= 20;
-          default:
-            return true;
-        }
-      });
-    }
-
-    // Sort
-    filtered.sort((a, b) => {
-      switch (this.sortByFilter) {
-        case 'newest':
-          return new Date(b.valid_from).getTime() - new Date(a.valid_from).getTime();
-        case 'highest-discount':
-          return b.discount_percent - a.discount_percent;
-        case 'lowest-discount':
-          return a.discount_percent - b.discount_percent;
-        default:
-          return 0;
-      }
-    });
-
-    this.filteredOffers = filtered;
+  onFilterChange(): void {
+    this.loadOffers();
   }
 
   resetFilters(): void {
-    this.packageTypeFilter = 'all';
-    this.priceRangeFilter = 'all';
-    this.durationFilter = 'all';
-    this.sortByFilter = 'newest';
-    this.searchFilters = {
-      searchText: '',
-      priceMin: undefined,
-      priceMax: undefined,
-      discountMin: undefined,
-      discountMax: undefined,
-      sortBy: 'newest',
-    };
-    this.applyFilters();
-  }
-
-  onSearchFiltersChanged(filters: SearchFilters): void {
-    this.searchFilters = filters;
-    this.applyUnifiedFilters();
-  }
-
-  applyUnifiedFilters(): void {
-    let filtered = [...this.offers];
-
-    // Text search - search in offer name and description
-    if (this.searchFilters.searchText && this.searchFilters.searchText.trim()) {
-      const searchTerm = this.searchFilters.searchText.toLowerCase();
-      filtered = filtered.filter(offer =>
-        offer.offer_name.toLowerCase().includes(searchTerm) ||
-        offer.description.toLowerCase().includes(searchTerm)
-      );
-    }
-
-    // Discount range filter
-    if (this.searchFilters.discountMin !== undefined && this.searchFilters.discountMin !== null) {
-      filtered = filtered.filter(offer => offer.discount_percent >= this.searchFilters.discountMin!);
-    }
-
-    if (this.searchFilters.discountMax !== undefined && this.searchFilters.discountMax !== null) {
-      filtered = filtered.filter(offer => offer.discount_percent <= this.searchFilters.discountMax!);
-    }
-
-    // Sort
-    if (this.searchFilters.sortBy) {
-      filtered.sort((a, b) => {
-        switch (this.searchFilters.sortBy) {
-          case 'highest-discount':
-            return b.discount_percent - a.discount_percent;
-          case 'lowest-discount':
-            return a.discount_percent - b.discount_percent;
-          default:
-            return new Date(b.valid_from).getTime() - new Date(a.valid_from).getTime();
-        }
-      });
-    }
-
-    this.filteredOffers = filtered;
+    this.filterActive = 'all';
+    this.minDiscount = null;
+    this.maxDiscount = null;
+    this.startDate = null;
+    this.endDate = null;
+    this.selectedRoomTypeId = null;
+    this.sortBy = 'date';
+    this.loadOffers();
   }
 
   openBookingModal(offer: Offer): void {
-    this.selectedOffer = offer;
-    this.bookingModalOpen = true;
-    this.selectedRooms = [{ room_index: 0, adults: 1, children: 0 }];
+    this.navbarComponent?.openBookingModal();
   }
 
   closeBookingModal(): void {
-    this.bookingModalOpen = false;
-    this.selectedOffer = null;
+    this.navbarComponent?.closeBookingModal();
   }
 
   addRoom(): void {
@@ -262,25 +241,56 @@ export class OfferDisplayComponent implements OnInit, OnDestroy {
     // Navigate to booking page with selected offer
     this.router.navigate(['/booking'], {
       queryParams: { offer_id: this.selectedOffer.offer_id },
+      state: { from: '/offers' }
     });
   }
 
   saveToWishlist(offer: Offer): void {
-    this.wishlistService.addOfferToWishlist(offer.offer_id)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: (res) => {
-          alert(`Saved "${offer.offer_name}" to wishlist!`);
-        },
-        error: (err) => {
-          console.error('Error saving to wishlist:', err);
-          alert(`Saved "${offer.offer_name}" to wishlist!`);
-        }
-      });
+    if (offer.is_saved_to_wishlist && offer.wishlist_id) {
+      // Remove from wishlist using wishlist_id - OPTIMISTIC UPDATE
+      const previousState = offer.is_saved_to_wishlist;
+      const previousWishlistId = offer.wishlist_id;
+      
+      // Update UI immediately (optimistic)
+      offer.is_saved_to_wishlist = false;
+      offer.wishlist_id = undefined;
+      
+      this.wishlistService.removeFromWishlist(previousWishlistId)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: () => {
+            // Success - UI already updated optimistically
+          },
+          error: (err: any) => {
+            // Revert on error
+            offer.is_saved_to_wishlist = previousState;
+            offer.wishlist_id = previousWishlistId;
+            console.error('Error removing from wishlist:', err);
+          }
+        });
+    } else {
+      // Add to wishlist - OPTIMISTIC UPDATE
+      // Update UI immediately (optimistic)
+      offer.is_saved_to_wishlist = true;
+      
+      this.wishlistService.addOfferToWishlist(offer.offer_id)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: (res: any) => {
+            offer.wishlist_id = res.wishlist_id;
+          },
+          error: (err: any) => {
+            // Revert on error
+            offer.is_saved_to_wishlist = false;
+            offer.wishlist_id = undefined;
+            console.error('Error saving to wishlist:', err);
+          }
+        });
+    }
   }
 
   viewOfferDetails(offer: Offer): void {
-    this.router.navigate([`/admin/offers/view/${offer.offer_id}`]);
+    this.router.navigate(['/offer-details', offer.offer_id], { state: { from: 'offer-display' } });
   }
 
   getRoomTypesText(offer: Offer): string {

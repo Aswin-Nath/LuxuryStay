@@ -321,61 +321,162 @@
     </div>
 
     <!-- Review Section (Only for Staying or Checked Out) -->
-    <div *ngIf="canShowReview()" class="bg-white rounded-2xl border-2 border-yellow-400 p-6 shadow-sm mb-8">
-      <h3 class="text-lg font-semibold text-yellow-700 mb-4">Write a Review</h3>
-      <form (ngSubmit)="submitReview()" #reviewForm="ngForm" class="space-y-4">
-        <!-- Rating Input -->
-        <div class="space-y-2">
-          <label class="block text-sm font-medium text-gray-700">Your Rating</label>
-          <div class="flex gap-2" id="starRating">
+    <div *ngIf="canShowReview()" class="space-y-6 mb-8">
+      <!-- Existing Review Display (Google-style) -->
+      <div *ngIf="existingReview && !reviewsLoading" class="bg-white rounded-2xl border-2 border-blue-400 p-6 shadow-sm">
+        <h3 class="text-lg font-semibold text-blue-700 mb-4">Your Review</h3>
+        <div class="space-y-4">
+          <!-- Customer Review Card -->
+          <div class="bg-gray-50 rounded-lg p-4">
+            <div class="flex items-start justify-between mb-3">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center font-bold text-white">
+                  {{ (existingReview.user?.full_name || 'U')[0].toUpperCase() }}
+                </div>
+                <div>
+                  <p class="font-semibold text-gray-800">{{ existingReview.user?.full_name || 'You' }}</p>
+                  <p class="text-xs text-gray-500">{{ existingReview.created_at | date: 'short' }}</p>
+                </div>
+              </div>
+              <div class="flex gap-1">
+                <span *ngFor="let i of [1,2,3,4,5]" class="text-lg" [ngClass]="i <= existingReview.rating ? 'text-yellow-400' : 'text-gray-300'">★</span>
+              </div>
+            </div>
+            <p class="text-gray-700 mb-3">{{ existingReview.comment }}</p>
+
+            <!-- User Review Images -->
+            <div *ngIf="existingReview.images && existingReview.images.length > 0" class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+              <div *ngFor="let image of existingReview.images" class="relative group">
+                <img [src]="image.image_url" alt="Review image" class="w-full h-24 object-cover rounded-lg">
+              </div>
+            </div>
+          </div>
+
+          <!-- Admin Response (if exists) -->
+          <div *ngIf="existingReview.admin_response" class="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-500">
+            <div class="flex items-start gap-3 mb-3">
+              <div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center font-bold text-white">
+                A
+              </div>
+              <div>
+                <p class="font-semibold text-blue-800">Admin Response</p>
+                <p class="text-xs text-blue-600">{{ existingReview.responded_at | date: 'short' }}</p>
+              </div>
+            </div>
+            <p class="text-gray-700 mb-3">{{ existingReview.admin_response }}</p>
+
+            <!-- Admin Response Images -->
+            <div *ngIf="existingReview.admin_response_images && existingReview.admin_response_images.length > 0" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div *ngFor="let image of existingReview.admin_response_images" class="relative group">
+                <img [src]="image.image_url" alt="Admin response image" class="w-full h-24 object-cover rounded-lg">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Review Loading State -->
+      <div *ngIf="reviewsLoading" class="bg-white rounded-2xl border-2 border-yellow-400 p-6 shadow-sm">
+        <div class="flex items-center justify-center py-4">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600 mr-3"></div>
+          <p class="text-gray-600">Loading reviews...</p>
+        </div>
+      </div>
+
+      <!-- Review Submission Form (only show if no review exists) -->
+      <div *ngIf="!existingReview && !reviewsLoading" class="bg-white rounded-2xl border-2 border-yellow-400 p-6 shadow-sm">
+        <h3 class="text-lg font-semibold text-yellow-700 mb-4">Write a Review</h3>
+        <form (ngSubmit)="submitReview()" #reviewForm="ngForm" class="space-y-4">
+          <!-- Rating Input -->
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Your Rating</label>
+            <div class="flex gap-2" id="starRating">
+              <button
+                *ngFor="let star of [1, 2, 3, 4, 5]"
+                type="button"
+                (click)="setRating(star)"
+                [ngClass]="star <= (selectedRating || 0) ? 'text-yellow-400' : 'text-gray-300'"
+                class="text-4xl cursor-pointer hover:text-yellow-400 transition-colors"
+              >
+                ★
+              </button>
+            </div>
+            <p class="text-sm text-gray-500">
+              {{ selectedRating > 0 ? ratingTexts[selectedRating] : 'Click to rate your experience' }}
+            </p>
+          </div>
+
+          <!-- Review Text -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Your Review</label>
+            <textarea
+              [(ngModel)]="reviewText"
+              name="reviewText"
+              maxlength="200"
+              rows="3"
+              placeholder="Share your experience (max 200 characters)"
+              class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 resize-none"
+            ></textarea>
+            <p class="text-sm text-gray-500 text-right mt-1">
+              {{ (reviewText || '').length }}/200
+            </p>
+          </div>
+
+          <!-- Image Upload -->
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Upload Images (Optional)</label>
+            <label class="block">
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                (change)="onReviewImageSelect($event)"
+                class="hidden"
+              />
+              <div class="border-2 border-dashed border-yellow-300 rounded-lg p-4 text-center cursor-pointer hover:bg-yellow-50 transition">
+                <span class="material-icons text-3xl text-yellow-600 block mb-2">image</span>
+                <p class="text-sm font-medium text-gray-700">Click to upload images</p>
+                <p class="text-xs text-gray-500">Max 5 images, 5MB each</p>
+              </div>
+            </label>
+
+            <!-- Image Previews -->
+            <div *ngIf="reviewImagePreviews.length > 0" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div *ngFor="let preview of reviewImagePreviews; let i = index" class="relative group">
+                <img [src]="preview" alt="Preview" class="w-full h-24 object-cover rounded-lg">
+                <button
+                  type="button"
+                  (click)="removeReviewImage(i)"
+                  class="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
+                >
+                  <span class="material-icons text-sm">close</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-3">
             <button
-              *ngFor="let star of [1, 2, 3, 4, 5]"
               type="button"
-              (click)="setRating(star)"
-              [ngClass]="star <= (selectedRating || 0) ? 'text-yellow-400' : 'text-gray-300'"
-              class="text-4xl cursor-pointer hover:text-yellow-400 transition-colors"
+              (click)="resetReview()"
+              class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg shadow"
             >
-              ★
+              Reset
+            </button>
+            <button
+              type="submit"
+              [disabled]="selectedRating === 0 || !reviewText || reviewText.trim().length === 0 || isSubmittingReview"
+              class="bg-linear-to-r from-yellow-500 to-pink-500 text-white px-6 py-2 rounded-lg shadow hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              <span *ngIf="!isSubmittingReview">Submit Review</span>
+              <span *ngIf="isSubmittingReview" class="flex items-center gap-2">
+                <span class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                Submitting...
+              </span>
             </button>
           </div>
-          <p class="text-sm text-gray-500">
-            {{ selectedRating > 0 ? ratingTexts[selectedRating] : 'Click to rate your experience' }}
-          </p>
-        </div>
-
-        <!-- Review Text -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Your Review</label>
-          <textarea
-            [(ngModel)]="reviewText"
-            name="reviewText"
-            maxlength="200"
-            rows="3"
-            placeholder="Share your experience (max 200 characters)"
-            class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 resize-none"
-          ></textarea>
-          <p class="text-sm text-gray-500 text-right mt-1">
-            {{ (reviewText || '').length }}/200
-          </p>
-        </div>
-
-        <div class="flex justify-end gap-3">
-          <button
-            type="button"
-            (click)="resetReview()"
-            class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg shadow"
-          >
-            Reset
-          </button>
-          <button
-            type="submit"
-            [disabled]="selectedRating === 0 || !reviewText || reviewText.trim().length === 0"
-            class="bg-linear-to-r from-yellow-500 to-pink-500 text-white px-6 py-2 rounded-lg shadow hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Submit Review
-          </button>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
 
     </div>

@@ -33,6 +33,7 @@ class ReviewResponse(ReviewBase):
     updated_at: datetime
     is_deleted: bool = False
     images: Optional[List[ImageResponse]] = []
+    admin_response_images: Optional[List[ImageResponse]] = []
     # Pydantic v2: allow constructing from ORM/SQLAlchemy objects
     model_config = {"from_attributes": True}
 

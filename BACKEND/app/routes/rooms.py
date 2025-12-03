@@ -215,20 +215,34 @@ async def get_room_types(
     room_type_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
     token_payload: dict = Security(check_permission, scopes=["ROOM_MANAGEMENT:WRITE"]),
+    _current_user: Users = Depends(get_current_user),
 ):
+    from app.crud.wishlist import get_wishlist_by_user_and_item
+    
     if room_type_id is not None:
         room_type_record = await svc_get_room_type(db, room_type_id)
         room_type_dict = to_dict_safe(room_type_record)
+        # Check wishlist status
+        wishlist_entry = await get_wishlist_by_user_and_item(
+            db, 
+            user_id=_current_user.user_id,
+            room_type_id=room_type_id
+        )
+        room_type_dict['is_saved_to_wishlist'] = wishlist_entry is not None
         return [RoomTypeResponse.model_validate(room_type_dict)]
 
-    cache_key = "room_types:all"
-    cached = await get_cached(cache_key)
-    if cached:
-        return cached
-
     items = await svc_list_room_types(db)
-    response_list = [RoomTypeResponse.model_validate(to_dict_safe(r)).model_copy(update={"message": "Fetched successfully"}) for r in items]
-    await set_cached(cache_key, response_list, ttl=300)
+    response_list = []
+    for r in items:
+        room_dict = to_dict_safe(r)
+        wishlist_entry = await get_wishlist_by_user_and_item(
+            db, 
+            user_id=_current_user.user_id,
+            room_type_id=r.room_type_id
+        )
+        room_dict['is_saved_to_wishlist'] = wishlist_entry is not None
+        response_list.append(RoomTypeResponse.model_validate(room_dict))
+    
     return response_list
 
 
@@ -236,11 +250,22 @@ async def get_room_types(
 async def get_room_type_by_id(
     room_type_id: int,
     db: AsyncSession = Depends(get_db),
-    token_payload: dict = Security(check_permission, scopes=["ROOM_MANAGEMENT:READ"]),
+    _current_user: Users = Depends(get_current_user),
 ):
-    """Fetch a single room type by ID"""
+    """Fetch a single room type by ID with wishlist status"""
+    from app.crud.wishlist import get_wishlist_by_user_and_item
+    
     room_type_record = await svc_get_room_type(db, room_type_id)
     room_type_dict = to_dict_safe(room_type_record)
+    
+    # Check wishlist status for current user
+    wishlist_entry = await get_wishlist_by_user_and_item(
+        db, 
+        user_id=_current_user.user_id,
+        room_type_id=room_type_id
+    )
+    room_type_dict['is_saved_to_wishlist'] = wishlist_entry is not None
+    
     return RoomTypeResponse.model_validate(room_type_dict)
 
 
@@ -375,16 +400,88 @@ async def list_room_types_public(
 ):
     """
     Get all room types (public endpoint for dropdowns, requires auth).
+    Includes wishlist status for the current user.
     """
-    cache_key = "room_types:public:all"
-    cached = await get_cached(cache_key)
-    if cached:
-        return cached
-
+    from app.crud.wishlist import get_wishlist_by_user_and_item
+    
     items = await svc_list_room_types(db)
-    response_list = [RoomTypeResponse.model_validate(to_dict_safe(r)) for r in items]
-    await set_cached(cache_key, response_list, ttl=300)
+    response_list = []
+    
+    for r in items:
+        room_dict = to_dict_safe(r)
+        # Check if current user has this room in their wishlist
+        wishlist_entry = await get_wishlist_by_user_and_item(
+            db, 
+            user_id=_current_user.user_id,
+            room_type_id=r.room_type_id
+        )
+        room_dict['is_saved_to_wishlist'] = wishlist_entry is not None
+        if wishlist_entry:
+            room_dict['wishlist_id'] = wishlist_entry.wishlist_id
+        response_list.append(RoomTypeResponse.model_validate(room_dict))
+    
     return response_list
+
+
+# ==========================================================
+# 📸 ROOM MEDIAS (Images + Reviews for all room types)
+# ==========================================================
+@router.get("/room-medias")
+async def get_room_medias(
+    db: AsyncSession = Depends(get_db),
+    _current_user: Users = Depends(get_current_user),
+):
+    """
+    Get images and reviews for all room types in a single optimized call.
+    
+    Returns a dictionary mapping room_type_id to their images and reviews.
+    This endpoint optimizes the N+2 problem by fetching all media data in one call
+    instead of calling /images and /reviews separately for each room type.
+    
+    Returns:
+        {
+            "room_type_id": {
+                "images": [...],
+                "reviews": [...]
+            }
+        }
+    """
+    from app.utils.images_util import get_images_for_entity
+    from app.crud.reviews import fetch_reviews_filtered
+    
+    # Get all room types
+    room_types = await svc_list_room_types(db)
+    
+    medias = {}
+    
+    # For each room type, fetch images and reviews
+    for room in room_types:
+        images = await get_images_for_entity(db, entity_type="room_type", entity_id=room.room_type_id)
+        reviews = await fetch_reviews_filtered(db, room_type_id=room.room_type_id)
+        
+        medias[room.room_type_id] = {
+            "images": [
+                {
+                    "image_id": img.image_id,
+                    "image_url": img.image_url,
+                    "is_primary": img.is_primary,
+                    "caption": img.caption,
+                }
+                for img in images
+            ],
+            "reviews": [
+                {
+                    "review_id": rev.review_id,
+                    "rating": rev.rating,
+                    "comment": rev.comment,
+                    "user_id": rev.user_id,
+                    "created_at": rev.created_at.isoformat() if rev.created_at else None,
+                }
+                for rev in reviews
+            ]
+        }
+    
+    return medias
 
 
 # ==========================================================

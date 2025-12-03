@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { BookingsService, BookingResponse } from '../../../services/bookings.service';
+import { ReviewsService, Review } from '../../../services/reviews.service';
 import { CustomerNavbarComponent } from '../../../core/components/customer-navbar/customer-navbar.component';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -31,6 +32,12 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
     4: 'Very Good - Exceeded expectations',
     5: 'Excellent - Outstanding experience'
   };
+  reviews: Review[] = [];
+  existingReview: Review | null = null;
+  isSubmittingReview: boolean = false;
+  reviewsLoading: boolean = false;
+  selectedReviewImages: File[] = [];
+  reviewImagePreviews: string[] = [];
 
   // Issue properties
   issueTitle: string = '';
@@ -44,6 +51,7 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
 
   constructor(
     private bookingsService: BookingsService,
+    private reviewsService: ReviewsService,
     private route: ActivatedRoute,
     private router: Router
   ) {}
@@ -101,12 +109,37 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
             });
           }
           this.loadPayments();
+          this.loadReviews();
           this.isLoading = false;
         },
         error: (err: any) => {
           console.error('Error loading booking details:', err);
           this.error = 'Failed to load booking details. Please try again.';
           this.isLoading = false;
+        }
+      });
+  }
+
+  private loadReviews(): void {
+    if (!this.booking) return;
+
+    this.reviewsLoading = true;
+    this.reviewsService
+      .getReviewsByBooking(this.bookingId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (reviews: Review[]) => {
+          this.reviews = reviews;
+          if (reviews.length > 0) {
+            this.existingReview = reviews[0]; // Show the first review (only one per booking)
+          }
+          this.reviewsLoading = false;
+          console.log("Reviews",this.reviews);
+        },
+        error: (err: any) => {
+          console.error('Error loading reviews:', err);
+          this.reviews = [];
+          this.reviewsLoading = false;
         }
       });
   }
@@ -391,25 +424,98 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
     this.selectedRating = rating;
   }
 
+  onReviewImageSelect(event: any): void {
+    const files = Array.from(event.target.files) as File[];
+    files.forEach((file: File) => {
+      // Check file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        this.showToast(`File ${file.name} is too large. Max 5MB allowed.`, 'error');
+        return;
+      }
+
+      this.selectedReviewImages.push(file);
+
+      // Generate preview
+      const reader = new FileReader();
+      reader.onload = (e: any) => {
+        this.reviewImagePreviews.push(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  removeReviewImage(index: number): void {
+    this.selectedReviewImages.splice(index, 1);
+    this.reviewImagePreviews.splice(index, 1);
+  }
+
   submitReview(): void {
     if (this.selectedRating === 0 || !this.reviewText || this.reviewText.trim().length === 0) {
       this.showToast('Please provide a rating and review text', 'error');
       return;
     }
 
-    console.log('Review submitted:', {
-      rating: this.selectedRating,
-      text: this.reviewText,
-      bookingId: this.booking?.booking_id
-    });
+    if (this.existingReview) {
+      this.showToast('You can only submit one review per booking', 'error');
+      return;
+    }
 
-    this.showToast('Review submitted successfully! Thank you for your feedback.', 'success');
-    this.resetReview();
+    this.isSubmittingReview = true;
+
+    // Get the first room type from the booking to associate with the review
+    const roomTypeId = this.booking?.rooms?.[0]?.room_type_id || 0;
+
+    const reviewPayload = {
+      booking_id: this.bookingId,
+      rating: this.selectedRating,
+      comment: this.reviewText,
+      room_type_id: roomTypeId
+    };
+
+    this.reviewsService
+      .createReview(reviewPayload)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (review: Review) => {
+          // Upload images if any
+          if (this.selectedReviewImages.length > 0) {
+            this.reviewsService
+              .uploadReviewImages(review.review_id, this.selectedReviewImages)
+              .pipe(takeUntil(this.destroy$))
+              .subscribe({
+                next: () => {
+                  this.showToast('Review submitted successfully with images!', 'success');
+                  this.resetReview();
+                  this.loadReviews();
+                  this.isSubmittingReview = false;
+                },
+                error: (err) => {
+                  console.error('Error uploading images:', err);
+                  this.showToast('Review submitted but image upload failed', 'error');
+                  this.isSubmittingReview = false;
+                  this.loadReviews();
+                }
+              });
+          } else {
+            this.showToast('Review submitted successfully!', 'success');
+            this.resetReview();
+            this.loadReviews();
+            this.isSubmittingReview = false;
+          }
+        },
+        error: (err) => {
+          console.error('Error submitting review:', err);
+          this.showToast('Failed to submit review. Please try again.', 'error');
+          this.isSubmittingReview = false;
+        }
+      });
   }
 
   resetReview(): void {
     this.selectedRating = 0;
     this.reviewText = '';
+    this.selectedReviewImages = [];
+    this.reviewImagePreviews = [];
   }
 
   // ✅ Issue Modal Methods

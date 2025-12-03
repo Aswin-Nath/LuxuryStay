@@ -162,13 +162,22 @@ export class BookingComponent implements OnInit, OnDestroy {
   // Protection flags for date change logic
   private isInitialLoad = true;
   private isProcessingDateChange = false;
+  
+  // Track previous page for cancel navigation
+  previousPage = '/';
 
   constructor(
     public bookingService: BookingService,
     private router: Router,
     private route: ActivatedRoute,
     private cdr: ChangeDetectorRef
-  ) {}
+  ) {
+    // Get previousPage from router state
+    const navigation = this.router.getCurrentNavigation();
+    if (navigation?.extras?.state?.['from']) {
+      this.previousPage = navigation.extras.state['from'];
+    }
+  }
 
   ngOnInit(): void {
     // Load user profile details for optional use in booking
@@ -265,9 +274,9 @@ export class BookingComponent implements OnInit, OnDestroy {
 
   closeeDatePickerModal(): void {
     this.showDatePickerModal = false;
-    // If came from navbar and user clicks cancel, go back to home
+    // Navigate to previous page or home if from navbar
     if (this.fromNavbar) {
-      this.router.navigate(['/']);
+      this.router.navigate([this.previousPage]);
     }
   }
 
@@ -1622,11 +1631,11 @@ export class BookingComponent implements OnInit, OnDestroy {
     this.roomGuestDetails = {};
   }
 
-  // Stop booking and go back to home
+  // Stop booking and go back to previous page
   stopBooking(): void {
     // If no rooms selected, just navigate back
     if (this.getTotalSelectedRooms() === 0) {
-      this.router.navigate(['/']);
+      this.router.navigate([this.previousPage]);
       return;
     }
 
@@ -1639,13 +1648,13 @@ export class BookingComponent implements OnInit, OnDestroy {
         next: () => {
           console.log('✅ All locks released');
           this.resetBooking();
-          this.router.navigate(['/']);
+          this.router.navigate([this.previousPage]);
         },
         error: (err) => {
           console.error('Error releasing locks:', err);
           // Still navigate even if lock release fails
           this.resetBooking();
-          this.router.navigate(['/']);
+          this.router.navigate([this.previousPage]);
         }
       });
     }

@@ -7,6 +7,8 @@ from decimal import Decimal
 class RoomTypeOffer(BaseModel):
     """Single room type offer configuration"""
     room_type_id: int
+    type_name: Optional[str] = None  # Room type name, populated on response
+    price_per_night: Optional[Decimal] = None  # Room type price, populated on response
     available_count: int = Field(..., gt=0, le=5, description="Number of rooms to allocate for this offer (max 5 total across all types)")
     discount_percent: Decimal = Field(..., ge=0, le=100, description="Discount percentage for this room type")
 
@@ -69,6 +71,8 @@ class OfferResponse(BaseModel):
     is_deleted: bool
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    is_saved_to_wishlist: bool = False  # Whether current user has saved this to wishlist
+    wishlist_id: Optional[int] = None  # Wishlist entry ID if user has saved this to wishlist
 
     class Config:
         from_attributes = True
@@ -85,6 +89,8 @@ class OfferListResponse(BaseModel):
     valid_to: date
     current_uses: int
     max_uses: Optional[int]
+    is_saved_to_wishlist: bool = False  # Whether current user has saved this to wishlist
+    wishlist_id: Optional[int] = None  # Wishlist entry ID if user has saved this to wishlist
 
     class Config:
         from_attributes = True

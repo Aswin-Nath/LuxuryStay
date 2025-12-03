@@ -1,21 +1,130 @@
 <app-customer-navbar></app-customer-navbar>
 
-<div class="min-h-screen bg-gray-50">
+<div class="py-8  sm:py-12 max-w-7xl mx-auto px-4 sm:px-6 mt-8 sm:mt-10">
   <!-- Hero Section -->
-  <section class="px-4 sm:px-6 max-w-7xl mx-auto pt-24 pb-8 text-center">
-    <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-4">Our Rooms</h1>
-    <p class="text-gray-600 text-base sm:text-lg max-w-2xl mx-auto">
-      Discover our collection of beautifully designed rooms tailored for your comfort
-    </p>
-  </section>
+  <!-- ✅ Room Details Header -->
+  <header class="relative rounded-3xl bg-linear-to-r mb-8 from-yellow-400 via-red-400 to-red-500 py-12 sm:py-20 text-center text-white shadow-md mt-6 sm:mt-4 overflow-hidden">
+    <div class="relative z-10">
+      <h1 class="text-3xl sm:text-5xl font-extrabold drop-shadow-lg">Room Details</h1>
+      <p class="text-base sm:text-lg mt-3 opacity-95">Choose the perfect room tailored to your needs</p>
 
-  <!-- Unified Search/Filter Section -->
-  <section class="px-4 sm:px-6 max-w-7xl mx-auto mb-8">
-    <app-customer-search 
-      searchType="rooms"
-      (filtersChanged)="onSearchFiltersChanged($event)">
-    </app-customer-search>
-  </section>
+      <!-- ✅ Sub Banner Badges -->
+      <div class="mt-6 flex flex-wrap justify-center gap-3">
+        <span class="bg-white text-yellow-600 px-4 py-2 rounded-full text-xs sm:text-sm font-medium shadow">🛏️ Best Comfort</span>
+        <span class="bg-white text-red-600 px-4 py-2 rounded-full text-xs sm:text-sm font-medium shadow">🌟 Top Choice</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Filters & Search -->
+  <div class="advanced-filters bg-white rounded-lg border border-gray-200 p-4 mb-4">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-sm font-semibold text-gray-700">Advanced Filters</h3>
+      <button (click)="resetFilters()" class="text-xs text-yellow-600 hover:text-yellow-700 underline">
+        Reset All
+      </button>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+      <!-- Room Type Filter -->
+      <div class="filter-group">
+        <label class="block text-xs font-medium text-gray-600 mb-1">Room Type</label>
+        <select
+          [(ngModel)]="selectedRoomTypeId"
+          class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+          [disabled]="loadingRoomTypes"
+        >
+          <option [ngValue]="null">All</option>
+          <option *ngFor="let rt of roomTypes" [ngValue]="rt.room_type_id">
+            {{ rt.type_name }}
+          </option>
+        </select>
+      </div>
+
+      <!-- Min Price -->
+      <div class="filter-group">
+        <label class="block text-xs font-medium text-gray-600 mb-1">Min Price (₹)</label>
+        <input
+          type="number"
+          min="0"
+          placeholder="Min price"
+          [(ngModel)]="minPrice"
+          class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+        />
+      </div>
+
+      <!-- Max Price -->
+      <div class="filter-group">
+        <label class="block text-xs font-medium text-gray-600 mb-1">Max Price (₹)</label>
+        <input
+          type="number"
+          min="0"
+          placeholder="Max price"
+          [(ngModel)]="maxPrice"
+          class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+        />
+      </div>
+
+      <!-- Min Adults -->
+      <div class="filter-group">
+        <label class="block text-xs font-medium text-gray-600 mb-1">Min Adults</label>
+        <input
+          type="number"
+          min="1"
+          placeholder="Min adults"
+          [(ngModel)]="minAdults"
+          class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+        />
+      </div>
+
+      <!-- Min Children -->
+      <div class="filter-group">
+        <label class="block text-xs font-medium text-gray-600 mb-1">Min Children</label>
+        <input
+          type="number"
+          min="0"
+          placeholder="Min children"
+          [(ngModel)]="minChildren"
+          class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+        />
+      </div>
+
+      <!-- Min Sq Ft -->
+      <div class="filter-group">
+        <label class="block text-xs font-medium text-gray-600 mb-1">Min Sq Ft</label>
+        <input
+          type="number"
+          min="0"
+          placeholder="Min sq ft"
+          [(ngModel)]="minSquareFt"
+          class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+        />
+      </div>
+
+      <!-- Max Sq Ft -->
+      <div class="filter-group">
+        <label class="block text-xs font-medium text-gray-600 mb-1">Max Sq Ft</label>
+        <input
+          type="number"
+          min="0"
+          placeholder="Max sq ft"
+          [(ngModel)]="maxSquareFt"
+          class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+        />
+      </div>
+
+      <!-- Search Button -->
+      <div class="filter-group flex items-end">
+        <button
+          (click)="onFilterChange()"
+          class="w-full px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-xs font-medium transition flex items-center justify-center gap-1"
+        >
+          <span class="material-icons text-sm">search</span>
+          Search
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Loading State -->
   <div *ngIf="loading" class="flex justify-center items-center h-96">
@@ -73,14 +182,17 @@
                 <span class="material-icons text-yellow-600 text-base shrink-0">aspect_ratio</span>
                 <div>
                   <p class="font-medium text-gray-800">Room Size</p>
-                  <p>28-45 Sq.mt</p>
+                  <p>{{ room.square_ft || 'N/A' }} Sq.ft</p>
                 </div>
               </div>
               <div class="flex items-start gap-2">
                 <span class="material-icons text-yellow-600 text-base shrink-0">star</span>
                 <div>
                   <p class="font-medium text-gray-800">Rating</p>
-                  <p class="text-green-600 font-semibold">4.8/5 (127 reviews)</p>
+                  <p class="text-green-600 font-semibold" *ngIf="roomReviews.get(room.room_type_id); let reviewData">
+                    {{ reviewData.count > 0 ? (reviewData.rating + '/5 (' + reviewData.count + ' reviews)') : 'No reviews yet' }}
+                  </p>
+                  <p class="text-gray-500" *ngIf="!roomReviews.get(room.room_type_id)">Loading...</p>
                 </div>
               </div>
             </div>
@@ -92,24 +204,11 @@
           <!-- Action Buttons -->
           <div class="flex flex-col sm:flex-row gap-3">
             <button
-              (click)="openDetailsModal(room)"
-              class="flex-1 px-4 py-2 sm:py-3 border border-yellow-600 text-yellow-600 font-semibold rounded-lg hover:bg-yellow-50 transition text-sm sm:text-base"
+              (click)="viewRoomDetails(room)"
+              class="flex-1 px-4 py-2 sm:py-3 bg-linear-to-r from-red-600 to-red-700 text-white font-semibold rounded-lg hover:from-red-700 hover:to-red-800 transition text-sm sm:text-base flex items-center justify-center gap-2"
             >
-              <span class="material-icons text-sm align-middle mr-1">info</span>
-              Room Details
-            </button>
-            <button
-              (click)="openReviewsModal()"
-              class="flex-1 px-4 py-2 sm:py-3 border border-yellow-600 text-yellow-600 font-semibold rounded-lg hover:bg-yellow-50 transition text-sm sm:text-base"
-            >
-              <span class="material-icons text-sm align-middle mr-1">star</span>
-              Reviews
-            </button>
-            <button
-              (click)="saveRoom(room)"
-              class="px-4 py-2 sm:py-3 border border-yellow-600 text-yellow-600 font-semibold rounded-lg hover:bg-yellow-50 transition text-sm sm:text-base"
-            >
-              <span class="material-icons text-sm align-middle">favorite</span>
+              <span class="material-icons text-sm">open_in_new</span>
+              View Details
             </button>
             <button
               (click)="openBookingModal(room)"
@@ -117,6 +216,13 @@
             >
               <span class="material-icons text-sm align-middle mr-1">shopping_cart</span>
               Book Now
+            </button>
+            <button
+              (click)="saveRoom(room)"
+              [class.bg-red-50]="room.is_saved_to_wishlist"
+              class="px-4 py-2 sm:py-3 border border-yellow-600 text-yellow-600 font-semibold rounded-lg hover:bg-yellow-50 transition text-sm sm:text-base"
+            >
+              <span class="material-icons text-sm align-middle" [style.color]="room.is_saved_to_wishlist ? '#ef4444' : 'currentColor'">{{ room.is_saved_to_wishlist ? 'favorite' : 'favorite_border' }}</span>
             </button>
           </div>
         </div>

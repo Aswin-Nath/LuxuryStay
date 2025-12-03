@@ -25,6 +25,16 @@ export class WishlistService {
     return this.http.get<WishlistItem[]>(`${this.apiUrl}`);
   }
 
+  // Get wishlist rooms with full details and primary image
+  getWishlistRooms(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/rooms`);
+  }
+
+  // Get wishlist offers with full details and primary image
+  getWishlistOffers(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/offers`);
+  }
+
   // Add room to wishlist
   addRoomToWishlist(room_type_id: number): Observable<WishlistItem> {
     return this.http.post<WishlistItem>(`${this.apiUrl}`, {

@@ -4,27 +4,33 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
 import { CustomerNavbarComponent } from '../../../core/components/customer-navbar/customer-navbar.component';
 import { CustomerSidebarComponent } from '../../../core/components/customer-sidebar/customer-sidebar.component';
+import { BookingsService } from '../../../services/bookings.service';
+import { OfferService } from '../../../services/offer.service';
+import { ProfileService } from '../../../core/services/profile/profile.service';
+import { WishlistService } from '../../../services/wishlist.service';
+import { takeUntil } from 'rxjs/operators';
+import { Subject } from 'rxjs';
 
 interface Booking {
-  id: string;
-  roomType: string;
-  roomNo: string;
-  checkIn: string;
-  checkOut: string;
-  guests: string;
-  rooms: number;
+  booking_id: string;
+  room_type_name?: string;
+  room_numbers?: string;
+  check_in: string;
+  check_out: string;
+  guest_count?: string;
+  number_of_rooms?: number;
 }
 
 interface Offer {
-  id: string;
-  title: string;
+  offer_id: number;
+  offer_name: string;
   description: string;
-  discount: string;
-  discountType: 'percent' | 'special';
-  imageUrl: string;
-  validTill: string;
-  buttonColor: string;
-  isSaved: boolean;
+  discount_percent: number;
+  valid_to: string;
+  imageUrl?: string;
+  isSaved?: boolean;
+  wishlist_id?: number;
+  is_saved_to_wishlist?: boolean;
 }
 
 @Component({
@@ -36,9 +42,9 @@ interface Offer {
 })
 export class CustomerDashboardComponent implements OnInit {
   // Stats
-  bookingsCount = 3;
-  offersCount = 6;
-  rewardPoints = 2450;
+  bookingsCount = 0;
+  offersCount = 0;
+  rewardPoints = 0;
 
   // Date picker modal properties
   showDatePickerModal: boolean = false;
@@ -47,52 +53,13 @@ export class CustomerDashboardComponent implements OnInit {
   datePickerError: string = '';
 
   // Upcoming Bookings
-  upcomingBookings: Booking[] = [
-    {
-      id: 'BK001',
-      roomType: 'Deluxe Room',
-      roomNo: '205',
-      checkIn: '10th Oct 2025, 2:00 PM',
-      checkOut: '13th Oct 2025, 11:00 AM',
-      guests: '2 Adults, 1 Child',
-      rooms: 1
-    },
-    {
-      id: 'BK002',
-      roomType: 'Standard Rooms',
-      roomNo: '110, 111',
-      checkIn: '20th Nov 2025, 3:00 PM',
-      checkOut: '24th Nov 2025, 12:00 PM',
-      guests: '4 Adults',
-      rooms: 2
-    }
-  ];
+  upcomingBookings: Booking[] = [];
 
   // Offers
-  offers: Offer[] = [
-    {
-      id: 'offer1',
-      title: 'Breakfast Inclusive Rate',
-      description: 'Wake up to a symphony of flavours with our breakfast spread.',
-      discount: '20% OFF',
-      discountType: 'percent',
-      imageUrl: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80',
-      validTill: 'Dec 31',
-      buttonColor: 'bg-yellow-500 hover:bg-yellow-600',
-      isSaved: false
-    },
-    {
-      id: 'offer2',
-      title: 'Romantic Getaway',
-      description: 'Special package for couples with wine & candlelight dinner.',
-      discount: 'Special',
-      discountType: 'special',
-      imageUrl: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80',
-      validTill: 'Jan 15',
-      buttonColor: 'bg-pink-500 hover:bg-pink-600',
-      isSaved: false
-    }
-  ];
+  offers: Offer[] = [];
+  
+  // Offer images map
+  offerImages = new Map<number, string>();
 
   // Toast
   showToast = false;
@@ -100,39 +67,170 @@ export class CustomerDashboardComponent implements OnInit {
   toastType: 'success' | 'error' | 'info' = 'success';
 
   currentPage = 'dashboard';
+  isLoading = true;
+  private destroy$ = new Subject<void>();
 
-  constructor(private router: Router) { }
+  constructor(
+    private router: Router,
+    private bookingsService: BookingsService,
+    private offerService: OfferService,
+    private profileService: ProfileService,
+    private wishlistService: WishlistService
+  ) { }
 
   ngOnInit(): void {
-    this.loadSavedOffers();
+    this.loadDashboardData();
   }
 
-  loadSavedOffers(): void {
-    const savedOffers = JSON.parse(localStorage.getItem('savedOffers') || '[]');
-    this.offers.forEach(offer => {
-      offer.isSaved = savedOffers.includes(offer.id);
-    });
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  loadDashboardData(): void {
+    this.isLoading = true;
+    
+    // Load user profile for loyalty points
+    this.profileService.getProfile()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (profile: any) => {
+          this.rewardPoints = profile.loyalty_points || 0;
+        },
+        error: (err: any) => {
+          console.error('Error loading profile:', err);
+        }
+      });
+
+    // Load recent bookings
+    this.bookingsService.getCustomerBookings()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (bookings: any[]) => {
+          // Filter upcoming bookings (check_out date is in future)
+          const now = new Date();
+          this.upcomingBookings = bookings
+            .filter(b => new Date(b.check_out) > now)
+            .slice(0, 3);  // Show only 3 most recent
+          
+          this.bookingsCount = bookings.length;
+        },
+        error: (err: any) => {
+          console.error('Error loading bookings:', err);
+          this.upcomingBookings = [];
+        }
+      });
+
+    // Load active offers with image medias
+    this.offerService.listOffersCustomer(0, 6, { isActive: true })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (offers: any[]) => {
+          // Filter offers that have not passed their valid_to date
+          const now = new Date();
+          this.offers = offers
+            .filter(o => new Date(o.valid_to) >= now)
+            .map(o => ({
+              offer_id: o.offer_id,
+              offer_name: o.offer_name,
+              description: o.description || 'Special offer',
+              discount_percent: o.discount_percent,
+              valid_to: o.valid_to,
+              isSaved: o.is_saved_to_wishlist || false,
+              is_saved_to_wishlist: o.is_saved_to_wishlist || false,
+              wishlist_id: o.wishlist_id
+            }));
+          this.offersCount = this.offers.length;
+          
+          // Load offer medias to get images
+          this.offerService.getOfferMedias()
+            .pipe(takeUntil(this.destroy$))
+            .subscribe({
+              next: (medias: any) => {
+                // Process medias: extract primary image for each offer
+                for (const offer of this.offers) {
+                  const offerMedias = medias[offer.offer_id];
+                  if (offerMedias && offerMedias.images && offerMedias.images.length > 0) {
+                    // Find primary image or use first one
+                    const primaryImage = offerMedias.images.find((img: any) => img.is_primary);
+                    const imageUrl = (primaryImage || offerMedias.images[0]).image_url;
+                    this.offerImages.set(offer.offer_id, imageUrl);
+                    offer.imageUrl = imageUrl;
+                  } else {
+                    // Fallback to placeholder
+                    this.offerImages.set(offer.offer_id, 'assets/images/placeholder-offer.jpg');
+                    offer.imageUrl = 'assets/images/placeholder-offer.jpg';
+                  }
+                }
+              },
+              error: (err: any) => {
+                console.warn('Failed to load offer medias:', err);
+                // Fallback: set placeholders for all offers
+                this.offers.forEach(offer => {
+                  this.offerImages.set(offer.offer_id, 'assets/images/placeholder-offer.jpg');
+                  offer.imageUrl = 'assets/images/placeholder-offer.jpg';
+                });
+              }
+            });
+        },
+        error: (err: any) => {
+          console.error('Error loading offers:', err);
+          this.offers = [];
+        }
+      });
+
+    this.isLoading = false;
   }
 
   toggleSaveOffer(offer: Offer): void {
-    offer.isSaved = !offer.isSaved;
-
-    const savedOffers = JSON.parse(localStorage.getItem('savedOffers') || '[]');
-
-    if (offer.isSaved) {
-      if (!savedOffers.includes(offer.id)) {
-        savedOffers.push(offer.id);
-      }
-      this.displayToast('Offer saved to your wishlist!', 'success');
+    if (offer.is_saved_to_wishlist && offer.wishlist_id) {
+      // Remove from wishlist - OPTIMISTIC UPDATE
+      const previousState = offer.is_saved_to_wishlist;
+      const previousWishlistId = offer.wishlist_id;
+      
+      // Update UI immediately (optimistic)
+      offer.is_saved_to_wishlist = false;
+      offer.isSaved = false;
+      offer.wishlist_id = undefined;
+      
+      this.wishlistService.removeFromWishlist(previousWishlistId)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: () => {
+            this.displayToast('Offer removed from wishlist', 'info');
+          },
+          error: (err: any) => {
+            // Revert on error
+            offer.is_saved_to_wishlist = previousState;
+            offer.isSaved = previousState;
+            offer.wishlist_id = previousWishlistId;
+            this.displayToast('Error removing offer from wishlist', 'error');
+            console.error('Error removing from wishlist:', err);
+          }
+        });
     } else {
-      const index = savedOffers.indexOf(offer.id);
-      if (index > -1) {
-        savedOffers.splice(index, 1);
-      }
-      this.displayToast('Offer removed from wishlist', 'info');
+      // Add to wishlist - OPTIMISTIC UPDATE
+      // Update UI immediately (optimistic)
+      offer.is_saved_to_wishlist = true;
+      offer.isSaved = true;
+      
+      this.wishlistService.addOfferToWishlist(offer.offer_id)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: (res: any) => {
+            offer.wishlist_id = res.wishlist_id;
+            this.displayToast('Offer saved to your wishlist!', 'success');
+          },
+          error: (err: any) => {
+            // Revert on error
+            offer.is_saved_to_wishlist = false;
+            offer.isSaved = false;
+            offer.wishlist_id = undefined;
+            this.displayToast('Error saving offer to wishlist', 'error');
+            console.error('Error saving to wishlist:', err);
+          }
+        });
     }
-
-    localStorage.setItem('savedOffers', JSON.stringify(savedOffers));
   }
 
   displayToast(message: string, type: 'success' | 'error' | 'info'): void {
@@ -167,13 +265,24 @@ export class CustomerDashboardComponent implements OnInit {
     return type === 'percent' ? 'bg-green-100 text-green-800' : 'bg-pink-100 text-pink-800';
   }
 
+  /**
+   * Navigate to booking detail page
+   */
+  viewBookingDetails(booking: Booking): void {
+    this.router.navigate(['/bookings', booking.booking_id]);
+  }
+
+  /**
+   * Navigate to offer detail page
+   */
+  viewOfferDetails(offer: Offer): void {
+    this.router.navigate(['/offer-details', offer.offer_id], { state: { from: 'dashboard' } });
+  }
+  
+  /**
+   * Book now - show date picker modal
+   */
   bookNow(): void {
-    // Initialize with today and tomorrow dates
-    const today = new Date().toISOString().split('T')[0];
-    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    this.checkIn = today;
-    this.checkOut = tomorrow;
-    this.datePickerError = '';
     this.showDatePickerModal = true;
   }
 
@@ -182,43 +291,48 @@ export class CustomerDashboardComponent implements OnInit {
    */
   closeBookingModal(): void {
     this.showDatePickerModal = false;
+    this.checkIn = '';
+    this.checkOut = '';
     this.datePickerError = '';
-  }
-
-  /**
-   * Proceed with booking - navigate to booking component with dates
-   */
-  proceedWithBooking(): void {
-    if (!this.checkIn || !this.checkOut) {
-      this.datePickerError = 'Please select check-in and check-out dates';
-      return;
-    }
-
-    if (this.checkIn >= this.checkOut) {
-      this.datePickerError = 'Check-out date must be after check-in date';
-      return;
-    }
-
-    this.datePickerError = '';
-    
-    // Navigate to booking component with dates as query parameters
-    this.router.navigate(['/booking'], {
-      queryParams: {
-        checkIn: this.checkIn,
-        checkOut: this.checkOut
-      }
-    });
   }
 
   /**
    * Calculate number of nights
    */
   calculateNumberOfNights(): number {
-    if (!this.checkIn || !this.checkOut) return 1;
-    const start = new Date(this.checkIn);
-    const end = new Date(this.checkOut);
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return Math.max(1, diffDays);
+    if (!this.checkIn || !this.checkOut) return 0;
+    const checkInDate = new Date(this.checkIn);
+    const checkOutDate = new Date(this.checkOut);
+    const diffTime = checkOutDate.getTime() - checkInDate.getTime();
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    return Math.max(0, Math.ceil(diffDays));
+  }
+
+  /**
+   * Proceed with booking
+   */
+  proceedWithBooking(): void {
+    // Validate dates
+    if (!this.checkIn || !this.checkOut) {
+      this.datePickerError = 'Please select both check-in and check-out dates';
+      return;
+    }
+
+    const checkInDate = new Date(this.checkIn);
+    const checkOutDate = new Date(this.checkOut);
+
+    if (checkOutDate <= checkInDate) {
+      this.datePickerError = 'Check-out date must be after check-in date';
+      return;
+    }
+
+    // Navigate to rooms page with dates as query params
+    this.closeBookingModal();
+    this.router.navigate(['/rooms'], {
+      queryParams: {
+        checkIn: this.checkIn,
+        checkOut: this.checkOut
+      }
+    });
   }
 }

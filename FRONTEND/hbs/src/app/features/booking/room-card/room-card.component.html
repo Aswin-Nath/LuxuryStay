@@ -99,16 +99,18 @@
       </div>
 
       <!-- Action Buttons -->
-      <div class="mt-4 flex gap-4">
+      <div class="mt-4 flex gap-3 flex-wrap">
         <button 
           (click)="openDetailsModal()"
-          class="text-blue-600 font-medium hover:underline hover:text-blue-800 transition">
-          📋 Room Details
+          class="flex items-center gap-1 px-4 py-2 text-blue-600 font-medium hover:bg-blue-50 rounded-lg transition">
+          <span class="material-icons text-sm">description</span>
+          Room Info
         </button>
         <button 
           (click)="openReviewsModal()"
-          class="text-yellow-600 font-medium hover:underline hover:text-yellow-800 transition">
-          ⭐ View Reviews
+          class="flex items-center gap-1 px-4 py-2 text-yellow-600 font-medium hover:bg-yellow-50 rounded-lg transition">
+          <span class="material-icons text-sm">rate_review</span>
+          Reviews
         </button>
       </div>
     </div>
