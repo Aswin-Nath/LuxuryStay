@@ -11,6 +11,8 @@ import { ImageService } from '../../services/image.service';
 import { RoomsService } from '../../core/services/rooms/rooms.service';
 import { ReviewsService, Review } from '../../services/reviews.service';
 import { WishlistService } from '../../services/wishlist.service';
+import { BookingStateService } from '../../services/booking-state.service';
+import { DatePickerModalComponent } from '../../shared/components/date-picker-modal/date-picker-modal.component';
 interface Amenity{
     amenity_id:number,
     amenity_name:string
@@ -31,7 +33,7 @@ interface RoomDetail {
 @Component({
   selector: 'app-customer-room-detail',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, CustomerNavbarComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, CustomerNavbarComponent, DatePickerModalComponent],
   templateUrl: './customer-room-detail.component.html',
   styleUrl: './customer-room-detail.component.css',
 })
@@ -44,6 +46,13 @@ export class CustomerRoomDetailComponent implements OnInit, OnDestroy {
   previousPage = 'room-display';
   
   selectedImageIndex = 0;
+  
+  // Date Picker Modal Properties
+  showDatePickerModal = false;
+  datePickerCheckIn: string = '';
+  datePickerCheckOut: string = '';
+  datePickerError: string = '';
+  
   private destroy$ = new Subject<void>();
 
   constructor(
@@ -53,7 +62,8 @@ export class CustomerRoomDetailComponent implements OnInit, OnDestroy {
     private roomTypeService: RoomTypeService,
     private reviewsService: ReviewsService,
     private wishlistService: WishlistService,
-    private roomService:RoomsService
+    private roomService: RoomsService,
+    private bookingStateService: BookingStateService
   ) {
     const navigation = this.router.getCurrentNavigation();
     this.previousPage = navigation?.extras?.state?.['from'] || 'rooms';
@@ -152,10 +162,47 @@ export class CustomerRoomDetailComponent implements OnInit, OnDestroy {
   }
 
   bookNow(): void {
-    this.router.navigate(['/booking'], { 
-      queryParams: { room_type_id: this.roomId },
-      state: { from: this.previousPage }
+    if (!this.roomId) return;
+    
+    this.showDatePickerModal = true;
+    
+    // Set default dates
+    const today = new Date();
+    this.datePickerCheckIn = this.formatDateForInput(today);
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    this.datePickerCheckOut = this.formatDateForInput(tomorrow);
+    
+    this.datePickerError = '';
+  }
+
+  onDatePickerClose(): void {
+    this.showDatePickerModal = false;
+    this.datePickerCheckIn = '';
+    this.datePickerCheckOut = '';
+    this.datePickerError = '';
+  }
+
+  onDatePickerProceed(data: { checkIn: string; checkOut: string; roomTypeId?: number; offerId?: number }): void {
+    this.showDatePickerModal = false;
+    
+    // Store state in service
+    this.bookingStateService.setBookingState({
+      checkIn: data.checkIn,
+      checkOut: data.checkOut,
+      roomTypeId: this.roomId ?? undefined
     });
+    
+    // Navigate without query params
+    this.router.navigate(['/booking']);
+  }
+
+  private formatDateForInput(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   goBack(): void {

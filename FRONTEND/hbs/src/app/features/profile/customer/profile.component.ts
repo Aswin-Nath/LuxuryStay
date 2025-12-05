@@ -104,15 +104,7 @@ export class ProfileComponent implements OnInit {
   /**
    * Open date picker modal for booking
    */
-  openBookingModal(): void {
-    // Initialize with today and tomorrow dates
-    const today = new Date().toISOString().split('T')[0];
-    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    this.checkIn = today;
-    this.checkOut = tomorrow;
-    this.datePickerError = '';
-    this.showDatePickerModal = true;
-  }
+
 
   /**
    * Close date picker modal

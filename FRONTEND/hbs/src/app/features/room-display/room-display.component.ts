@@ -6,8 +6,10 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { RoomsService } from '../../core/services/rooms/rooms.service';
 import { WishlistService } from '../../services/wishlist.service';
+import { BookingStateService } from '../../services/booking-state.service';
 import { CustomerNavbarComponent } from '../../core/components/customer-navbar/customer-navbar.component';
 import { CustomerSidebarComponent } from '../../core/components/customer-sidebar/customer-sidebar.component';
+import { DatePickerModalComponent } from '../../shared/components/date-picker-modal/date-picker-modal.component';
 
 export interface RoomType {
   room_type_id: number;
@@ -33,7 +35,7 @@ export interface Review {
 @Component({
   selector: 'app-room-display',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, CustomerNavbarComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, CustomerNavbarComponent, DatePickerModalComponent],
   templateUrl: './room-display.component.html',
   styleUrl: './room-display.component.css',
 })
@@ -94,6 +96,13 @@ export class RoomDisplayComponent implements OnInit, OnDestroy {
   bookingModalOpen = false;
   selectedRoomsForBooking: Array<{ room_index: number; adults: number; children: number }> = [];
 
+  // Date Picker Modal Properties
+  showDatePickerModal = false;
+  datePickerCheckIn: string = '';
+  datePickerCheckOut: string = '';
+  datePickerError: string = '';
+  selectedRoomForBooking: RoomType | null = null;
+
   // Image loading
   roomImages = new Map<number, string>(); // room_type_id -> image_url
   roomReviews = new Map<number, { rating: number; count: number }>(); // room_type_id -> {rating, count}
@@ -104,7 +113,8 @@ export class RoomDisplayComponent implements OnInit, OnDestroy {
     private router: Router,
     private route: ActivatedRoute,
     private roomsService: RoomsService,
-    private wishlistService: WishlistService
+    private wishlistService: WishlistService,
+    private bookingStateService: BookingStateService
   ) {}
 
   ngOnInit(): void {
@@ -288,50 +298,53 @@ export class RoomDisplayComponent implements OnInit, OnDestroy {
   }
 
   openBookingModal(room: RoomType): void {
-    this.navbarComponent?.openBookingModal();
+    this.selectedRoomForBooking = room;
+    this.showDatePickerModal = true;
+    
+    // Set default dates
+    const today = new Date();
+    this.datePickerCheckIn = this.formatDateForInput(today);
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    this.datePickerCheckOut = this.formatDateForInput(tomorrow);
+    
+    this.datePickerError = '';
   }
 
   closeBookingModal(): void {
-    this.navbarComponent?.closeBookingModal();
+    this.showDatePickerModal = false;
+    this.selectedRoomForBooking = null;
+    this.datePickerCheckIn = '';
+    this.datePickerCheckOut = '';
+    this.datePickerError = '';
   }
 
-  addRoomToBooking(): void {
-    this.selectedRoomsForBooking.push({
-      room_index: this.selectedRoomsForBooking.length,
-      adults: 1,
-      children: 0,
+  onDatePickerClose(): void {
+    this.closeBookingModal();
+  }
+
+  onDatePickerProceed(data: { checkIn: string; checkOut: string; roomTypeId?: number; offerId?: number }): void {
+    this.showDatePickerModal = false;
+    
+    // Store state in service
+    this.bookingStateService.setBookingState({
+      checkIn: data.checkIn,
+      checkOut: data.checkOut,
+      roomTypeId: data.roomTypeId
     });
+    
+    // Navigate without query params
+    this.router.navigate(['/booking']);
   }
 
-  removeRoomFromBooking(index: number): void {
-    this.selectedRoomsForBooking.splice(index, 1);
+  private formatDateForInput(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
-  increaseCounter(roomIndex: number, type: 'adults' | 'children'): void {
-    const room = this.selectedRoomsForBooking[roomIndex];
-    if (this.selectedRoom) {
-      if (type === 'adults' && room.adults < this.selectedRoom.max_adult_count) {
-        room.adults++;
-      }
-      if (type === 'children' && room.children < this.selectedRoom.max_child_count) {
-        room.children++;
-      }
-    }
-  }
-
-  decreaseCounter(roomIndex: number, type: 'adults' | 'children'): void {
-    const room = this.selectedRoomsForBooking[roomIndex];
-    if (type === 'adults' && room.adults > 1) room.adults--;
-    if (type === 'children' && room.children > 0) room.children--;
-  }
-
-  proceedToBooking(): void {
-    if (!this.selectedRoom) return;
-    this.router.navigate(['/booking'], {
-      queryParams: { room_type_id: this.selectedRoom.room_type_id },
-      state: { from: '/rooms' }
-    });
-  }
 
   getRatingColor(rating: number): string {
     if (rating >= 4.5) return 'text-green-600';

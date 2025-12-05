@@ -10,7 +10,8 @@ import { ProfileService } from '../../../core/services/profile/profile.service';
 import { WishlistService } from '../../../services/wishlist.service';
 import { takeUntil } from 'rxjs/operators';
 import { Subject } from 'rxjs';
-
+import { BookingStateService } from '../../../services/booking-state.service';
+import { DatePickerModalComponent } from '../../../shared/components/date-picker-modal/date-picker-modal.component';
 interface Booking {
   booking_id: string;
   room_type_name?: string;
@@ -36,7 +37,7 @@ interface Offer {
 @Component({
   selector: 'app-customer-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, CustomerNavbarComponent, CustomerSidebarComponent],
+  imports: [CommonModule, FormsModule, RouterModule, CustomerNavbarComponent, CustomerSidebarComponent,DatePickerModalComponent],
   templateUrl: './customer-dashboard.component.html',
   styleUrls: ['./customer-dashboard.component.css']
 })
@@ -51,7 +52,9 @@ export class CustomerDashboardComponent implements OnInit {
   checkIn: string = '';
   checkOut: string = '';
   datePickerError: string = '';
-
+  // Date Picker Modal Properties
+  datePickerCheckIn: string = '';
+  datePickerCheckOut: string = '';
   // Upcoming Bookings
   upcomingBookings: Booking[] = [];
 
@@ -75,7 +78,9 @@ export class CustomerDashboardComponent implements OnInit {
     private bookingsService: BookingsService,
     private offerService: OfferService,
     private profileService: ProfileService,
-    private wishlistService: WishlistService
+    private wishlistService: WishlistService,
+        private bookingStateService: BookingStateService
+
   ) { }
 
   ngOnInit(): void {
@@ -85,6 +90,26 @@ export class CustomerDashboardComponent implements OnInit {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+    onDatePickerClose(): void {
+    this.showDatePickerModal = false;
+    this.datePickerCheckIn = '';
+    this.datePickerCheckOut = '';
+    this.datePickerError = '';
+  }
+
+  onDatePickerProceed(data: { checkIn: string; checkOut: string; roomTypeId?: number; offerId?: number }): void {
+    this.showDatePickerModal = false;
+    
+    // Store state in service
+    this.bookingStateService.setBookingState({
+      checkIn: data.checkIn,
+      checkOut: data.checkOut,
+    });
+    
+    // Navigate without query params
+    this.router.navigate(['/booking']);
   }
 
   loadDashboardData(): void {
@@ -267,7 +292,26 @@ export class CustomerDashboardComponent implements OnInit {
    */
   bookNow(): void {
     this.showDatePickerModal = true;
+    // Set today as check-in date
+    this.showDatePickerModal = true;
+    
+    // Set default dates
+    const today = new Date();
+    this.datePickerCheckIn = this.formatDateForInput(today);
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    this.datePickerCheckOut = this.formatDateForInput(tomorrow);
+    
+    this.datePickerError = '';
   }
+    private formatDateForInput(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
 
   /**
    * Close date picker modal
@@ -308,14 +352,17 @@ export class CustomerDashboardComponent implements OnInit {
       this.datePickerError = 'Check-out date must be after check-in date';
       return;
     }
-
+    console.log(this.checkIn,this.checkOut);
     // Navigate to rooms page with dates as query params
-    this.closeBookingModal();
-    this.router.navigate(['/rooms'], {
+    this.showDatePickerModal=false;
+    this.router.navigate(['/booking'], {
       queryParams: {
         checkIn: this.checkIn,
         checkOut: this.checkOut
-      }
+      },state: { from: this.router.url }
     });
+    this.closeBookingModal();
+
   }
+  
 }

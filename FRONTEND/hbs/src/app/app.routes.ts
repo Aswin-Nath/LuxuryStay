@@ -34,6 +34,7 @@ import { RoomDisplayComponent } from './features/room-display/room-display.compo
 import { WishlistComponent } from './features/wishlist/wishlist.component';
 import { CustomerRoomDetailComponent } from './features/customer-room-detail/customer-room-detail.component';
 import { CustomerOfferDetailComponent } from './features/customer-offer-detail/customer-offer-detail.component';
+import { OfferClaimComponent } from './features/booking/offer-claim/offer-claim.component';
 
 export const routes: Routes = [
 	{ path: '', redirectTo: 'login', pathMatch: 'full' },
@@ -70,7 +71,8 @@ export const routes: Routes = [
 							{ path: 'details/:id', component: BookingDetailsComponent }
 						]
 					},
-					{ path: '', redirectTo: 'dashboard', pathMatch: 'full' }
+					{ path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+					{path:"offer-claim",component:BookingComponent}
 				]
 			},
 			// Admin Routes

@@ -7,8 +7,10 @@ import { takeUntil } from 'rxjs/operators';
 import { OfferService } from '../../services/offer.service';
 import { WishlistService } from '../../services/wishlist.service';
 import { RoomsService } from '../../core/services/rooms/rooms.service';
+import { BookingStateService } from '../../services/booking-state.service';
 import { CustomerNavbarComponent } from '../../core/components/customer-navbar/customer-navbar.component';
 import { CustomerSidebarComponent } from '../../core/components/customer-sidebar/customer-sidebar.component';
+import { DatePickerModalComponent } from '../../shared/components/date-picker-modal/date-picker-modal.component';
 
 interface Offer {
   offer_id: number;
@@ -38,7 +40,7 @@ export interface RoomType {
 @Component({
   selector: 'app-offer-display',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, CustomerNavbarComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, CustomerNavbarComponent, DatePickerModalComponent],
   templateUrl: './offer-display.component.html',
   styleUrl: './offer-display.component.css',
 })
@@ -65,6 +67,13 @@ export class OfferDisplayComponent implements OnInit, OnDestroy {
   selectedOffer: Offer | null = null;
   selectedRooms: Array<{ room_index: number; adults: number; children: number }> = [];
 
+  // Date Picker Modal Properties
+  showDatePickerModal = false;
+  datePickerCheckIn: string = '';
+  datePickerCheckOut: string = '';
+  datePickerError: string = '';
+  selectedOfferForBooking: Offer | null = null;
+
   // Image loading
   offerImages = new Map<number, string>(); // offer_id -> image_url
 
@@ -75,7 +84,8 @@ export class OfferDisplayComponent implements OnInit, OnDestroy {
     private wishlistService: WishlistService,
     private roomsService: RoomsService,
     private router: Router,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    private bookingStateService: BookingStateService
   ) {}
 
   ngOnInit(): void {
@@ -209,11 +219,51 @@ export class OfferDisplayComponent implements OnInit, OnDestroy {
   }
 
   openBookingModal(offer: Offer): void {
-    this.navbarComponent?.openBookingModal();
+    this.selectedOfferForBooking = offer;
+    this.showDatePickerModal = true;
+    
+    // Set default dates
+    const today = new Date();
+    this.datePickerCheckIn = this.formatDateForInput(today);
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    this.datePickerCheckOut = this.formatDateForInput(tomorrow);
+    
+    this.datePickerError = '';
   }
 
   closeBookingModal(): void {
-    this.navbarComponent?.closeBookingModal();
+    this.showDatePickerModal = false;
+    this.selectedOfferForBooking = null;
+    this.datePickerCheckIn = '';
+    this.datePickerCheckOut = '';
+    this.datePickerError = '';
+  }
+
+  onDatePickerClose(): void {
+    this.closeBookingModal();
+  }
+
+  onDatePickerProceed(data: { checkIn: string; checkOut: string; roomTypeId?: number; offerId?: number }): void {
+    this.showDatePickerModal = false;
+    
+    // Store state in service
+    this.bookingStateService.setBookingState({
+      checkIn: data.checkIn,
+      checkOut: data.checkOut,
+      offerId: this.selectedOfferForBooking?.offer_id
+    });
+    
+    // Navigate without query params
+    this.router.navigate(['/booking']);
+  }
+
+  private formatDateForInput(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   addRoom(): void {
@@ -271,6 +321,12 @@ export class OfferDisplayComponent implements OnInit, OnDestroy {
           console.error('Error toggling wishlist:', err);
         }
       });
+  }
+    bookNow(offer_id:number): void {
+    this.router.navigate(['/offer-process'], { 
+      queryParams: { offer_id:offer_id },
+      state: { from: "offers" }
+    });
   }
 
   viewOfferDetails(offer: Offer): void {

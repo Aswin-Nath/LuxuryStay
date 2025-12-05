@@ -290,3 +290,14 @@
     </main>
   </div>
 </div>
+
+<!-- Date Picker Modal -->
+<app-date-picker-modal 
+  [isOpen]="showDatePickerModal"
+  [checkIn]="datePickerCheckIn"
+  [checkOut]="datePickerCheckOut"
+  [error]="datePickerError"
+  [offerId]="offerId ?? undefined"
+  (close)="onDatePickerClose()"
+  (proceed)="onDatePickerProceed($event)">
+</app-date-picker-modal>

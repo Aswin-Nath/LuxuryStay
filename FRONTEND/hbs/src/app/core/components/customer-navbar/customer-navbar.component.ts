@@ -4,7 +4,8 @@ import { Router, RouterLink, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Subject, Observable } from 'rxjs';
 import { AuthenticationService } from '../../services/authentication/authentication.service';
-
+import { BookingStateService } from '../../../services/booking-state.service';
+import { DatePickerModalComponent } from '../../../shared/components/date-picker-modal/date-picker-modal.component';
 interface Notification {
   type: 'booking' | 'issue' | 'refund' | 'offer';
   msg: string;
@@ -14,7 +15,7 @@ interface Notification {
 @Component({
   selector: 'app-customer-navbar',
   standalone: true,
-  imports: [CommonModule, RouterModule, RouterLink, FormsModule],
+  imports: [CommonModule, RouterModule, RouterLink, FormsModule,DatePickerModalComponent],
   templateUrl: './customer-navbar.component.html',
   styleUrls: ['./customer-navbar.component.css']
 })
@@ -33,7 +34,9 @@ export class CustomerNavbarComponent implements OnInit, OnDestroy {
   checkIn: string = '';
   checkOut: string = '';
   datePickerError: string = '';
-
+  // Date Picker Modal Properties
+  datePickerCheckIn: string = '';
+  datePickerCheckOut: string = '';
   notifications: Notification[] = [
     { type: 'booking', msg: 'New booking: Room 201 confirmed', time: '2m ago' },
     { type: 'issue', msg: 'Issue reported in Room 105', time: '30m ago' },
@@ -42,7 +45,9 @@ export class CustomerNavbarComponent implements OnInit, OnDestroy {
 
   constructor(
     private authService: AuthenticationService,
-    private router: Router
+    private router: Router,
+        private bookingStateService: BookingStateService
+
   ) {
     this.isLoggedIn$ = this.authService.authState$;
   }
@@ -107,14 +112,15 @@ export class CustomerNavbarComponent implements OnInit, OnDestroy {
     // Show date picker modal directly
     this.showDatePickerModal = true;
     
-    // Set today as check-in date
-    const today = new Date();
-    this.checkIn = this.formatDateForInput(today);
+    this.showDatePickerModal = true;
     
-    // Set tomorrow as check-out date
+    // Set default dates
+    const today = new Date();
+    this.datePickerCheckIn = this.formatDateForInput(today);
+    
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    this.checkOut = this.formatDateForInput(tomorrow);
+    this.datePickerCheckOut = this.formatDateForInput(tomorrow);
     
     this.datePickerError = '';
   }
@@ -141,43 +147,26 @@ export class CustomerNavbarComponent implements OnInit, OnDestroy {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   }
 
-  proceedWithBooking(): void {
-    this.datePickerError = '';
 
-    if (!this.checkIn) {
-      this.datePickerError = 'Please select a check-in date';
-      return;
-    }
 
-    if (!this.checkOut) {
-      this.datePickerError = 'Please select a check-out date';
-      return;
-    }
-
-    const checkInDate = new Date(this.checkIn);
-    const checkOutDate = new Date(this.checkOut);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (checkInDate < today) {
-      this.datePickerError = 'Check-in date cannot be in the past';
-      return;
-    }
-
-    if (checkOutDate <= checkInDate) {
-      this.datePickerError = 'Check-out date must be after check-in date';
-      return;
-    }
-
-    // Close modal and navigate to booking with dates
+    onDatePickerClose(): void {
     this.showDatePickerModal = false;
-    this.router.navigate(['/booking'], {
-      queryParams: {
-        checkIn: this.checkIn,
-        checkOut: this.checkOut
-      },
-      state: { from: this.router.url }
+    this.datePickerCheckIn = '';
+    this.datePickerCheckOut = '';
+    this.datePickerError = '';
+  }
+
+  onDatePickerProceed(data: { checkIn: string; checkOut: string; roomTypeId?: number; offerId?: number }): void {
+    this.showDatePickerModal = false;
+    
+    // Store state in service
+    this.bookingStateService.setBookingState({
+      checkIn: data.checkIn,
+      checkOut: data.checkOut
     });
+    
+    // Navigate without query params
+    this.router.navigate(['/booking']);
   }
 
   logout(): void {

@@ -3,6 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule, ActivatedRoute } from '@angular/router';
 import { BookingService, RoomLock, BookingSession, Room } from '../../services/booking.service';
+import { BookingStateService } from '../../services/booking-state.service';
+import { ToastService } from '../../services/toast.service';
 import { RoomCardComponent } from './room-card/room-card.component';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -112,6 +114,10 @@ export class BookingComponent implements OnInit, OnDestroy {
     square_ft_min: undefined,
     square_ft_max: undefined
   };
+
+  // Tracking parameters from query params (room_type_id or offer_id)
+  selectedRoomTypeIdFromQuery: number | null = null;
+  selectedOfferIdFromQuery: number | null = null;
   
   // Track which room is being booked (for spinner)
   bookingRoomType: string | null = null;
@@ -170,7 +176,9 @@ export class BookingComponent implements OnInit, OnDestroy {
     public bookingService: BookingService,
     private router: Router,
     private route: ActivatedRoute,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private bookingStateService: BookingStateService,
+    private toastService: ToastService
   ) {
     // Get previousPage from router state
     const navigation = this.router.getCurrentNavigation();
@@ -240,23 +248,60 @@ export class BookingComponent implements OnInit, OnDestroy {
     this.previousCheckIn = today;
     this.previousCheckOut = tomorrow;
 
-    // Check if dates were passed from profile component via query params
-    this.route.queryParams.pipe(takeUntil(this.destroy$)).subscribe(params => {
-      if (params['checkIn'] && params['checkOut']) {
-        this.checkIn = params['checkIn'];
-        this.checkOut = params['checkOut'];
-        this.previousCheckIn = params['checkIn'];
-        this.previousCheckOut = params['checkOut'];
-        console.log('📅 Dates received from profile:', this.checkIn, this.checkOut);
-        // Directly proceed to search with provided dates
-        this.proceedFromDateModal();
-      } else {
-        // No dates provided - could be from navbar or direct navigation
-        this.fromNavbar = true;
-        // Show modal
-        this.openDatePickerModal();
-      }
-    });
+   // Subscribe to booking state service (replaces query params)
+    this.bookingStateService.getBookingState()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(state => {
+        if (!state) return;
+
+        const checkIn = state.checkIn;
+        const checkOut = state.checkOut;
+        const roomTypeId = state.roomTypeId;
+        const offerId = state.offerId;
+
+        console.log('Booking state received:', { checkIn, checkOut, roomTypeId, offerId, phase: this.currentPhase });
+
+    // Only act if we have valid dates AND we haven't already processed them
+        if (checkIn && checkOut && !this.datesSelected) {
+          console.log('Valid dates found in state → applying and proceeding');
+          this.checkIn = checkIn;
+          this.checkOut = checkOut;
+          this.previousCheckIn = checkIn;
+          this.previousCheckOut = checkOut;
+          this.datesSelected = true;
+
+          // If roomTypeId is provided, store it for auto-lock but DON'T filter search
+          if (roomTypeId) {
+            this.selectedRoomTypeIdFromQuery = roomTypeId;
+            console.log('Room type ID stored for auto-lock:', roomTypeId);
+          }
+
+          // If offerId is provided, store it for later use
+          if (offerId) {
+            this.selectedOfferIdFromQuery = offerId;
+            console.log('Offer ID received:', offerId);
+          }
+
+          // Clear state from service after using it
+          this.bookingStateService.clearBookingState();
+
+          // Only proceed if we're still in DATES phase
+          if (this.currentPhase === PHASES.DATES) {
+            this.proceedFromDateModal();
+          }
+          return; // Exit early
+        }
+
+        // Only show modal if:
+        // - No dates in state
+        // - We are in DATES phase
+        // - We haven't already selected dates
+        // - This is likely a fresh visit
+        if (!checkIn && !checkOut && this.currentPhase === PHASES.DATES && !this.datesSelected) {
+          console.log('No dates in state → showing modal (fresh visit)');
+          this.openDatePickerModal();
+        }
+      });
   }
 
   ngOnDestroy(): void {
@@ -308,11 +353,74 @@ export class BookingComponent implements OnInit, OnDestroy {
           
           // Move to search-and-details phase
           this.currentPhase = PHASES.SEARCH_AND_DETAILS;
+          // This will load room types and auto-lock if needed
           this.loadAvailableRoomTypesWithFilters();
         },
         error: (err) => {
           this.searchError = 'Failed to create booking session: ' + err.error?.detail;
         }
+      });
+  }
+
+  // Attempt to auto-lock a specific room type if provided
+  private attemptAutoLockRoomType(): void {
+    if (!this.selectedRoomTypeIdFromQuery || !this.availableRoomTypes.length) {
+      return;
+    }
+
+    const requestedRoomType = this.availableRoomTypes.find(
+      rt => rt.room_type_id === this.selectedRoomTypeIdFromQuery
+    );
+
+    if (!requestedRoomType) {
+      this.toastService.error(`Requested room type is not available for your selected dates`);
+      this.searchError = `Requested room type is not available for your selected dates. Here are other rooms you can book:`;
+      this.selectedRoomTypeIdFromQuery = null;
+      this.searchFilters.room_type_id = null;
+      return;
+    }
+
+    // Check if room type has available rooms
+    if (!requestedRoomType.free_rooms || requestedRoomType.free_rooms <= 0) {
+      this.toastService.error(`No ${requestedRoomType.type_name} rooms available for your selected dates`);
+      this.searchError = `No ${requestedRoomType.type_name} rooms available for your selected dates. Here are other rooms you can book:`;
+      this.selectedRoomTypeIdFromQuery = null;
+      this.searchFilters.room_type_id = null;
+      return;
+    }
+
+    // Auto-lock the room
+    this.bookingRoomType = requestedRoomType.type_name;
+    this.isBookingRoom = true;
+    this.lockRoomOfType(requestedRoomType)
+      .then((lock) => {
+        if (lock) {
+          // Successfully locked - update cart with consistent key format
+          const cartKey = `room_${requestedRoomType.room_type_id}`;
+          if (!this.roomCart[cartKey]) {
+            this.roomCart[cartKey] = { count: 0, roomType: requestedRoomType, locks: [] };
+          }
+          this.roomCart[cartKey].count += 1;
+          this.roomCart[cartKey].locks.push(lock);
+          
+          // CRITICAL: Initialize guest details for auto-locked room
+          this.initializeGuestDetailsForRoom(lock);
+          
+          // Update selected locks
+          this.updateSelectedLocks();
+          this.searchError = '';
+          this.isBookingRoom = false;
+          this.bookingRoomType = null;
+          this.toastService.success(`✅ ${requestedRoomType.type_name} room locked successfully!`);
+          console.log(`✅ Auto-locked 1x ${requestedRoomType.type_name}`);
+          this.cdr.markForCheck();
+        }
+      })
+      .catch((err) => {
+        this.toastService.error(`Unable to lock ${requestedRoomType.type_name}`);
+        this.searchError = `Unable to lock ${requestedRoomType.type_name}. ${err}`;
+        this.isBookingRoom = false;
+        this.bookingRoomType = null;
       });
   }
 
@@ -1279,6 +1387,11 @@ export class BookingComponent implements OnInit, OnDestroy {
           console.log('✅ Rooms found with filters:', rooms);
           this.availableRoomTypes = rooms;
           this.isLoadingRoomTypes = false;
+          
+          // After rooms are loaded, attempt to auto-lock if room_type_id was provided
+          if (this.selectedRoomTypeIdFromQuery) {
+            this.attemptAutoLockRoomType();
+          }
         },
         error: (err) => {
           console.error('❌ Failed to load filtered room types:', err);

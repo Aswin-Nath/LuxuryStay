@@ -10,6 +10,8 @@ import { OfferService } from '../../services/offer.service';
 import { ImageService } from '../../services/image.service';
 import { ReviewsService, Review } from '../../services/reviews.service';
 import { WishlistService } from '../../services/wishlist.service';
+import { BookingStateService } from '../../services/booking-state.service';
+import { DatePickerModalComponent } from '../../shared/components/date-picker-modal/date-picker-modal.component';
 
 interface OfferDetail {
   offer_id: number;
@@ -32,7 +34,7 @@ interface OfferDetail {
 @Component({
   selector: 'app-customer-offer-detail',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, CustomerNavbarComponent, ],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, CustomerNavbarComponent, DatePickerModalComponent],
   templateUrl: './customer-offer-detail.component.html',
   styleUrl: './customer-offer-detail.component.css',
 })
@@ -45,6 +47,13 @@ export class CustomerOfferDetailComponent implements OnInit, OnDestroy {
   previousPage = 'offers';
   
   selectedImageIndex = 0;
+  
+  // Date Picker Modal Properties
+  showDatePickerModal = false;
+  datePickerCheckIn: string = '';
+  datePickerCheckOut: string = '';
+  datePickerError: string = '';
+  
   private destroy$ = new Subject<void>();
 
   constructor(
@@ -53,7 +62,8 @@ export class CustomerOfferDetailComponent implements OnInit, OnDestroy {
     private offerService: OfferService,
     private imageService: ImageService,
     private reviewsService: ReviewsService,
-    private wishlistService: WishlistService
+    private wishlistService: WishlistService,
+    private bookingStateService: BookingStateService
   ) {
     const navigation = this.router.getCurrentNavigation();
     this.previousPage = navigation?.extras?.state?.['from'] || 'offers';
@@ -135,10 +145,47 @@ export class CustomerOfferDetailComponent implements OnInit, OnDestroy {
   }
 
   claimOffer(): void {
-    this.router.navigate(['/booking'], { 
-      queryParams: { offer_id: this.offerId },
-      state: { from: this.previousPage }
+    if (!this.offerId) return;
+    
+    this.showDatePickerModal = true;
+    
+    // Set default dates
+    const today = new Date();
+    this.datePickerCheckIn = this.formatDateForInput(today);
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    this.datePickerCheckOut = this.formatDateForInput(tomorrow);
+    
+    this.datePickerError = '';
+  }
+
+  onDatePickerClose(): void {
+    this.showDatePickerModal = false;
+    this.datePickerCheckIn = '';
+    this.datePickerCheckOut = '';
+    this.datePickerError = '';
+  }
+
+  onDatePickerProceed(data: { checkIn: string; checkOut: string; roomTypeId?: number; offerId?: number }): void {
+    this.showDatePickerModal = false;
+    
+    // Store state in service
+    this.bookingStateService.setBookingState({
+      checkIn: data.checkIn,
+      checkOut: data.checkOut,
+      offerId: this.offerId ?? undefined
     });
+    
+    // Navigate without query params
+    this.router.navigate(['/booking']);
+  }
+
+  private formatDateForInput(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   goBack(): void {
