@@ -43,7 +43,7 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
   issueTitle: string = '';
   issueDescription: string = '';
   selectedImages: any[] = [];
-
+  previousPage="bookings";
   // Cancel properties
   cancellationReason: string = '';
 
@@ -54,7 +54,11 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
     private reviewsService: ReviewsService,
     private route: ActivatedRoute,
     private router: Router
-  ) {}
+  ) {
+    const navigation = this.router.getCurrentNavigation();
+    this.previousPage = navigation?.extras?.state?.['from'] || 'offers';
+
+  }
 
   ngOnInit(): void {
     this.route.params.pipe(takeUntil(this.destroy$)).subscribe((params) => {
@@ -198,8 +202,12 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
   }
 
   goBack(): void {
+    if(this.previousPage=="dashboard"){
+      this.router.navigate(["/dashboard"]);
+    }
+    else{
     this.router.navigate(['/bookings']);
-  }
+  }}
 
   getStatusBadgeClass(status: string): string {
     const statusClasses: { [key: string]: string } = {

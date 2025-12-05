@@ -55,7 +55,12 @@ async def _enrich_offer_room_types(db: AsyncSession, offer) -> None:
             if room_type:
                 # Add type_name and price_per_night to room_type_config
                 room_type_config['type_name'] = room_type.type_name
-                room_type_config['price_per_night'] = float(room_type.price_per_night)
+                room_type_config['original_price'] = float(room_type.price_per_night)  # Original price
+                
+                # Calculate discounted price if discount_percent is provided
+                discount_percent = room_type_config.get('discount_percent', offer.discount_percent or 0)
+                discounted_price = float(room_type.price_per_night) * (1 - discount_percent / 100)
+                room_type_config['price_per_night'] = discounted_price
 
 
 # ============================================================

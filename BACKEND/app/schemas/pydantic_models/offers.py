@@ -8,7 +8,8 @@ class RoomTypeOffer(BaseModel):
     """Single room type offer configuration"""
     room_type_id: int
     type_name: Optional[str] = None  # Room type name, populated on response
-    price_per_night: Optional[Decimal] = None  # Room type price, populated on response
+    original_price: Optional[Decimal] = None  # Original room type price before discount, populated on response
+    price_per_night: Optional[Decimal] = None  # Discounted price per night, populated on response
     available_count: int = Field(..., gt=0, le=5, description="Number of rooms to allocate for this offer (max 5 total across all types)")
     discount_percent: Decimal = Field(..., ge=0, le=100, description="Discount percentage for this room type")
 

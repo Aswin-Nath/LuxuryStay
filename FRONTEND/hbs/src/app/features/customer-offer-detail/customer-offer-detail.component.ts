@@ -25,6 +25,7 @@ interface OfferDetail {
     type_name: string;
     price_per_night: number;
     original_price: number;
+    available_count:number;
   }[];
 }
 
@@ -41,7 +42,7 @@ export class CustomerOfferDetailComponent implements OnInit, OnDestroy {
   reviews: Review[] = [];
   loading = true;
   error = '';
-  previousPage = 'offer-display';
+  previousPage = 'offers';
   
   selectedImageIndex = 0;
   private destroy$ = new Subject<void>();
@@ -141,13 +142,8 @@ export class CustomerOfferDetailComponent implements OnInit, OnDestroy {
   }
 
   goBack(): void {
-    if (this.previousPage === 'wishlist') {
-      this.router.navigate(['/wishlist']);
-    } else if (this.previousPage === 'offers' || this.previousPage === 'offer-display') {
-      this.router.navigate(['/offers']);
-    } else {
-      this.router.navigate(['/offers']);
-    }
+    console.log(this.previousPage);
+    this.router.navigate([this.previousPage]);
   }
 
   isOfferExpired(): boolean {

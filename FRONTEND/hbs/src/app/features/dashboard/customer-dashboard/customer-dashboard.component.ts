@@ -183,54 +183,36 @@ export class CustomerDashboardComponent implements OnInit {
   }
 
   toggleSaveOffer(offer: Offer): void {
-    if (offer.is_saved_to_wishlist && offer.wishlist_id) {
-      // Remove from wishlist - OPTIMISTIC UPDATE
-      const previousState = offer.is_saved_to_wishlist;
-      const previousWishlistId = offer.wishlist_id;
-      
-      // Update UI immediately (optimistic)
-      offer.is_saved_to_wishlist = false;
-      offer.isSaved = false;
-      offer.wishlist_id = undefined;
-      
-      this.wishlistService.removeFromWishlist(previousWishlistId)
-        .pipe(takeUntil(this.destroy$))
-        .subscribe({
-          next: () => {
-            this.displayToast('Offer removed from wishlist', 'info');
-          },
-          error: (err: any) => {
-            // Revert on error
-            offer.is_saved_to_wishlist = previousState;
-            offer.isSaved = previousState;
-            offer.wishlist_id = previousWishlistId;
-            this.displayToast('Error removing offer from wishlist', 'error');
-            console.error('Error removing from wishlist:', err);
-          }
-        });
-    } else {
-      // Add to wishlist - OPTIMISTIC UPDATE
-      // Update UI immediately (optimistic)
-      offer.is_saved_to_wishlist = true;
-      offer.isSaved = true;
-      
-      this.wishlistService.addOfferToWishlist(offer.offer_id)
-        .pipe(takeUntil(this.destroy$))
-        .subscribe({
-          next: (res: any) => {
+    // OPTIMISTIC UPDATE - save previous state
+    const previousState = offer.is_saved_to_wishlist;
+    const previousWishlistId = offer.wishlist_id;
+    
+    // Update UI immediately (optimistic)
+    offer.is_saved_to_wishlist = !offer.is_saved_to_wishlist;
+    offer.isSaved = offer.is_saved_to_wishlist;
+
+    // Call unified toggle endpoint
+    this.wishlistService.toggleWishlist('offer', offer.offer_id)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res: any) => {
+          if (res.action === 'added') {
             offer.wishlist_id = res.wishlist_id;
             this.displayToast('Offer saved to your wishlist!', 'success');
-          },
-          error: (err: any) => {
-            // Revert on error
-            offer.is_saved_to_wishlist = false;
-            offer.isSaved = false;
+          } else if (res.action === 'removed') {
             offer.wishlist_id = undefined;
-            this.displayToast('Error saving offer to wishlist', 'error');
-            console.error('Error saving to wishlist:', err);
+            this.displayToast('Offer removed from wishlist', 'info');
           }
-        });
-    }
+        },
+        error: (err: any) => {
+          // Revert on error
+          offer.is_saved_to_wishlist = previousState;
+          offer.isSaved = previousState;
+          offer.wishlist_id = previousWishlistId;
+          this.displayToast('Error updating wishlist', 'error');
+          console.error('Error toggling wishlist:', err);
+        }
+      });
   }
 
   displayToast(message: string, type: 'success' | 'error' | 'info'): void {
@@ -269,7 +251,8 @@ export class CustomerDashboardComponent implements OnInit {
    * Navigate to booking detail page
    */
   viewBookingDetails(booking: Booking): void {
-    this.router.navigate(['/bookings', booking.booking_id]);
+    console.log(booking);
+    this.router.navigate(['/booking', booking.booking_id],{state:{from:"dashboard"}});
   }
 
   /**

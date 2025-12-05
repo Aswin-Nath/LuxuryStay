@@ -59,6 +59,14 @@ export class TokenInterceptor implements HttpInterceptor {
   }
 
   private handle401(req: HttpRequest<any>, next: HttpHandler): Observable<any> {
+    // ✅ Check if refresh token itself has expired BEFORE attempting refresh
+    const refreshTokenExpiry = localStorage.getItem('refresh_token_expires_at');
+    if (refreshTokenExpiry && Date.now() > Number(refreshTokenExpiry)) {
+      console.error('TokenInterceptor: Refresh token has expired; forcing logout');
+      this.forceLogout();
+      return throwError(() => new Error('Refresh token expired'));
+    }
+
     if (this.refreshInProgress) {
       return this.refreshSubject.pipe(
         filter(token => token !== null),
@@ -92,6 +100,11 @@ export class TokenInterceptor implements HttpInterceptor {
         }
         if (res?.role_id !== undefined) {
           localStorage.setItem('auth_role_id', String(res.role_id));
+        }
+        // ✅ Also update refresh token expiration if provided
+        if (res?.refresh_token_expires_at !== undefined) {
+          localStorage.setItem('refresh_token_expires_at', String(res.refresh_token_expires_at));
+          console.debug('TokenInterceptor: Refresh token expiration updated', new Date(res.refresh_token_expires_at).toLocaleString());
         }
 
         // notify queued requests

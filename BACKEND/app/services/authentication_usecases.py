@@ -320,11 +320,15 @@ async def login_flow(
     # Clamp to >= 0 to avoid returning negative expires_in values.
     expires_in = max(0, int((session.access_token_expires_at - datetime.utcnow()).total_seconds())) if session.access_token_expires_at else 0
 
+    # Calculate refresh token expiration as Unix timestamp (milliseconds)
+    refresh_token_expires_at_unix = int(session.refresh_token_expires_at.timestamp() * 1000) if session.refresh_token_expires_at else None
+
     token_response = TokenResponse(
         access_token=session.access_token,
         expires_in=expires_in,
         token_type="Bearer",
         role_id=user.role_id,
+        refresh_token_expires_at=refresh_token_expires_at_unix,
     )
 
     return AuthResult(
@@ -419,18 +423,24 @@ async def refresh_tokens(db: AsyncSession, refresh_token: str) -> AuthResult:
 
     expires_in = max(0, int((session.access_token_expires_at - datetime.utcnow()).total_seconds())) if session.access_token_expires_at else 0
     
+    # Calculate refresh token expiration as Unix timestamp (milliseconds)
+    refresh_token_expires_at_unix = int(session.refresh_token_expires_at.timestamp() * 1000) if session.refresh_token_expires_at else None
 
     token_response = TokenResponse(
         access_token=session.access_token,
         expires_in=expires_in,
         token_type="Bearer",
         role_id=user.role_id,
+        refresh_token_expires_at=refresh_token_expires_at_unix,
     )
 
     return AuthResult(
         token_response=token_response,
         refresh_token=session.refresh_token,
         refresh_token_expires_at=session.refresh_token_expires_at,
+    #    token_response=token_response,
+        # refresh_token=session.refresh_token,
+        # refresh_token_expires_at=session.refresh_token_expires_at,
     )
 
 

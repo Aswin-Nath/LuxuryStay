@@ -3,8 +3,8 @@ from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.postgres_connection import get_db
-from app.schemas.pydantic_models.wishlist import WishlistCreate, WishlistResponse, WishlistRoomResponse, WishlistOfferResponse
-from app.services.wishlist_service import add_to_wishlist as svc_add, list_user_wishlist as svc_list, remove_wishlist as svc_remove, list_user_wishlist_rooms as svc_list_rooms, list_user_wishlist_offers as svc_list_offers
+from app.schemas.pydantic_models.wishlist import WishlistCreate, WishlistResponse, WishlistRoomResponse, WishlistOfferResponse, WishlistToggle
+from app.services.wishlist_service import add_to_wishlist as svc_add, list_user_wishlist as svc_list, remove_wishlist as svc_remove, list_user_wishlist_rooms as svc_list_rooms, list_user_wishlist_offers as svc_list_offers, toggle_wishlist as svc_toggle
 from app.dependencies.authentication import get_current_user,check_permission
 from app.models.sqlalchemy_schemas.users import Users
 from app.core.cache import get_cached, set_cached, invalidate_pattern
@@ -66,8 +66,58 @@ async def add_wishlist(
 
 
 # ============================================================================
-# 🔹 READ - Fetch user's ALL wishlist items (backward compatibility)
+# 🔹 TOGGLE - Add or remove item from wishlist (unified endpoint)
 # ============================================================================
+@router.post("/toggle", response_model=dict, status_code=status.HTTP_200_OK)
+async def toggle_wishlist(
+    payload: WishlistToggle,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"])
+):
+    """
+    Toggle an item in user's wishlist (add if not present, remove if present).
+    
+    Unified endpoint that handles both adding and removing items from wishlist.
+    - If item is NOT in wishlist: adds it and returns action='added' with wishlist_id
+    - If item IS in wishlist: removes it and returns action='removed'
+    
+    **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role.
+    
+    Args:
+        payload (WishlistToggle): Request with type ('room' or 'offer'), room_type_id or offer_id.
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user.
+    
+    Returns:
+        dict: {"action": "added"/"removed", "wishlist_id": id (only if added)}
+    
+    Raises:
+        HTTPException (400): If payload is invalid.
+        HTTPException (403): If user lacks permission.
+    """
+    result = await svc_toggle(db, payload, current_user)
+    
+    # audit wishlist toggle
+    try:
+        action_text = "added to" if result.get("action") == "added" else "removed from"
+        await log_audit(
+            user_id=current_user.user_id,
+            action=f"WISHLIST_{result.get('action').upper()}",
+            resource_type="WISHLIST",
+            resource_id=result.get("wishlist_id"),
+            old_val=None,
+            new_val=result
+        )
+    except Exception:
+        pass  # Audit failure doesn't stop the operation
+    
+    # invalidate this user's wishlist cache
+    await invalidate_pattern(f"wishlist:user:{current_user.user_id}:*")
+    return result
+
+
+
 @router.get("/", response_model=List[WishlistResponse])
 async def list_wishlist(db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user),    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"])):
     """

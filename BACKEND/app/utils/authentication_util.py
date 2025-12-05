@@ -74,9 +74,14 @@ def create_access_token(data: dict, jti: str):
 
 
 def create_refresh_token(data: dict, expires_delta: timedelta | None = None, jti: str | None = None):
-    """Create a refresh JWT. Optionally include a `jti` claim."""
+    """Create a refresh JWT with fixed 7-day expiration.
+    
+    NOTE: We ALWAYS use 7 days (REFRESH_TOKEN_EXPIRE_DAYS) regardless of expires_delta.
+    This ensures refresh tokens never expire before their stated TTL.
+    """
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS))
+    # Always use 7-day expiration; ignore expires_delta for consistency
+    expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode.update({"exp": expire, "scope": "refresh_token"})
     if jti:
         to_encode.update({"jti": str(jti)})

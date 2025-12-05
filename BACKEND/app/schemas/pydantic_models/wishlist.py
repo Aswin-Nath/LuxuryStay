@@ -11,6 +11,16 @@ class WishlistCreate(BaseModel):
 
 
 # ============================================================================
+# 🔹 WISHLIST TOGGLE REQUEST
+# ============================================================================
+class WishlistToggle(BaseModel):
+    """Toggle request - add if not present, remove if present"""
+    type: str = Field(..., description="Type of item: 'room' or 'offer'")
+    room_type_id: Optional[int] = Field(None, ge=1, description="Room type ID (required if type='room')")
+    offer_id: Optional[int] = Field(None, ge=1, description="Offer ID (required if type='offer')")
+
+
+# ============================================================================
 # 🔹 ROOM TYPE WISHLIST RESPONSE
 # ============================================================================
 class WishlistRoomResponse(BaseModel):

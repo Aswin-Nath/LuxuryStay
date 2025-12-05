@@ -258,3 +258,70 @@ async def remove_wishlist(db: AsyncSession, wishlist_id: int, user_id: int):
     await soft_delete_wishlist_entry(db, wishlist_entry)
     await db.commit()
     return {"message": "Wishlist item removed"}
+
+
+# ==========================================================
+# 🔹 TOGGLE WISHLIST ITEM (ADD IF NOT PRESENT, REMOVE IF PRESENT)
+# ==========================================================
+
+async def toggle_wishlist(db: AsyncSession, payload, current_user) -> dict:
+    """
+    Toggle an item in wishlist - adds if not present, removes if already present.
+    
+    This is a unified endpoint that handles both add and remove operations.
+    - If item is NOT in wishlist: adds it and returns {"action": "added", "wishlist_id": id}
+    - If item IS in wishlist: removes it and returns {"action": "removed"}
+    
+    Args:
+        db (AsyncSession): Database session
+        payload: Request with type ('room' or 'offer'), room_type_id or offer_id
+        current_user: Authenticated user
+    
+    Returns:
+        dict: {"action": "added"/"removed", "wishlist_id": id (only if added)}
+    
+    Raises:
+        HTTPException (400): If payload is invalid
+    """
+    wishlist_data = payload.model_dump()
+    user_id = current_user.user_id
+    item_type = wishlist_data.get("type", "").lower()
+    room_type_id = wishlist_data.get("room_type_id")
+    offer_id = wishlist_data.get("offer_id")
+
+    # Validate item type
+    if item_type not in ["room", "offer"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Type must be 'room' or 'offer'",
+        )
+
+    # Validate that exactly one ID is provided based on type
+    if item_type == "room" and not room_type_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="room_type_id is required when type='room'",
+        )
+    
+    if item_type == "offer" and not offer_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="offer_id is required when type='offer'",
+        )
+
+    # Check if item already exists in wishlist
+    existing_item = await get_wishlist_by_user_and_item(db, user_id, room_type_id, offer_id)
+    
+    if existing_item and not existing_item.is_deleted:
+        # Item exists - remove it
+        await soft_delete_wishlist_entry(db, existing_item)
+        await db.commit()
+        return {"action": "removed"}
+    else:
+        # Item doesn't exist - add it
+        wishlist_entry = await create_wishlist_entry(db, user_id, room_type_id, offer_id)
+        await db.commit()
+        return {
+            "action": "added",
+            "wishlist_id": wishlist_entry.wishlist_id
+        }

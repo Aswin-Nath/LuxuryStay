@@ -11,6 +11,7 @@ export interface TokenResponse {
   token_type: string;
   role_id: number;
   message: string;
+  refresh_token_expires_at?: number;  // Unix timestamp (milliseconds) when refresh token expires
 }
 
 @Injectable({
@@ -59,6 +60,12 @@ export class AuthenticationService {
         localStorage.setItem('expires_in', String(res.expires_in));
         localStorage.setItem('auth_role_id', String(res.role_id));
         
+        // ✅ Store refresh token expiration (Unix timestamp in milliseconds)
+        if (res.refresh_token_expires_at) {
+          localStorage.setItem('refresh_token_expires_at', String(res.refresh_token_expires_at));
+          console.debug('AuthenticationService: Refresh token expires at', new Date(res.refresh_token_expires_at));
+        }
+        
         this.authStateSubject.next(true);
         if (res?.expires_in !== undefined) {
           this.setTokenRefreshTimer(res.expires_in);
@@ -90,6 +97,12 @@ export class AuthenticationService {
         localStorage.setItem('access_token', res.access_token);
         localStorage.setItem('expires_in', String(res.expires_in));
         
+        // ✅ Also update refresh token expiration if provided
+        if (res.refresh_token_expires_at) {
+          localStorage.setItem('refresh_token_expires_at', String(res.refresh_token_expires_at));
+          console.debug('AuthenticationService: Refresh token expiration updated', new Date(res.refresh_token_expires_at));
+        }
+        
         this.authStateSubject.next(true);
         // Reset timer with new expiration time
         if (res?.expires_in !== undefined) {
@@ -116,6 +129,7 @@ export class AuthenticationService {
       localStorage.removeItem('expires_in');
       localStorage.removeItem('auth_role_id');
       localStorage.removeItem('permissions');
+      localStorage.removeItem('refresh_token_expires_at');  // ✅ Also clear refresh token expiration
     } catch (err) {
       // ignore errors for read-only/private environments
     }
@@ -139,8 +153,26 @@ export class AuthenticationService {
   }
 
   /**
+   * Check if refresh token has expired.
+   * @returns true if refresh token is expired; false if valid or unknown
+   */
+  private isRefreshTokenExpired(): boolean {
+    const refreshTokenExpiry = localStorage.getItem('refresh_token_expires_at');
+    if (!refreshTokenExpiry) {
+      return false;  // If not set, assume valid
+    }
+    const expiryTime = Number(refreshTokenExpiry);
+    const isExpired = Date.now() > expiryTime;
+    if (isExpired) {
+      console.warn('AuthenticationService: Refresh token has expired');
+    }
+    return isExpired;
+  }
+
+  /**
    * Set a timer to proactively refresh token before expiration.
    * Refreshes 30 seconds before token expires to prevent 401 errors.
+   * Also checks if refresh token itself has expired.
    * 
    * @param expiresIn Token expiration time in seconds
    */
@@ -150,13 +182,21 @@ export class AuthenticationService {
       clearTimeout(this.tokenRefreshTimer);
     }
 
+    // Check if refresh token itself has expired BEFORE scheduling refresh
+    if (this.isRefreshTokenExpired()) {
+      console.error('AuthenticationService: Refresh token has expired; logging out');
+      this.logout().subscribe();
+      return;
+    }
+
     // Refresh 30 seconds before expiration 
     const refreshTime = (expiresIn - 30) * 1000;
 
     if (refreshTime > 0) {
       console.debug('AuthenticationService: Token refresh scheduled in', {
         seconds: Math.round(refreshTime / 1000),
-        totalExpiresIn: expiresIn
+        totalExpiresIn: expiresIn,
+        refreshTokenExpiresAt: new Date(Number(localStorage.getItem('refresh_token_expires_at'))).toLocaleString()
       });
       this.tokenRefreshTimer = setTimeout(() => {
         console.debug('AuthenticationService: Proactively refreshing token');

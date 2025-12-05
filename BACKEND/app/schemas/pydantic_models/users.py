@@ -106,5 +106,6 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: int
     role_id: int
+    refresh_token_expires_at: Optional[int] = None  # Unix timestamp when refresh token expires (7 days)
 
     model_config = {"from_attributes": True}
