@@ -11,7 +11,7 @@ import { ImageService } from '../../services/image.service';
 import { ReviewsService, Review } from '../../services/reviews.service';
 import { WishlistService } from '../../services/wishlist.service';
 import { BookingStateService } from '../../services/booking-state.service';
-import { DatePickerModalComponent } from '../../shared/components/date-picker-modal/date-picker-modal.component';
+import { OfferDatePickerModalComponent } from '../../shared/components/offer-date-picker-modal/offer-date-picker-modal.component';
 
 interface OfferDetail {
   offer_id: number;
@@ -34,7 +34,7 @@ interface OfferDetail {
 @Component({
   selector: 'app-customer-offer-detail',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, CustomerNavbarComponent, DatePickerModalComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, CustomerNavbarComponent, OfferDatePickerModalComponent],
   templateUrl: './customer-offer-detail.component.html',
   styleUrl: './customer-offer-detail.component.css',
 })
@@ -48,11 +48,8 @@ export class CustomerOfferDetailComponent implements OnInit, OnDestroy {
   
   selectedImageIndex = 0;
   
-  // Date Picker Modal Properties
-  showDatePickerModal = false;
-  datePickerCheckIn: string = '';
-  datePickerCheckOut: string = '';
-  datePickerError: string = '';
+  // Offer Date Picker Modal Properties
+  showOfferDatePickerModal = false;
   
   private destroy$ = new Subject<void>();
 
@@ -139,46 +136,58 @@ export class CustomerOfferDetailComponent implements OnInit, OnDestroy {
     // For now, we'll skip this - but the implementation would be similar to rooms
     this.reviews = [];
   }
-
   selectImage(index: number): void {
     this.selectedImageIndex = index;
   }
 
+  /**
+   * Open offer date picker modal to check availability and lock rooms
+   */
   claimOffer(): void {
     if (!this.offerId) return;
+    this.showOfferDatePickerModal = true;
+  }
+
+  /**
+   * Handle modal closed event
+   */
+  onOfferDatePickerClosed(): void {
+    this.showOfferDatePickerModal = false;
+  }
+
+  /**
+   * Handle modal proceed event - navigate to booking page with locked rooms data
+   */
+  onOfferDatePickerProceed(event: any): void {
+    this.showOfferDatePickerModal = false;
     
-    this.showDatePickerModal = true;
-    
-    // Set default dates
-    const today = new Date();
-    this.datePickerCheckIn = this.formatDateForInput(today);
-    
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    this.datePickerCheckOut = this.formatDateForInput(tomorrow);
-    
-    this.datePickerError = '';
+    if (this.offerId && event) {
+      const offerId = this.offerId;
+      
+      // Navigate to booking page with locked rooms data
+      setTimeout(() => {
+        this.router.navigate(['/offers/book', offerId], {
+          state: {
+            lockedRoomsData: {
+              offer_id: offerId,
+              check_in: event.check_in,
+              check_out: event.check_out,
+              locked_rooms: event.locked_rooms,
+              total_amount: event.total_amount_after_discount,
+              expires_at: event.expires_at
+            },
+            from: 'offer-details'
+          }
+        });
+      }, 50);
+    }
   }
 
   onDatePickerClose(): void {
-    this.showDatePickerModal = false;
-    this.datePickerCheckIn = '';
-    this.datePickerCheckOut = '';
-    this.datePickerError = '';
+    this.onOfferDatePickerClosed();
   }
-
   onDatePickerProceed(data: { checkIn: string; checkOut: string; roomTypeId?: number; offerId?: number }): void {
-    this.showDatePickerModal = false;
-    
-    // Store state in service
-    this.bookingStateService.setBookingState({
-      checkIn: data.checkIn,
-      checkOut: data.checkOut,
-      offerId: this.offerId ?? undefined
-    });
-    
-    // Navigate without query params
-    this.router.navigate(['/booking']);
+    // Legacy method - replaced by onOfferDatePickerProceed
   }
 
   private formatDateForInput(date: Date): string {

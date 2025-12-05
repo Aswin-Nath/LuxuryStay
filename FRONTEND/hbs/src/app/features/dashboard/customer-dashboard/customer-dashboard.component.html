@@ -81,7 +81,6 @@
               class="rounded-xl bg-white p-3 md:p-4 lg:p-5 shadow hover:shadow-lg transition">
               <div class="flex flex-col sm:flex-row justify-between sm:items-start mb-3 gap-2">
                 <h4 class="text-base md:text-lg font-semibold text-yellow-700">{{ booking.room_type_name }}</h4>
-                <span class="text-xs md:text-sm text-gray-500 whitespace-nowrap">Room No: {{ booking.room_numbers }}</span>
               </div>
               <div class="grid sm:grid-cols-2 gap-2 md:gap-3 text-xs md:text-sm text-gray-600">
                 <p>📅 <span class="font-semibold">Check-in:</span> {{ booking.check_in | date: 'MMM d, yyyy h:mm a' }}</p>

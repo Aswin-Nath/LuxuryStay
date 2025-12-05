@@ -10,13 +10,14 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 
 // Define booking phases - numeric for simplicity
-type Phase = 0 | 1 | 2;
+type Phase = 0 | 1 | 2 | 3;
 
 // Phase constants
 const PHASES = {
   DATES: 0,
   SEARCH_AND_DETAILS: 1,
-  PAYMENT: 2
+  PAYMENT: 2,
+  CONFIRMATION: 3
 } as const;
 
 // Guest details per room
@@ -157,6 +158,10 @@ export class BookingComponent implements OnInit, OnDestroy {
   remainingMinutes: number = 0;
   remainingSeconds: number = 0;
   timerColor: string = 'text-green-500';
+
+  // Confirmation phase state
+  confirmationData: any = null;
+  bookingId: number | null = null;
   isTimerRunning: boolean = false;
   
   // Lock expiry tracking
@@ -1323,8 +1328,23 @@ export class BookingComponent implements OnInit, OnDestroy {
     this.bookingStartTime = null;
     this.isInitialLoad = true; // Reset flag for next booking
     this.isProcessingDateChange = false;
+    this.confirmationData = null; // Clear confirmation data
+    this.bookingId = null; // Clear booking ID
     this.cdr.markForCheck();
     this.cdr.detectChanges();
+  }
+
+  goToDashboard(): void {
+    // Reset booking state and navigate to dashboard
+    this.selectedPaymentMethod = null;
+    this.upiId = '';
+    this.roomGuestDetails = {};
+    this.selectedLocks = [];
+    this.bookingSummary = null;
+    this.confirmationData = null;
+    this.bookingId = null;
+    this.currentPhase = PHASES.DATES;
+    this.router.navigate(['/dashboard/bookings']);
   }
 
   // Helper method for phase checking - REMOVED TO FIX RENDERING ISSUE
@@ -1667,26 +1687,12 @@ export class BookingComponent implements OnInit, OnDestroy {
           console.log('✅ Booking confirmed successfully:', response);
           this.isProcessingPayment = false;
 
-          // Show success message with booking details
-          const message = `✅ Booking Confirmed!\n\n` +
-            `Booking ID: ${response.booking_id}\n` +
-            `Transaction Ref: ${response.transaction_reference}\n` +
-            `Total Amount: ₹${response.total_amount.toFixed(2)}\n` +
-            `Rooms: ${response.room_count}\n\n` +
-            `Thank you for booking with LuxuryStay!`;
-          
-          alert(message);
+          // Store confirmation data
+          this.confirmationData = response;
+          this.bookingId = response.booking_id;
 
-          // Reset booking state
-          this.selectedPaymentMethod = null;
-          this.upiId = '';
-          this.roomGuestDetails = {};
-          this.selectedLocks = [];
-          this.bookingSummary = null;
-          this.currentPhase = PHASES.DATES;
-
-          // Navigate to bookings dashboard
-          this.router.navigate(['/dashboard/bookings']);
+          // Move to confirmation phase
+          this.currentPhase = PHASES.CONFIRMATION;
         },
         error: (err) => {
           this.isProcessingPayment = false;
@@ -1874,10 +1880,5 @@ export class BookingComponent implements OnInit, OnDestroy {
     } catch (error) {
       console.error('Error in loadUserDetails:', error);
     }
-  }
-
-  goToDashboard(): void {
-    this.resetBooking();
-    this.router.navigate(['/dashboard']);
   }
 }

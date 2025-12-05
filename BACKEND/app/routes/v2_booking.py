@@ -8,6 +8,7 @@ from app.dependencies.authentication import get_current_user
 from app.models.sqlalchemy_schemas.users import Users
 from app.models.sqlalchemy_schemas.rooms import Rooms, RoomAvailabilityLocks, RoomTypes
 from app.models.sqlalchemy_schemas.bookings import Bookings, BookingRoomMap
+from app.models.sqlalchemy_schemas.offers import Offers
 from app.models.sqlalchemy_schemas.payments import Payments
 from app.crud.bookings import create_payment
 import uuid
@@ -853,3 +854,605 @@ async def get_payment_status(
         "message": "Payment processing...",
         "user_id": current_user.user_id
     }
+
+
+# ==========================================================
+# 🎁 OFFER-BASED BOOKING FLOW
+# ==========================================================
+
+# ─────────────────────────────────────────────────────────
+# 1️⃣ CHECK AVAILABILITY FOR OFFER
+# ─────────────────────────────────────────────────────────
+@router.post("/offer/check-availability")
+async def check_offer_availability(
+    offer_id: int = Body(...),
+    check_in: str = Body(...),
+    check_out: str = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+):
+    """
+    Check if enough rooms are available for all room types in the offer.
+    
+    Returns availability status for each room type:
+    - required_count: How many rooms of this type are included in the offer
+    - available_count: How many rooms are actually free for the dates
+    - is_available: True if available_count >= required_count
+    
+    Body:
+    {
+      "offer_id": 5,
+      "check_in": "2025-12-15",
+      "check_out": "2025-12-18"
+    }
+    """
+    try:
+        check_in_date = datetime.strptime(check_in, "%Y-%m-%d").date()
+        check_out_date = datetime.strptime(check_out, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format (use YYYY-MM-DD)")
+
+    if check_in_date >= check_out_date:
+        raise HTTPException(status_code=400, detail="check_in must be before check_out")
+
+    now = datetime.utcnow()
+
+    # 1. Get offer details
+    offer_result = await db.execute(
+        select(Offers).where(Offers.offer_id == offer_id)
+    )
+    offer = offer_result.scalar_one_or_none()
+
+    if not offer:
+        raise HTTPException(status_code=404, detail=f"Offer with ID {offer_id} not found")
+
+    if not offer.is_active:
+        raise HTTPException(status_code=400, detail="Offer is not active")
+
+    from datetime import date as date_type
+    today = date_type.today()
+    if not (offer.valid_from <= today <= offer.valid_to):
+        raise HTTPException(status_code=400, detail="Offer is not valid for today")
+
+    # 2. Check room types in offer
+    if not offer.room_types or len(offer.room_types) == 0:
+        raise HTTPException(status_code=400, detail="Offer has no room types configured")
+
+    availability_results = []
+    all_available = True
+
+    for room_config in offer.room_types:
+        room_type_id = room_config.get("room_type_id")
+        required_count = room_config.get("available_count", 1)
+
+        # Get total rooms of this type
+        rooms_result = await db.execute(
+            select(Rooms.room_id).where(Rooms.room_type_id == room_type_id)
+        )
+        total_room_ids = [r[0] for r in rooms_result.fetchall()]
+
+        # Get locked rooms for date range
+        locked_result = await db.execute(
+            select(RoomAvailabilityLocks.room_id)
+            .where(RoomAvailabilityLocks.expires_at > now)
+            .where(RoomAvailabilityLocks.check_in < check_out_date)
+            .where(RoomAvailabilityLocks.check_out > check_in_date)
+            .where(RoomAvailabilityLocks.room_type_id == room_type_id)
+        )
+        locked_ids = set(locked_result.scalars().all())
+
+        available_count = len([rid for rid in total_room_ids if rid not in locked_ids])
+        is_available = available_count >= required_count
+
+        if not is_available:
+            all_available = False
+
+        # Get room type name
+        rt_result = await db.execute(
+            select(RoomTypes).where(RoomTypes.room_type_id == room_type_id)
+        )
+        room_type = rt_result.scalar_one_or_none()
+
+        availability_results.append({
+            "room_type_id": room_type_id,
+            "type_name": room_type.type_name if room_type else "Unknown",
+            "required_count": required_count,
+            "available_count": available_count,
+            "is_available": is_available
+        })
+
+    return {
+        "offer_id": offer_id,
+        "offer_name": offer.offer_name,
+        "check_in": check_in,
+        "check_out": check_out,
+        "overall_available": all_available,
+        "room_types": availability_results,
+        "message": "All room types available!" if all_available else "Some room types not available for these dates"
+    }
+
+
+# ─────────────────────────────────────────────────────────
+# 2️⃣ LOCK ALL ROOMS FOR OFFER
+# ─────────────────────────────────────────────────────────
+@router.post("/offer/lock")
+async def lock_offer_rooms(
+    offer_id: int = Body(...),
+    check_in: str = Body(...),
+    check_out: str = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+):
+    """
+    Lock all required rooms for an offer.
+    Creates one lock per room, all tagged with same offer_id.
+    
+    Returns list of locked rooms with lock_ids and 15-min expiry.
+    
+    Body:
+    {
+      "offer_id": 5,
+      "check_in": "2025-12-15",
+      "check_out": "2025-12-18"
+    }
+    """
+    try:
+        check_in_date = datetime.strptime(check_in, "%Y-%m-%d").date()
+        check_out_date = datetime.strptime(check_out, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format (use YYYY-MM-DD)")
+
+    if check_in_date >= check_out_date:
+        raise HTTPException(status_code=400, detail="check_in must be before check_out")
+
+    now = datetime.utcnow()
+    expiry = now + timedelta(minutes=15)
+
+    # 1. Validate offer
+    offer_result = await db.execute(
+        select(Offers).where(Offers.offer_id == offer_id)
+    )
+    offer = offer_result.scalar_one_or_none()
+
+    if not offer:
+        raise HTTPException(status_code=404, detail=f"Offer with ID {offer_id} not found")
+
+    if not offer.is_active:
+        raise HTTPException(status_code=400, detail="Offer is not active")
+
+    from datetime import date as date_type
+    today = date_type.today()
+    if not (offer.valid_from <= today <= offer.valid_to):
+        raise HTTPException(status_code=400, detail="Offer is not valid for today")
+
+    # 2. Lock rooms for each room type in offer
+    locked_rooms = []
+    locked_lock_ids = []
+
+    for room_config in offer.room_types:
+        room_type_id = room_config.get("room_type_id")
+        required_count = room_config.get("available_count", 1)
+
+        # Get free rooms of this type
+        rooms_result = await db.execute(
+            select(Rooms).where(Rooms.room_type_id == room_type_id)
+        )
+        all_rooms = rooms_result.scalars().all()
+
+        # Get locked rooms
+        locked_result = await db.execute(
+            select(RoomAvailabilityLocks.room_id)
+            .where(RoomAvailabilityLocks.expires_at > now)
+            .where(RoomAvailabilityLocks.check_in < check_out_date)
+            .where(RoomAvailabilityLocks.check_out > check_in_date)
+            .where(RoomAvailabilityLocks.room_type_id == room_type_id)
+        )
+        locked_ids = set(locked_result.scalars().all())
+
+        # Pick first 'required_count' free rooms
+        free_rooms = [r for r in all_rooms if r.room_id not in locked_ids]
+
+        if len(free_rooms) < required_count:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Not enough {room_type_id} rooms available. Need {required_count}, found {len(free_rooms)}"
+            )
+
+        # Lock these rooms
+        for room in free_rooms[:required_count]:
+            lock = RoomAvailabilityLocks(
+                room_id=room.room_id,
+                room_type_id=room_type_id,
+                user_id=current_user.user_id,
+                offer_id=offer_id,
+                check_in=check_in_date,
+                check_out=check_out_date,
+                expires_at=expiry
+            )
+            db.add(lock)
+            locked_lock_ids.append(lock.lock_id)
+
+            locked_rooms.append({
+                "room_id": room.room_id,
+                "room_no": room.room_no,
+                "room_type_id": room_type_id,
+                "lock_id": None  # Will be set after commit
+            })
+
+    await db.commit()
+
+    # Refresh to get lock IDs
+    refresh_result = await db.execute(
+        select(RoomAvailabilityLocks)
+        .where(RoomAvailabilityLocks.offer_id == offer_id)
+        .where(RoomAvailabilityLocks.user_id == current_user.user_id)
+        .where(RoomAvailabilityLocks.expires_at == expiry)
+    )
+    refreshed_locks = refresh_result.scalars().all()
+
+    locked_rooms_detailed = []
+    for lock in refreshed_locks:
+        locked_rooms_detailed.append({
+            "lock_id": lock.lock_id,
+            "room_id": lock.room_id,
+            "room_type_id": lock.room_type_id,
+            "offer_id": lock.offer_id,
+            "check_in": lock.check_in.isoformat(),
+            "check_out": lock.check_out.isoformat(),
+            "expires_at": lock.expires_at.isoformat()
+        })
+
+    return {
+        "offer_id": offer_id,
+        "offer_name": offer.offer_name,
+        "locked_rooms": locked_rooms_detailed,
+        "total_locked": len(locked_rooms_detailed),
+        "expires_at": expiry.isoformat(),
+        "remaining_minutes": 15,
+        "message": f"Successfully locked {len(locked_rooms_detailed)} rooms for offer #{offer_id}"
+    }
+
+
+# ─────────────────────────────────────────────────────────
+# 2️⃣B RELEASE OFFER LOCKS (Cancel Booking)
+# ─────────────────────────────────────────────────────────
+@router.post("/offer/{offer_id}/release")
+async def release_offer_locks(
+    offer_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+):
+    """
+    Release all locks for a specific offer for the current user.
+    Used when user cancels offer booking.
+    """
+    from sqlalchemy import delete
+    
+    # Delete all locks for this offer and user
+    result = await db.execute(
+        delete(RoomAvailabilityLocks).where(
+            RoomAvailabilityLocks.offer_id == offer_id
+        ).where(
+            RoomAvailabilityLocks.user_id == current_user.user_id
+        )
+    )
+    
+    locks_released = result.rowcount
+    await db.commit()
+
+    return {
+        "success": True,
+        "offer_id": offer_id,
+        "locks_released": locks_released,
+        "message": f"Released {locks_released} room locks for offer #{offer_id}"
+    }
+
+
+# ─────────────────────────────────────────────────────────
+# 3️⃣ GET ROOMS LOCKED BY OFFER_ID
+# ─────────────────────────────────────────────────────────
+@router.get("/offer/{offer_id}/locked-rooms")
+async def get_rooms_by_offer_id(
+    offer_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+):
+    """
+    Get all locked rooms for a specific offer_id.
+    Used in Details_Filling and Payments pages to show room details and pricing.
+    
+    Returns room details with pricing and guest count capacities.
+    
+    Query: /api/v2/rooms/offer/5/locked-rooms
+    """
+    now = datetime.utcnow()
+
+    # Get all locks for this offer_id and user
+    result = await db.execute(
+        select(RoomAvailabilityLocks, Rooms, RoomTypes)
+        .join(Rooms, Rooms.room_id == RoomAvailabilityLocks.room_id)
+        .join(RoomTypes, RoomTypes.room_type_id == Rooms.room_type_id)
+        .where(RoomAvailabilityLocks.offer_id == offer_id)
+        .where(RoomAvailabilityLocks.user_id == current_user.user_id)
+        .where(RoomAvailabilityLocks.expires_at > now)
+    )
+
+    rows = result.fetchall()
+    if not rows:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No active locks found for offer #{offer_id}"
+        )
+
+    # Validate offer exists
+    offer_result = await db.execute(
+        select(Offers).where(Offers.offer_id == offer_id)
+    )
+    offer = offer_result.scalar_one_or_none()
+
+    if not offer:
+        raise HTTPException(status_code=404, detail="Offer not found")
+
+    # Build room details with pricing
+    rooms_details = []
+    total_amount = 0.0
+
+    for lock, room, room_type in rows:
+        nights = (lock.check_out - lock.check_in).days
+        
+        # Get discount for this room type from offer config
+        discount_percent = 0
+        for room_config in offer.room_types:
+            if room_config.get("room_type_id") == room_type.room_type_id:
+                discount_percent = room_config.get("discount_percent", 0)
+                break
+
+        original_price = float(room_type.price_per_night) * nights
+        discount_amount = original_price * (discount_percent / 100)
+        final_price = original_price - discount_amount
+
+        total_amount += final_price
+
+        rooms_details.append({
+            "lock_id": lock.lock_id,
+            "room_id": room.room_id,
+            "room_no": room.room_no,
+            "room_type_id": room_type.room_type_id,
+            "type_name": room_type.type_name,
+            "check_in": lock.check_in.isoformat(),
+            "check_out": lock.check_out.isoformat(),
+            "nights": nights,
+            "original_price_per_night": float(room_type.price_per_night),
+            "original_total": original_price,
+            "discount_percent": discount_percent,
+            "discount_amount": round(discount_amount, 2),
+            "final_price": round(final_price, 2),
+            "max_adult_count": room_type.max_adult_count,
+            "max_child_count": room_type.max_child_count,
+            "square_ft": room_type.square_ft,
+            "description": room_type.description,
+            "expires_at": lock.expires_at.isoformat()
+        })
+
+    return {
+        "offer_id": offer_id,
+        "offer_name": offer.offer_name,
+        "total_rooms": len(rooms_details),
+        "rooms": rooms_details,
+        "total_discount": round(sum(
+            float(room_type.price_per_night) * (lock.check_out - lock.check_in).days * 
+            (next((rc.get("discount_percent", 0) for rc in offer.room_types if rc.get("room_type_id") == room_type.room_type_id), 0) / 100)
+            for lock, room, room_type in rows
+        ), 2),
+        "total_amount_after_discount": round(total_amount, 2)
+    }
+
+
+# ─────────────────────────────────────────────────────────
+# 4️⃣ CONFIRM BOOKING WITH OFFER_ID
+# ─────────────────────────────────────────────────────────
+@router.post("/offer/{offer_id}/booking/confirm")
+async def confirm_offer_booking(
+    offer_id: int,
+    request: BookingConfirmRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+):
+    """
+    Confirm booking for offer-locked rooms.
+    Similar to regular confirm_booking but operates on offer_id filtered locks.
+    
+    Body:
+    {
+      "offer_id": 5,
+      "payment_method_id": 1,
+      "rooms_guest_details": [
+        {
+          "lock_id": 123,
+          "guest_name": "John Doe",
+          "guest_age": 28,
+          "adult_count": 2,
+          "child_count": 1,
+          "special_requests": "High floor"
+        }
+      ]
+    }
+    """
+    now = datetime.utcnow()
+    
+    # Step 1: Get all locks for this offer_id
+    lock_ids = [gd.lock_id for gd in request.rooms_guest_details]
+    
+    result = await db.execute(
+        select(RoomAvailabilityLocks, Rooms, RoomTypes)
+        .join(Rooms, Rooms.room_id == RoomAvailabilityLocks.room_id)
+        .join(RoomTypes, RoomTypes.room_type_id == Rooms.room_type_id)
+        .where(RoomAvailabilityLocks.lock_id.in_(lock_ids))
+        .where(RoomAvailabilityLocks.user_id == current_user.user_id)
+        .where(RoomAvailabilityLocks.offer_id == offer_id)
+        .where(RoomAvailabilityLocks.expires_at > now)
+    )
+
+    rows = result.fetchall()
+    if not rows:
+        raise HTTPException(status_code=400, detail="No active offer locks found")
+
+    if len(rows) != len(request.rooms_guest_details):
+        raise HTTPException(status_code=400, detail="Mismatch between locked rooms and guest details")
+
+    # Get offer for discount calculation
+    offer_result = await db.execute(
+        select(Offers).where(Offers.offer_id == offer_id)
+    )
+    offer = offer_result.scalar_one_or_none()
+    if not offer:
+        raise HTTPException(status_code=404, detail="Offer not found")
+
+    # Create mapping of lock_id to guest details
+    guest_details_map = {gd.lock_id: gd for gd in request.rooms_guest_details}
+
+    # Step 2: Create booking entry
+    first_lock = rows[0][0]
+    user = current_user
+    
+    booking = Bookings(
+        user_id=current_user.user_id,
+        room_count=len(rows),
+        check_in=first_lock.check_in,
+        check_out=first_lock.check_out,
+        total_price=0,  # Will update after calculating
+        status="Confirmed",
+        created_at=now,
+        primary_customer_name=user.full_name if hasattr(user, 'full_name') else None,
+        primary_customer_phone_number=user.phone_number if hasattr(user, 'phone_number') else None,
+        primary_customer_dob=user.dob if hasattr(user, 'dob') else None
+    )
+    db.add(booking)
+    await db.flush()
+
+    # Step 3: Map rooms to booking with guest details + Calculate total with discount
+    total_amount = 0.0
+    booking_rooms_details = []
+    
+    for lock, room, room_type in rows:
+        guest_detail = guest_details_map.get(lock.lock_id)
+        if not guest_detail:
+            raise HTTPException(status_code=400, detail=f"Missing guest details for lock {lock.lock_id}")
+
+        nights = (lock.check_out - lock.check_in).days
+        
+        # Get discount for this room type
+        discount_percent = 0
+        for room_config in offer.room_types:
+            if room_config.get("room_type_id") == room_type.room_type_id:
+                discount_percent = room_config.get("discount_percent", 0)
+                break
+
+        original_price = float(room_type.price_per_night) * nights
+        discount_amount = original_price * (discount_percent / 100)
+        final_price = original_price - discount_amount
+        total_amount += final_price
+
+        # Create BookingRoomMap
+        booking_room = BookingRoomMap(
+            booking_id=booking.booking_id,
+            room_id=room.room_id,
+            room_type_id=room_type.room_type_id,
+            guest_name=guest_detail.guest_name,
+            guest_age=guest_detail.guest_age,
+            special_requests=guest_detail.special_requests,
+            updated_at=now,
+            adults=guest_detail.adult_count,
+            children=guest_detail.child_count
+        )
+        db.add(booking_room)
+
+        booking_rooms_details.append({
+            "room_id": room.room_id,
+            "room_no": room.room_no,
+            "type_name": room_type.type_name,
+            "check_in": lock.check_in,
+            "check_out": lock.check_out,
+            "nights": nights,
+            "original_price_per_night": float(room_type.price_per_night),
+            "discount_percent": discount_percent,
+            "final_price_per_night": float(room_type.price_per_night) * (1 - discount_percent / 100),
+            "total_price": final_price,
+            "guest_name": guest_detail.guest_name,
+            "guest_age": guest_detail.guest_age,
+            "adult_count": guest_detail.adult_count,
+            "child_count": guest_detail.child_count,
+            "special_requests": guest_detail.special_requests
+        })
+
+    await db.flush()
+
+    # Step 4: Calculate GST (18%)
+    gst_amount = total_amount * 0.18
+    final_amount = total_amount + gst_amount
+    booking.total_price = final_amount
+
+    # Step 5: Create payment record
+    transaction_reference = f"OFFER_{offer_id}_{booking.booking_id}_{uuid.uuid4().hex[:8].upper()}"
+    payment = Payments(
+        booking_id=booking.booking_id,
+        amount=final_amount,
+        method_id=request.payment_method_id,
+        status="SUCCESS",
+        transaction_reference=transaction_reference,
+        user_id=current_user.user_id,
+        remarks=f"Offer #{offer_id} booking - {len(rows)} room(s)"
+    )
+    db.add(payment)
+    await db.flush()
+
+    # Step 6: Delete locks
+    await db.execute(
+        delete(RoomAvailabilityLocks).where(
+            RoomAvailabilityLocks.lock_id.in_(lock_ids)
+        )
+    )
+
+    await db.commit()
+
+    # Get payment method name
+    payment_methods = {1: "Credit/Debit Card", 2: "UPI", 3: "Net Banking"}
+    payment_method_name = payment_methods.get(request.payment_method_id, "Unknown")
+
+    # Return confirmation
+    return PaymentConfirmationResponse(
+        booking_id=booking.booking_id,
+        user_id=current_user.user_id,
+        check_in=first_lock.check_in,
+        check_out=first_lock.check_out,
+        total_nights=sum((lock.check_out - lock.check_in).days for lock, _, _ in rows),
+        booking_status="CONFIRMED",
+        created_at=now,
+        rooms=[
+            BookingRoomDetail(
+                room_id=detail["room_id"],
+                room_no=detail["room_no"],
+                type_name=detail["type_name"],
+                check_in=detail["check_in"],
+                check_out=detail["check_out"],
+                nights=detail["nights"],
+                price_per_night=detail["final_price_per_night"],
+                total_price=detail["total_price"],
+                guest_name=detail["guest_name"],
+                guest_age=detail["guest_age"],
+                adult_count=detail["adult_count"],
+                child_count=detail["child_count"],
+                special_requests=detail["special_requests"]
+            )
+            for detail in booking_rooms_details
+        ],
+        room_count=len(rows),
+        subtotal=total_amount,
+        gst_18_percent=gst_amount,
+        total_amount=final_amount,
+        payment_id=payment.payment_id,
+        payment_status="SUCCESS",
+        payment_method=payment_method_name,
+        transaction_reference=transaction_reference,
+        transaction_date=now
+    )

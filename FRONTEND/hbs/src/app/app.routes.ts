@@ -35,6 +35,7 @@ import { WishlistComponent } from './features/wishlist/wishlist.component';
 import { CustomerRoomDetailComponent } from './features/customer-room-detail/customer-room-detail.component';
 import { CustomerOfferDetailComponent } from './features/customer-offer-detail/customer-offer-detail.component';
 import { OfferClaimComponent } from './features/booking/offer-claim/offer-claim.component';
+import { OfferBookingComponent } from './features/booking/offer-booking.component';
 
 export const routes: Routes = [
 	{ path: '', redirectTo: 'login', pathMatch: 'full' },
@@ -64,6 +65,7 @@ export const routes: Routes = [
 					{ path: 'wishlist', component: WishlistComponent },
 					{ path: 'room-details/:id', component: CustomerRoomDetailComponent },
 					{ path: 'offer-details/:id', component: CustomerOfferDetailComponent },
+					{ path: 'offers/book/:offerId', component: OfferBookingComponent },
 					{
 						path: 'bookings',
 						children: [

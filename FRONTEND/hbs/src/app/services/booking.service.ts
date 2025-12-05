@@ -189,12 +189,48 @@ export class BookingService {
     // IMPORTANT: Kill all previous timers when starting a new session
     this.timerCleanup.next();
     
+    // Parse expiry time with validation
     const expiryTime = new Date(session.expiry_time).getTime();
+    const now = new Date().getTime();
+    
+    // 🚨 CRITICAL VALIDATION: Check if expiry time is valid and in the future
+    if (isNaN(expiryTime)) {
+      console.error('❌ INVALID EXPIRY TIME FORMAT:', session.expiry_time);
+      console.error('Unable to parse timestamp. Setting 15 minutes from now as fallback.');
+      const fallbackExpiry = now + (15 * 60 * 1000);
+      this.startSessionTimer({ ...session, expiry_time: new Date(fallbackExpiry).toISOString() });
+      return;
+    }
+
+    const timeUntilExpiry = expiryTime - now;
+    
+    if (timeUntilExpiry < 0) {
+      console.error('❌ BACKEND RETURNED EXPIRED TIMESTAMP!');
+      console.error('Expiry Time:', new Date(expiryTime).toISOString());
+      console.error('Current Time:', new Date(now).toISOString());
+      console.error('Time Difference (ms):', timeUntilExpiry);
+      console.warn('⚠️ Using fallback: 15 minutes from now');
+      
+      // Fallback: Use 15 minutes from now
+      const fallbackExpiry = now + (15 * 60 * 1000);
+      this.startSessionTimer({ ...session, expiry_time: new Date(fallbackExpiry).toISOString() });
+      return;
+    }
+
+    console.log('✅ SESSION TIMER INITIALIZED:', {
+      expiry_time: session.expiry_time,
+      expiry_timestamp: expiryTime,
+      now_timestamp: now,
+      time_until_expiry_ms: timeUntilExpiry,
+      time_until_expiry_seconds: Math.floor(timeUntilExpiry / 1000),
+      expiry_date: new Date(expiryTime).toISOString(),
+      current_date: new Date(now).toISOString()
+    });
     
     // For NEW sessions, always calculate fresh remaining time from expiry time
-    const now = new Date().getTime();
     const initialRemaining = Math.max(0, Math.floor((expiryTime - now) / 1000));
     
+    console.log('⏱️ INITIAL REMAINING TIME:', initialRemaining, 'seconds');
     this.remainingTime.next(initialRemaining);
     
     // Create a subject to handle this specific subscription cleanup
@@ -212,6 +248,7 @@ export class BookingService {
         this.remainingTime.next(remaining);
         
         if (remaining <= 0) {
+          console.warn('⏰ SESSION EXPIRED - Triggering session expired handler');
           this.isSessionExpired.next(true);
           timerSubject.next();
           timerSubject.complete();

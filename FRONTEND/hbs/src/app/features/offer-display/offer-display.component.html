@@ -189,7 +189,7 @@
               View Details
             </button>
             <button
-              (click)="openBookingModal(offer)"
+              (click)="bookNow(offer)"
               class="flex-1 px-4 py-2 sm:py-3 bg-yellow-600 text-white font-semibold rounded-lg hover:bg-yellow-700 transition text-sm sm:text-base flex items-center justify-center gap-2"
             >
               <span class="material-icons text-sm">shopping_cart</span>
@@ -214,16 +214,14 @@
     <p class="text-gray-600 text-lg">No offers found matching your filters</p>
   </div>
 
-  <!-- Date Picker Modal -->
-  <app-date-picker-modal 
-    [isOpen]="showDatePickerModal"
-    [checkIn]="datePickerCheckIn"
-    [checkOut]="datePickerCheckOut"
-    [error]="datePickerError"
-    [offerId]="selectedOfferForBooking?.offer_id"
-    (close)="onDatePickerClose($event)"
-    (proceed)="onDatePickerProceed($event)">
-  </app-date-picker-modal>
+  <!-- Offer Date Picker Modal -->
+  <app-offer-date-picker-modal
+    [offerId]="selectedOfferForDatePicker?.offer_id ?? 0"
+    [offerName]="selectedOfferForDatePicker?.offer_name ?? ''"
+    [isVisible]="showOfferDatePickerModal"
+    (closed)="onOfferDatePickerClosed()"
+    (proceedToDetails)="onOfferDatePickerProceed($event)"
+  ></app-offer-date-picker-modal>
 
 </div>
 

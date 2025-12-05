@@ -739,6 +739,111 @@
   </div>
 
   <!-- ===================================================
+       PHASE 3: CONFIRMATION PAGE
+       =================================================== -->
+  <div *ngIf="currentPhase === PHASES.CONFIRMATION" class="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 p-4 lg:p-8">
+    <div class="max-w-4xl mx-auto">
+      <!-- Sticky Header with Timer -->
+      <div class="sticky top-0 z-40 bg-white shadow-md rounded-lg p-4 mb-8">
+        <div class="flex items-center justify-between">
+          <h1 class="text-2xl font-bold text-gray-800">🏨 LuxuryStay</h1>
+          <div class="text-right">
+            <p class="text-sm text-gray-600">Booking Reference</p>
+            <p class="text-xl font-bold text-blue-600">#{{ confirmationData?.booking_id }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Content -->
+      <div class="space-y-8">
+        <!-- Success Icon with Animation -->
+        <div class="flex justify-center">
+          <div class="relative w-24 h-24 bg-linear-to-r from-green-400 to-green-600 rounded-full flex items-center justify-center animate-pulse">
+            <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Success Message -->
+        <div class="text-center">
+          <h2 class="text-4xl font-bold text-gray-800 mb-2">✅ Booking Confirmed!</h2>
+          <p class="text-xl text-gray-600">Thank you for booking with LuxuryStay</p>
+        </div>
+
+        <!-- Booking Details Card -->
+        <div class="bg-white rounded-2xl shadow-lg p-8 border-2 border-green-200">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Left Column -->
+            <div class="space-y-6">
+              <div>
+                <p class="text-gray-600 text-sm font-semibold mb-1">BOOKING ID</p>
+                <p class="text-2xl font-bold text-gray-800">{{ confirmationData?.booking_id }}</p>
+              </div>
+              
+              <div>
+                <p class="text-gray-600 text-sm font-semibold mb-1">TRANSACTION REFERENCE</p>
+                <p class="text-lg font-mono text-gray-700">{{ confirmationData?.transaction_reference }}</p>
+              </div>
+
+              <div>
+                <p class="text-gray-600 text-sm font-semibold mb-1">TOTAL AMOUNT PAID</p>
+                <p class="text-3xl font-bold text-green-600">₹{{ confirmationData?.total_amount | number:'1.0-2' }}</p>
+              </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="space-y-6 bg-gray-50 p-6 rounded-lg">
+              <div>
+                <p class="text-gray-600 text-sm font-semibold mb-1">CHECK-IN</p>
+                <p class="text-xl font-bold text-gray-800">{{ confirmationData?.check_in | date:'MMM dd, yyyy' }}</p>
+              </div>
+
+              <div>
+                <p class="text-gray-600 text-sm font-semibold mb-1">CHECK-OUT</p>
+                <p class="text-xl font-bold text-gray-800">{{ confirmationData?.check_out | date:'MMM dd, yyyy' }}</p>
+              </div>
+
+              <div>
+                <p class="text-gray-600 text-sm font-semibold mb-1">ROOMS BOOKED</p>
+                <p class="text-2xl font-bold text-blue-600">{{ confirmationData?.room_count }} Room<span *ngIf="confirmationData?.room_count !== 1">s</span></p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Confirmation Message -->
+        <div class="bg-blue-50 border-l-4 border-blue-500 p-6 rounded-lg">
+          <p class="text-blue-800 font-semibold mb-2">📧 Confirmation Email</p>
+          <p class="text-blue-700">A detailed confirmation email has been sent to your registered email address with all booking details and hotel information.</p>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <button 
+            (click)="goToDashboard()"
+            class="py-4 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition transform hover:scale-105 shadow-lg">
+            📋 View My Bookings
+          </button>
+          
+          <button 
+            (click)="startNewBooking()"
+            class="py-4 px-6 bg-linear-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold rounded-lg transition transform hover:scale-105 shadow-lg">
+            🏨 Browse More Hotels
+          </button>
+        </div>
+
+        <!-- Support Information -->
+        <div class="bg-gray-50 rounded-lg p-6 text-center">
+          <p class="text-gray-600 mb-2">Need Help?</p>
+          <p class="text-gray-700 font-semibold">Contact our support team at <a href="mailto:support@luxurystay.com" class="text-blue-600 hover:underline">support@luxurystay.com</a></p>
+          <p class="text-gray-600 text-sm mt-2">Available 24/7 to assist you</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================
        CHANGE DATES MODAL (Overlay)
        =================================================== -->
     <div *ngIf="showChangeDatesModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

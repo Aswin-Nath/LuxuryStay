@@ -291,13 +291,12 @@
   </div>
 </div>
 
-<!-- Date Picker Modal -->
-<app-date-picker-modal 
-  [isOpen]="showDatePickerModal"
-  [checkIn]="datePickerCheckIn"
-  [checkOut]="datePickerCheckOut"
-  [error]="datePickerError"
-  [offerId]="offerId ?? undefined"
-  (close)="onDatePickerClose()"
-  (proceed)="onDatePickerProceed($event)">
-</app-date-picker-modal>
+<!-- Offer Date Picker Modal -->
+<app-offer-date-picker-modal
+  [offerId]="offerId ?? 0"
+  [offerName]="offer?.offer_name ?? ''"
+  [isVisible]="showOfferDatePickerModal"
+  (closed)="onOfferDatePickerClosed()"
+  (proceedToDetails)="onOfferDatePickerProceed($event)"
+></app-offer-date-picker-modal>
+

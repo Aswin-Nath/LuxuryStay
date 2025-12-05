@@ -10,7 +10,7 @@ import { RoomsService } from '../../core/services/rooms/rooms.service';
 import { BookingStateService } from '../../services/booking-state.service';
 import { CustomerNavbarComponent } from '../../core/components/customer-navbar/customer-navbar.component';
 import { CustomerSidebarComponent } from '../../core/components/customer-sidebar/customer-sidebar.component';
-import { DatePickerModalComponent } from '../../shared/components/date-picker-modal/date-picker-modal.component';
+import { OfferDatePickerModalComponent } from '../../shared/components/offer-date-picker-modal/offer-date-picker-modal.component';
 
 interface Offer {
   offer_id: number;
@@ -40,7 +40,7 @@ export interface RoomType {
 @Component({
   selector: 'app-offer-display',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, CustomerNavbarComponent, DatePickerModalComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, CustomerNavbarComponent, OfferDatePickerModalComponent],
   templateUrl: './offer-display.component.html',
   styleUrl: './offer-display.component.css',
 })
@@ -68,11 +68,8 @@ export class OfferDisplayComponent implements OnInit, OnDestroy {
   selectedRooms: Array<{ room_index: number; adults: number; children: number }> = [];
 
   // Date Picker Modal Properties
-  showDatePickerModal = false;
-  datePickerCheckIn: string = '';
-  datePickerCheckOut: string = '';
-  datePickerError: string = '';
-  selectedOfferForBooking: Offer | null = null;
+  showOfferDatePickerModal = false;
+  selectedOfferForDatePicker: Offer | null = null;
 
   // Image loading
   offerImages = new Map<number, string>(); // offer_id -> image_url
@@ -218,27 +215,60 @@ export class OfferDisplayComponent implements OnInit, OnDestroy {
     this.loadOffers();
   }
 
+  /**
+   * Open offer date picker modal to check availability and lock rooms
+   */
+  bookNow(offer: Offer): void {
+    this.selectedOfferForDatePicker = offer;
+    this.showOfferDatePickerModal = true;
+  }
+
+  /**
+   * Handle modal closed event
+   */
+  onOfferDatePickerClosed(): void {
+    this.showOfferDatePickerModal = false;
+    this.selectedOfferForDatePicker = null;
+  }
+
+  /**
+   * Handle modal proceed event - navigate to booking page with locked rooms data
+   */
+  onOfferDatePickerProceed(event: any): void {
+    this.showOfferDatePickerModal = false;
+    
+    if (this.selectedOfferForDatePicker && event) {
+      const offerId = this.selectedOfferForDatePicker.offer_id;
+      this.selectedOfferForDatePicker = null;
+      
+      // Navigate to booking page with locked rooms data
+      setTimeout(() => {
+        this.router.navigate(['/offers/book', offerId], {
+          state: {
+            lockedRoomsData: {
+              offer_id: offerId,
+              check_in: event.check_in,
+              check_out: event.check_out,
+              locked_rooms: event.locked_rooms,
+              total_amount: event.total_amount_after_discount,
+              expires_at: event.expires_at
+            },
+            from: 'offers'
+          }
+        });
+      }, 50);
+    } else {
+      this.selectedOfferForDatePicker = null;
+    }
+  }
+
   openBookingModal(offer: Offer): void {
-    this.selectedOfferForBooking = offer;
-    this.showDatePickerModal = true;
-    
-    // Set default dates
-    const today = new Date();
-    this.datePickerCheckIn = this.formatDateForInput(today);
-    
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    this.datePickerCheckOut = this.formatDateForInput(tomorrow);
-    
-    this.datePickerError = '';
+    // Legacy method - now just calls bookNow
+    this.bookNow(offer);
   }
 
   closeBookingModal(): void {
-    this.showDatePickerModal = false;
-    this.selectedOfferForBooking = null;
-    this.datePickerCheckIn = '';
-    this.datePickerCheckOut = '';
-    this.datePickerError = '';
+    this.onOfferDatePickerClosed();
   }
 
   onDatePickerClose(): void {
@@ -246,17 +276,7 @@ export class OfferDisplayComponent implements OnInit, OnDestroy {
   }
 
   onDatePickerProceed(data: { checkIn: string; checkOut: string; roomTypeId?: number; offerId?: number }): void {
-    this.showDatePickerModal = false;
-    
-    // Store state in service
-    this.bookingStateService.setBookingState({
-      checkIn: data.checkIn,
-      checkOut: data.checkOut,
-      offerId: this.selectedOfferForBooking?.offer_id
-    });
-    
-    // Navigate without query params
-    this.router.navigate(['/booking']);
+    // Legacy method - replaced by onOfferDatePickerProceed
   }
 
   private formatDateForInput(date: Date): string {
@@ -321,12 +341,6 @@ export class OfferDisplayComponent implements OnInit, OnDestroy {
           console.error('Error toggling wishlist:', err);
         }
       });
-  }
-    bookNow(offer_id:number): void {
-    this.router.navigate(['/offer-process'], { 
-      queryParams: { offer_id:offer_id },
-      state: { from: "offers" }
-    });
   }
 
   viewOfferDetails(offer: Offer): void {
