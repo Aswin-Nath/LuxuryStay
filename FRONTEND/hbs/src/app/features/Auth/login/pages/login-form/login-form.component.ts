@@ -3,14 +3,14 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule, DOCUMENT, NgIf } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { AuthenticationService, TokenResponse } from '../../core/services/authentication/authentication.service';
+import { AuthenticationService, TokenResponse } from '../../../../../shared/services/authentication.service';
 
 @Component({
   selector: 'app-login',
   standalone: true,
   imports: [FormsModule, RouterLink, CommonModule, RouterLinkActive, NgIf],
-  templateUrl: './login.html',
-  styleUrls: ['./login.css'] // optional if you want extra styles
+  templateUrl: './login-form.html',
+  styleUrls: ['./login-form.css'] // optional if you want extra styles
 })
 export class Login implements AfterViewInit {
   @ViewChild('toast') toast!: ElementRef<HTMLDivElement>;

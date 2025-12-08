@@ -4,16 +4,16 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { BookingsService, BookingResponse } from '../../../services/bookings.service';
-import { AdminNavbarComponent } from '../../../layout/Admin/admin-navbar/admin-navbar.component';
-import { AdminSidebarComponent } from '../../../layout/Admin/admin-sidebar/admin-sidebar.component';
+import { BookingsService, BookingResponse } from '../../../../../shared/services/bookings.service';
+import { AdminNavbarComponent } from '../../../../../layout/Admin/admin-navbar/admin-navbar.component';
+import { AdminSidebarComponent } from '../../../../../layout/Admin/admin-sidebar/admin-sidebar.component';
 
 @Component({
   selector: 'app-admin-bookings',
   standalone: true,
   imports: [CommonModule, FormsModule, AdminNavbarComponent, AdminSidebarComponent],
-  templateUrl: './admin-bookings.component.html',
-  styleUrl: './admin-bookings.component.css',
+  templateUrl: './bookings.html',
+  styleUrl: './bookings.css',
 })
 export class AdminBookingsComponent implements OnInit, OnDestroy {
   bookings: BookingResponse[] = [];

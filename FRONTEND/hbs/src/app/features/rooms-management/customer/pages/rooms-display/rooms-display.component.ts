@@ -4,12 +4,20 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { RoomsService } from '../../core/services/rooms/rooms.service';
-import { WishlistService } from '../../services/wishlist.service';
-import { BookingStateService } from '../../services/booking-state.service';
-import { CustomerNavbarComponent } from '../../layout/Customer/customer-navbar/customer-navbar.component';
-import { CustomerSidebarComponent } from '../../layout/Customer/customer-sidebar/customer-sidebar.component';
-import { DatePickerModalComponent } from '../../shared/components/date-picker-modal/date-picker-modal.component';
+// import { RoomsService } from '../../../../../core/services/rooms/rooms.service';
+import { WishlistService } from '../../../../wishlist-management/wishlist.service';
+// import {BookingStt}
+import { RoomsService } from '../../../../../shared/services/rooms.service';
+import { BookingStateService } from '../../../../../shared/services/booking-state.service';
+import { CustomerNavbarComponent } from '../../../../../layout/Customer/customer-navbar/customer-navbar.component';
+import { DatePickerModalComponent } from '../../../../../shared/components/date-picker-modal/date-picker-modal.component';
+
+// import { RoomsService } from '../../core/services/rooms/rooms.service';
+// import { WishlistService } from '../../services/wishlist.service';
+// import { BookingStateService } from '../../services/booking-state.service';
+// import { CustomerNavbarComponent } from '../../layout/Customer/customer-navbar/customer-navbar.component';
+// import { CustomerSidebarComponent } from '../../layout/Customer/customer-sidebar/customer-sidebar.component';
+// import { DatePickerModalComponent } from '../../shared/components/date-picker-modal/date-picker-modal.component';
 
 export interface RoomType {
   room_type_id: number;
@@ -36,8 +44,8 @@ export interface Review {
   selector: 'app-room-display',
   standalone: true,
   imports: [CommonModule, FormsModule, ReactiveFormsModule, CustomerNavbarComponent, DatePickerModalComponent],
-  templateUrl: './room-display.component.html',
-  styleUrl: './room-display.component.css',
+  templateUrl: './rooms-display.html',
+  styleUrl: './rooms-display.css',
 })
 export class RoomDisplayComponent implements OnInit, OnDestroy {
   @ViewChild(CustomerNavbarComponent) navbarComponent!: CustomerNavbarComponent;

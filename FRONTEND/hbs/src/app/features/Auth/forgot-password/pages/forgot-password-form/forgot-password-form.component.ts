@@ -2,15 +2,15 @@ import { Component, ElementRef, ViewChild, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { AuthenticationService } from '../../core/services/authentication/authentication.service';
+import { AuthenticationService } from '../../../../../shared/services/authentication.service';
 import { HttpErrorResponse } from '@angular/common/http';
 
 @Component({
   selector: 'app-forgot-password',
   standalone: true,
   imports: [FormsModule, CommonModule, RouterLink, RouterLinkActive],
-  templateUrl: './forgot-password.html',
-  styleUrls: ['./forgot-password.css']
+  templateUrl: './forgot-password-form.html',
+  styleUrls: ['./forgot-password-form.css']
 })
 export class ForgotPassword implements OnDestroy {
 

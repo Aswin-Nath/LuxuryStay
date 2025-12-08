@@ -1,14 +1,14 @@
 import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { PermissionGroup, Permission } from '../../../core/services/role-management/role-management.service';
+import { PermissionGroup, Permission } from '../../../../services/role-management.service';
 
 @Component({
   selector: 'app-role-permission-modal',
   standalone: true,
   imports: [CommonModule, FormsModule],
-  templateUrl: './role-permission-modal.component.html',
-  styleUrls: ['./role-permission-modal.component.css']
+  templateUrl: './role-mapping.html',
+  styleUrls: ['./role-mapping.css']
 })
 export class RolePermissionModalComponent implements OnInit, OnChanges {
   @Input() isOpen = false;

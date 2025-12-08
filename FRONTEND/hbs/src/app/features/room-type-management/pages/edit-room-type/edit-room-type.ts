@@ -2,13 +2,10 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { RoomsService } from '../../../core/services/rooms/rooms.service';
-import { AdminNavbarComponent } from '../../../layout/Admin/admin-navbar/admin-navbar.component';
-import { AdminSidebarComponent } from '../../../layout/Admin/admin-sidebar/admin-sidebar.component';
-import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
-import { forkJoin, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
-
+import { RoomsService } from '../../../../shared/services/rooms.service';
+import { AdminNavbarComponent } from '../../../../layout/Admin/admin-navbar/admin-navbar.component';
+import { AdminSidebarComponent } from '../../../../layout/Admin/admin-sidebar/admin-sidebar.component';
+import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
 @Component({
   selector: 'app-edit-room-type',
   standalone: true,

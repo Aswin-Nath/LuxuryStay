@@ -36,8 +36,7 @@ export interface Review {
   selector: 'app-room-display',
   standalone: true,
   imports: [CommonModule, FormsModule, ReactiveFormsModule, CustomerNavbarComponent, DatePickerModalComponent],
-  templateUrl: './room-display.component.html',
-  styleUrl: './room-display.component.css',
+  templateUrl: './room-display.component.html'
 })
 export class RoomDisplayComponent implements OnInit, OnDestroy {
   @ViewChild(CustomerNavbarComponent) navbarComponent!: CustomerNavbarComponent;

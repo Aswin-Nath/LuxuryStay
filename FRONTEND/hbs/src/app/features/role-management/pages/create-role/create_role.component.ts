@@ -6,8 +6,8 @@ import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } 
   selector: 'app-add-role-modal',
   standalone: true,
   imports: [CommonModule, FormsModule, ReactiveFormsModule],
-  templateUrl: './add-role-modal.component.html',
-  styleUrls: ['./add-role-modal.component.css']
+  templateUrl: './create_role.html',
+  styleUrls: ['./create_role.css']
 })
 export class AddRoleModalComponent implements OnInit {
   @Input() isOpen = false;

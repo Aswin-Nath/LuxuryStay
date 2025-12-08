@@ -3,11 +3,12 @@ import { CommonModule, DOCUMENT } from '@angular/common';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
-import { SignupService } from "../../core/services/signup/signup.service"
+// import { SignupService } from "../signup.service"
+import { SignupService } from '../../signup.service';
 @Component({
   selector: 'app-signup',
-  templateUrl: './signup.html',
-  styleUrls: ['./signup.css'],
+  templateUrl: './signup-form.html',
+  styleUrls: ['./signup-form.css'],
   imports: [CommonModule, RouterLink, RouterLinkActive, FormsModule],
   standalone: true
 })

@@ -2,17 +2,18 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
-import { AdminNavbarComponent } from '../../../layout/Admin/admin-navbar/admin-navbar.component';
-import { AdminSidebarComponent } from '../../../layout/Admin/admin-sidebar/admin-sidebar.component';
-import { AdminManagementService, AdminUser, Role } from '../../../core/services/admin-management/admin-management.service';
-import { AdminFormModalComponent } from '../users-management/admin-form-modal.component';
+import { AdminNavbarComponent } from '../../../../layout/Admin/admin-navbar/admin-navbar.component';
+import { AdminSidebarComponent } from '../../../../layout/Admin/admin-sidebar/admin-sidebar.component';
+import { AdminManagementService, AdminUser, Role } from '../../../../core/services/admin-management/admin-management.service';
+// import { AdminFormModalComponent } from '../users-management/admin-form-modal.component';
+import { AdminFormModalComponent } from '../admin-addition/admin-addition.component';
 
 @Component({
   selector: 'app-admin-management',
   standalone: true,
   imports: [CommonModule, FormsModule, RouterModule, AdminNavbarComponent, AdminSidebarComponent, AdminFormModalComponent],
-  templateUrl: './admin-management.component.html',
-  styleUrls: ['./admin-management.component.css']
+  templateUrl: './admins-display.html',
+  styleUrls: ['./admins-display.css']
 })
 export class AdminManagementComponent implements OnInit {
   // Make Math available in template

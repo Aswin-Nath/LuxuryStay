@@ -4,9 +4,9 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { WishlistService } from '../../services/wishlist.service';
-import { CustomerNavbarComponent } from '../../layout/Customer/customer-navbar/customer-navbar.component';
-import { CustomerSidebarComponent } from '../../layout/Customer/customer-sidebar/customer-sidebar.component';
+import { WishlistService } from '../../wishlist.service';
+import { CustomerNavbarComponent } from '../../../../layout/Customer/customer-navbar/customer-navbar.component';
+import { CustomerSidebarComponent } from '../../../../layout/Customer/customer-sidebar/customer-sidebar.component';
 
 interface WishlistRoom {
   wishlist_id: number;
@@ -39,8 +39,8 @@ interface WishlistOffer {
   selector: 'app-wishlist',
   standalone: true,
   imports: [CommonModule, FormsModule, ReactiveFormsModule, CustomerNavbarComponent, CustomerSidebarComponent],
-  templateUrl: './wishlist.component.html',
-  styleUrl: './wishlist.component.css',
+  templateUrl: './wishlist-display.html',
+  styleUrl: './wishlist-display.css',
 })
 export class WishlistComponent implements OnInit, OnDestroy {
   currentTab: 'rooms' | 'offers' = 'rooms';

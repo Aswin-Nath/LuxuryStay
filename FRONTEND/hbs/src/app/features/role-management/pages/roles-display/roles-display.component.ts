@@ -1,13 +1,14 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { AdminNavbarComponent } from '../../../layout/Admin/admin-navbar/admin-navbar.component';
-import { AdminSidebarComponent } from '../../../layout/Admin/admin-sidebar/admin-sidebar.component';
-import { RoleManagementService, Role, PermissionGroup, Permission } from '../../../core/services/role-management/role-management.service';
+import { AdminNavbarComponent } from '../../../../layout/Admin/admin-navbar/admin-navbar.component';
+import { AdminSidebarComponent } from '../../../../layout/Admin/admin-sidebar/admin-sidebar.component';
+import { RoleManagementService, Role, PermissionGroup, Permission } from '../../../../services/role-management.service';
 // import { RolePermissionModalComponent } from '../permissions-management/role-permission-modal.component';
-import { AddRoleModalComponent } from './add-role-modal.component';
+// import { AddRoleModalComponent } from './add-role-modal.component';
+import { AddRoleModalComponent } from '../create-role/create_role.component';
 // import { RolePermissionModalComponent } from '../../role-permission-modal.component';
-import { RolePermissionModalComponent } from '../permissions-management/role-permission-modal.component';
+import { RolePermissionModalComponent } from '../role-mapping/role-mapping.component';
 @Component({
   selector: 'app-role-management',
   standalone: true,
@@ -19,8 +20,8 @@ import { RolePermissionModalComponent } from '../permissions-management/role-per
     RolePermissionModalComponent,
     AddRoleModalComponent
   ],
-  templateUrl: './role-management.component.html',
-  styleUrls: ['./role-management.component.css']
+  templateUrl: './roles-display.html',
+  styleUrls: ['./roles-display.css']
 })
 export class RoleManagementComponent implements OnInit {
   // Data

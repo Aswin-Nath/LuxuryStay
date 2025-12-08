@@ -2,10 +2,11 @@ import { Component, OnInit, OnDestroy, ChangeDetectorRef, ChangeDetectionStrateg
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule, ActivatedRoute } from '@angular/router';
-import { BookingService, RoomLock, BookingSession, Room } from '../../services/booking.service';
-import { BookingStateService } from '../../services/booking-state.service';
-import { ToastService } from '../../services/toast.service';
-import { RoomCardComponent } from './room-card/room-card.component';
+import { BookingService, RoomLock, BookingSession, Room } from '../../../../../shared/services/booking.service';
+import { BookingStateService } from '../../../../../shared/services/booking-state.service';
+import { ToastService } from '../../../../../shared/services/toast.service';
+// import { RoomCardComponent } from './room-card/room-card.component';
+import { RoomCardComponent } from '../../../room_card/pages/room-card/room-card.component';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 
@@ -34,8 +35,8 @@ export interface RoomGuestDetails {
   selector: 'app-booking',
   standalone: true,
   imports: [CommonModule, FormsModule, RouterModule, RoomCardComponent],
-  templateUrl: './booking.component.html',
-  styleUrls: ['./booking.component.css']
+  templateUrl: './room_booking.html',
+  styleUrls: ['./room_booking.css']
 })
 export class BookingComponent implements OnInit, OnDestroy {
   // Make PHASES available to template with explicit typing

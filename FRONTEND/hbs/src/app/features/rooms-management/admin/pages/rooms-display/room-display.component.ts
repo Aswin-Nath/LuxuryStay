@@ -5,10 +5,10 @@ import { RouterModule, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { RoomsService, Room, RoomType, PaginatedRoomsResponse, RoomsFilterParams } from '../../../core/services/rooms/rooms.service';
-import { AdminNavbarComponent } from '../../../layout/Admin/admin-navbar/admin-navbar.component';
-import { AdminSidebarComponent } from '../../../layout/Admin/admin-sidebar/admin-sidebar.component';
-import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
+import { RoomsService, Room, RoomType, PaginatedRoomsResponse, RoomsFilterParams } from '../../../../../shared/services/rooms.service';
+import { AdminNavbarComponent } from '../../../../../layout/Admin/admin-navbar/admin-navbar.component';
+import { AdminSidebarComponent } from '../../../../../layout/Admin/admin-sidebar/admin-sidebar.component';
+import { SpinnerComponent } from '../../../../../shared/components/spinner/spinner.component';
 import { EditRoomComponent } from '../edit-room/edit-room';
 import { AddRoomComponent } from '../add-room/add-room';
 import { BulkUploadComponent } from '../bulk-upload/bulk-upload.component';
@@ -17,8 +17,8 @@ import { BulkUploadComponent } from '../bulk-upload/bulk-upload.component';
   selector: 'app-rooms',
   standalone: true,
   imports: [CommonModule, HttpClientModule, RouterModule, FormsModule, AdminNavbarComponent, AdminSidebarComponent, SpinnerComponent, EditRoomComponent, AddRoomComponent, BulkUploadComponent],
-  templateUrl: './rooms.html',
-  styleUrl: './rooms.css',
+  templateUrl: './room-display.html',
+  styleUrl: './room-display.css',
   providers: [RoomsService]
 })
 export class Rooms implements OnInit, OnDestroy {

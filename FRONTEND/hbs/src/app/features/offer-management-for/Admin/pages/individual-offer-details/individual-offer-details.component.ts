@@ -1,9 +1,9 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { OfferService, Offer, OfferImage } from '../../../services/offer.service';
-import { AdminNavbarComponent } from '../../../layout/Admin/admin-navbar/admin-navbar.component';
-import { AdminSidebarComponent } from '../../../layout/Admin/admin-sidebar/admin-sidebar.component';
+import { OfferService, Offer, OfferImage } from '../../../../../services/offer.service';
+import { AdminNavbarComponent } from '../../../../../layout/Admin/admin-navbar/admin-navbar.component';
+import { AdminSidebarComponent } from '../../../../../layout/Admin/admin-sidebar/admin-sidebar.component';
 
 @Component({
   selector: 'app-individual-offer-details',

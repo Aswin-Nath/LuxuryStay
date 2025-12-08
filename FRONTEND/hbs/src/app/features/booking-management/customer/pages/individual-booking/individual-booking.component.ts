@@ -2,9 +2,9 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { BookingsService, BookingResponse } from '../../../services/bookings.service';
-import { ReviewsService, Review } from '../../../services/reviews.service';
-import { CustomerNavbarComponent } from '../../../layout/Customer/customer-navbar/customer-navbar.component';
+import { BookingsService, BookingResponse } from '../../../../../shared/services/bookings.service';
+import { ReviewsService, Review } from '../../../../../services/reviews.service';
+import { CustomerNavbarComponent } from '../../../../../layout/Customer/customer-navbar/customer-navbar.component';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 
@@ -12,8 +12,8 @@ import { takeUntil } from 'rxjs/operators';
   selector: 'app-booking-details',
   standalone: true,
   imports: [CommonModule, FormsModule, RouterModule, CustomerNavbarComponent],
-  templateUrl: './booking-details.component.html',
-  styleUrls: ['./booking-details.component.css']
+  templateUrl: './individual-booking.html',
+  styleUrls: ['./individual-booking.css']
 })
 export class BookingDetailsComponent implements OnInit, OnDestroy {
   booking: BookingResponse | null = null;

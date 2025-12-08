@@ -4,15 +4,19 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { CustomerNavbarComponent } from '../../layout/Customer/customer-navbar/customer-navbar.component';
-import { CustomerSidebarComponent } from '../../layout/Customer/customer-sidebar/customer-sidebar.component';
-import { RoomTypeService } from '../../services/room-types.service';
-import { ImageService } from '../../services/image.service';
-import { RoomsService } from '../../core/services/rooms/rooms.service';
-import { ReviewsService, Review } from '../../services/reviews.service';
-import { WishlistService } from '../../services/wishlist.service';
-import { BookingStateService } from '../../services/booking-state.service';
-import { DatePickerModalComponent } from '../../shared/components/date-picker-modal/date-picker-modal.component';
+import { CustomerNavbarComponent } from '../../../../../layout/Customer/customer-navbar/customer-navbar.component';
+import { ImageService } from '../../../../../shared/services/image.service';
+import { RoomsService } from '../../../../../shared/services/rooms.service';
+import { ReviewsService,Review } from '../../../../../services/reviews.service';
+import { DatePickerModalComponent } from '../../../../../shared/components/date-picker-modal/date-picker-modal.component';
+import { RoomTypeService } from '../../../../../services/room-types.service';
+import { WishlistService } from '../../../../wishlist-management/wishlist.service';
+import { BookingStateService } from '../../../../../services/booking-state.service';
+// import { RoomTypeService } from '../../services/room-types.service';
+// import { ImageService } from '../../services/image.service';
+// import { WishlistService } from '../../services/wishlist.service';
+// import { BookingStateService } from '../../services/booking-state.service';
+// import { DatePickerModalComponent } from '../../shared/components/date-picker-modal/date-picker-modal.component';
 interface Amenity{
     amenity_id:number,
     amenity_name:string
@@ -34,8 +38,8 @@ interface RoomDetail {
   selector: 'app-customer-room-detail',
   standalone: true,
   imports: [CommonModule, FormsModule, ReactiveFormsModule, CustomerNavbarComponent, DatePickerModalComponent],
-  templateUrl: './individual-room-details.component.html',
-  styleUrl: './customer-room-detail.component.css',
+  templateUrl: './individual-room-details.html',
+  styleUrl: './individual-room-details.css',
 })
 export class CustomerRoomDetailComponent implements OnInit, OnDestroy {
   roomId: number | null = null;

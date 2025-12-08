@@ -1,6 +1,6 @@
 import { Component, OnInit, ViewChild, ElementRef, inject, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RoomsService } from '../../../core/services/rooms/rooms.service';
+import { RoomsService } from '../../../../../shared/services/rooms.service';
 
 interface BulkUploadResults {
   total_processed: number;

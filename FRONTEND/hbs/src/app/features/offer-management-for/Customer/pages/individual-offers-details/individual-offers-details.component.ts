@@ -4,14 +4,13 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { CustomerNavbarComponent } from '../../layout/Customer/customer-navbar/customer-navbar.component';
-import { CustomerSidebarComponent } from '../../layout/Customer/customer-sidebar/customer-sidebar.component';
-import { OfferService } from '../../services/offer.service';
-import { ImageService } from '../../services/image.service';
-import { ReviewsService, Review } from '../../services/reviews.service';
-import { WishlistService } from '../../services/wishlist.service';
-import { BookingStateService } from '../../services/booking-state.service';
-import { OfferDatePickerModalComponent } from '../../shared/components/offer-date-picker-modal/offer-date-picker-modal.component';
+import { CustomerNavbarComponent } from '../../../../../layout/Customer/customer-navbar/customer-navbar.component';
+import { OfferService } from '../../../../../services/offer.service';
+import { ImageService } from '../../../../../shared/services/image.service';
+import { ReviewsService, Review } from '../../../../../services/reviews.service';
+import { WishlistService } from '../../../../../services/wishlist.service';
+import { BookingStateService } from '../../../../../shared/services/booking-state.service';
+import { OfferDatePickerModalComponent } from '../../../../../shared/components/offer-date-picker-modal/offer-date-picker-modal.component';
 
 interface OfferDetail {
   offer_id: number;
@@ -35,8 +34,8 @@ interface OfferDetail {
   selector: 'app-customer-offer-detail',
   standalone: true,
   imports: [CommonModule, FormsModule, ReactiveFormsModule, CustomerNavbarComponent, OfferDatePickerModalComponent],
-  templateUrl: './customer-offer-detail.component.html',
-  styleUrl: './customer-offer-detail.component.css',
+  templateUrl: './individual-offers-details.html',
+  styleUrl: './individual-offers-details.css',
 })
 export class CustomerOfferDetailComponent implements OnInit, OnDestroy {
   offerId: number | null = null;

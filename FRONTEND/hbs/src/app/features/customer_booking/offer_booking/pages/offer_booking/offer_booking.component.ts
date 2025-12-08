@@ -5,10 +5,10 @@ import { FormsModule } from '@angular/forms';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 
-import { OfferBookingService, OfferRoomDetail } from '../../services/offer-booking.service';
-import { SharedOfferBookingService, OfferBookingState } from '../../services/shared-offer-booking.service';
-import { ToastService } from '../../services/toast.service';
-import { BookingService } from '../../services/booking.service';
+import { OfferBookingService, OfferRoomDetail } from '../../../../../services/offer-booking.service';
+import { SharedOfferBookingService, OfferBookingState } from '../../../../../shared/services/shared-offer-booking.service';
+import { ToastService } from '../../../../../shared/services/toast.service';
+import { BookingService } from '../../../../../shared/services/booking.service';
 
 /**
  * OfferBookingComponent
@@ -28,8 +28,8 @@ import { BookingService } from '../../services/booking.service';
     CommonModule,
     FormsModule
   ],
-  templateUrl: './offer-booking.component.html',
-  styleUrls: ['./offer-booking.component.css']
+  templateUrl: './offer_booking.html',
+  styleUrls: ['./offer_booking.css']
 })
 export class OfferBookingComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();

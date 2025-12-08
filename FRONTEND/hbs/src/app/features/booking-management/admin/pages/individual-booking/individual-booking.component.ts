@@ -4,17 +4,17 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { BookingsService, BookingResponse, BookingRoomMapResponse } from '../../../services/bookings.service';
-import { ReviewsService, Review } from '../../../services/reviews.service';
-import { AdminNavbarComponent } from '../../../layout/Admin/admin-navbar/admin-navbar.component';
-import { AdminSidebarComponent } from '../../../layout/Admin/admin-sidebar/admin-sidebar.component';
+import { BookingsService, BookingResponse, BookingRoomMapResponse } from '../../../../../shared/services/bookings.service';
+import { ReviewsService, Review } from '../../../../../services/reviews.service';
+import { AdminNavbarComponent } from '../../../../../layout/Admin/admin-navbar/admin-navbar.component';
+import { AdminSidebarComponent } from '../../../../../layout/Admin/admin-sidebar/admin-sidebar.component';
 
 @Component({
   selector: 'app-admin-booking-details',
   standalone: true,
   imports: [CommonModule, FormsModule, AdminNavbarComponent, AdminSidebarComponent],
-  templateUrl: './admin-booking-details.component.html',
-  styleUrl: './admin-booking-details.component.css',
+  templateUrl: './individual-booking.html',
+  styleUrl: './individual-booking.css',
 })
 export class AdminBookingDetailsComponent implements OnInit, OnDestroy {
   bookingId: number=0;

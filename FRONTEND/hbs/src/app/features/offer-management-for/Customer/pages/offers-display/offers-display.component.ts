@@ -4,12 +4,12 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { OfferService } from '../../services/offer.service';
-import { WishlistService } from '../../services/wishlist.service';
-import { RoomsService } from '../../core/services/rooms/rooms.service';
-import { BookingStateService } from '../../services/booking-state.service';
-import { CustomerNavbarComponent } from '../../layout/Customer/customer-navbar/customer-navbar.component';
-import { OfferDatePickerModalComponent } from '../../shared/components/offer-date-picker-modal/offer-date-picker-modal.component';
+import { OfferService } from '../../../../../services/offer.service';
+import { WishlistService } from '../../../../../services/wishlist.service';
+import { RoomsService } from '../../../../../shared/services/rooms.service';
+import { BookingStateService } from '../../../../../shared/services/booking-state.service';
+import { CustomerNavbarComponent } from '../../../../../layout/Customer/customer-navbar/customer-navbar.component';
+import { OfferDatePickerModalComponent } from '../../../../../shared/components/offer-date-picker-modal/offer-date-picker-modal.component';
 
 interface Offer {
   offer_id: number;
@@ -40,8 +40,8 @@ export interface RoomType {
   selector: 'app-offer-display',
   standalone: true,
   imports: [CommonModule, FormsModule, ReactiveFormsModule, CustomerNavbarComponent, OfferDatePickerModalComponent],
-  templateUrl: './offer-display.component.html',
-  styleUrl: './offer-display.component.css',
+  templateUrl: './offers-display.html',
+  styleUrl: './offers-display.css',
 })
 export class OfferDisplayComponent implements OnInit, OnDestroy {
   @ViewChild(CustomerNavbarComponent) navbarComponent!: CustomerNavbarComponent;

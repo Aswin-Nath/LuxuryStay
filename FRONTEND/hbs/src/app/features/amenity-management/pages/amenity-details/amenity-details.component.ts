@@ -5,21 +5,24 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { RoomsService } from '../../../core/services/rooms/rooms.service';
-import { AdminNavbarComponent } from '../../../layout/Admin/admin-navbar/admin-navbar.component';
-import { AdminSidebarComponent } from '../../../layout/Admin/admin-sidebar/admin-sidebar.component';
-import { EditRoomComponent } from '../edit-room/edit-room';
+import { RoomsService } from '../../../../shared/services/rooms.service';
+import { AdminNavbarComponent } from '../../../../layout/Admin/admin-navbar/admin-navbar.component';
+import { AdminSidebarComponent } from '../../../../layout/Admin/admin-sidebar/admin-sidebar.component';
+// import { EditRoomComponent } from '../edit-room/edit-room';
+import { EditRoomComponent } from '../../../rooms-management/admin/pages/edit-room/edit-room';
 import { EditAmenityComponent } from '../edit-amenity/edit-amenity';
 import { AddAmenityComponent } from '../add-amenity/add-amenity';
-import { AddRoomComponent } from '../add-room/add-room';
-import { AddRoomTypeComponent } from '../add-room-type/add-room-type';
+import { AddRoomComponent } from '../../../rooms-management/admin/pages/add-room/add-room';
+import { AddRoomTypeComponent } from '../../../room-type-management/pages/add-room-type/add-room-type';
+// import { AddRoomComponent } from '../add-room/add-room';
+// import { AddRoomTypeComponent } from '../add-room-type/add-room-type';
 
 @Component({
   selector: 'app-room-types-amenities-management',
   standalone: true,
   imports: [CommonModule, HttpClientModule, FormsModule, AdminNavbarComponent, AdminSidebarComponent, EditRoomComponent, EditAmenityComponent, AddAmenityComponent, AddRoomComponent, AddRoomTypeComponent],
-  templateUrl: './room-types-amenities-management.html',
-  styleUrl: './room-types-amenities-management.css',
+  templateUrl: './amenity-details.html',
+  styleUrl: './amenity-details.css',
   providers: [RoomsService]
 })
 export class RoomTypesAmenitiesManagementComponent implements OnInit, OnDestroy {

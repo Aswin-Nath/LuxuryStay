@@ -2,19 +2,19 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
-import { BookingsService, BookingResponse } from '../../../services/bookings.service';
-import { RoomsService, RoomType } from '../../../core/services/rooms/rooms.service';
-import { CustomerNavbarComponent } from '../../../layout/Customer/customer-navbar/customer-navbar.component';
+import { BookingsService, BookingResponse } from '../../../../../shared/services/bookings.service';
+import { RoomsService, RoomType } from '../../../../../shared/services/rooms.service';
+import { CustomerNavbarComponent } from '../../../../../layout/Customer/customer-navbar/customer-navbar.component';
 import { Subject } from 'rxjs';
-import { CustomerSidebarComponent } from '../../../layout/Customer/customer-sidebar/customer-sidebar.component';
+import { CustomerSidebarComponent } from '../../../../../layout/Customer/customer-sidebar/customer-sidebar.component';
 import { takeUntil } from 'rxjs/operators';
 
 @Component({
   selector: 'app-my-bookings',
   standalone: true,
   imports: [CommonModule, FormsModule, RouterModule, CustomerNavbarComponent, CustomerSidebarComponent],
-  templateUrl: './my-bookings.component.html',
-  styleUrls: ['./my-bookings.component.css']
+  templateUrl: './my-bookings.html',
+  styleUrls: ['./my-bookings.css']
 })
 export class MyBookingsComponent implements OnInit, OnDestroy {
   bookings: BookingResponse[] = [];

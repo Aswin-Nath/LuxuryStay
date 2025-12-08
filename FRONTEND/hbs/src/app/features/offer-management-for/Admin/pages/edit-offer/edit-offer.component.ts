@@ -8,9 +8,9 @@ import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { OfferService } from '../../../services/offer.service';
-import { AdminNavbarComponent } from '../../../layout/Admin/admin-navbar/admin-navbar.component';
-import { AdminSidebarComponent } from '../../../layout/Admin/admin-sidebar/admin-sidebar.component';
+import { OfferService } from '../../../../../services/offer.service';
+import { AdminNavbarComponent } from '../../../../../layout/Admin/admin-navbar/admin-navbar.component';
+import { AdminSidebarComponent } from '../../../../../layout/Admin/admin-sidebar/admin-sidebar.component';
 
 interface RoomTypeSelection {
   room_type_id: number;

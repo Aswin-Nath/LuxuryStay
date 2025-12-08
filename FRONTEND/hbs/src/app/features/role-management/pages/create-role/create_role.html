@@ -3,16 +3,14 @@
      (click)="onClose()">
   
   <!-- Modal Content -->
-  <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+  <div class="bg-white rounded-lg shadow-xl max-w-md w-full"
        (click)="$event.stopPropagation()">
     
     <!-- Modal Header -->
-    <div class="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
-      <h2 class="text-xl font-semibold text-gray-800">
-        {{ mode === 'create' ? 'Create New Admin' : 'Edit Admin' }}
-      </h2>
+    <div class="bg-blue-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
+      <h2 class="text-xl font-semibold">Create New Role</h2>
       <button type="button" (click)="onClose()" 
-              class="text-gray-400 hover:text-gray-600 transition-colors">
+              class="text-white hover:text-blue-100 transition-colors">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
         </svg>
@@ -20,212 +18,75 @@
     </div>
 
     <!-- Modal Body -->
-    <form (ngSubmit)="onSubmit()" class="p-6 space-y-4">
-      
-      <!-- General Error Message -->
-      <div *ngIf="errors['general']" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-        {{ errors['general'] }}
+    <div class="px-6 py-6 space-y-4">
+      <!-- Error Message -->
+      <div *ngIf="errorMessage" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+        <i class="fas fa-exclamation-circle mr-2"></i>{{ errorMessage }}
       </div>
 
-      <!-- Full Name -->
-      <div>
-        <label for="full_name" class="block text-sm font-medium text-gray-700 mb-1">
-          Full Name <span class="text-red-500">*</span>
-        </label>
-        <input type="text" id="full_name" name="full_name"
-               [(ngModel)]="formData.full_name"
-               (blur)="validateFullName(); markTouched('full_name')"
-               (input)="isTouched('full_name') && validateFullName()"
-               [class.border-red-500]="errors['full_name'] && isTouched('full_name')"
-               [class.border-green-500]="!errors['full_name'] && formData.full_name && isTouched('full_name')"
-               class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-               placeholder="Enter full name"
-               required>
-        <p *ngIf="errors['full_name'] && isTouched('full_name')" class="mt-1 text-sm text-red-600">
-          {{ errors['full_name'] }}
-        </p>
-      </div>
-
-      <!-- Email -->
-      <div>
-        <label for="email" class="block text-sm font-medium text-gray-700 mb-1">
-          Email <span class="text-red-500">*</span>
-        </label>
-        <div class="relative">
-          <input type="email" id="email" name="email"
-                 [(ngModel)]="formData.email"
-                 (blur)="validateEmail(); markTouched('email')"
-                 [class.border-red-500]="errors['email'] && isTouched('email')"
-                 [class.border-green-500]="!errors['email'] && formData.email && isTouched('email')"
-                 class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                 placeholder="Enter email address"
-                 required>
-          <span *ngIf="!errors['email'] && formData.email && isTouched('email')" 
-                class="absolute right-3 top-2.5 text-green-500">
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-          </span>
-        </div>
-        <p *ngIf="errors['email'] && isTouched('email')" class="mt-1 text-sm text-red-600">
-          {{ errors['email'] }}
-        </p>
-      </div>
-
-      <!-- Password (only for create mode or optional for edit) -->
-      <div *ngIf="mode === 'create' || mode === 'edit'">
-        <label for="password" class="block text-sm font-medium text-gray-700 mb-1">
-          Password 
-          <span *ngIf="mode === 'create'" class="text-red-500">*</span>
-          <span *ngIf="mode === 'edit'" class="text-gray-500 text-xs">(optional - leave blank to keep current)</span>
-        </label>
-        <div class="relative">
-          <input [type]="showPassword ? 'text' : 'password'" 
-                 id="password" name="password"
-                 [(ngModel)]="formData.password"
-                 (input)="validatePasswordField(); markTouched('password')"
-                 (blur)="validatePasswordField(); markTouched('password')"
-                 [class.border-red-500]="errors['password'] && isTouched('password')"
-                 [class.border-green-500]="!errors['password'] && formData.password && isTouched('password')"
-                 class="w-full px-4 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                 [placeholder]="mode === 'edit' ? 'Leave blank to keep current password' : 'Enter password'"
-                 [required]="mode === 'create'">
-          <button type="button" (click)="togglePasswordVisibility()"
-                  class="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600">
-            <svg *ngIf="!showPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-            </svg>
-            <svg *ngIf="showPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
-            </svg>
-          </button>
-        </div>
-        <p *ngIf="errors['password'] && isTouched('password')" class="mt-1 text-sm text-red-600">
-          {{ errors['password'] }}
-        </p>
-        <p class="mt-1 text-xs text-gray-500">
-          Must be at least 8 characters with uppercase, lowercase, number, and special character
-        </p>
-      </div>
-
-      <!-- Phone Number -->
-      <div>
-        <label for="phone_number" class="block text-sm font-medium text-gray-700 mb-1">
-          Phone Number <span class="text-red-500">*</span>
-        </label>
-        <div class="relative">
-          <input type="tel" id="phone_number" name="phone_number"
-                 [(ngModel)]="formData.phone_number"
-                 (blur)="validatePhoneNumber(); markTouched('phone_number')"
-                 (input)="isTouched('phone_number') && validatePhoneNumber()"
-                 [class.border-red-500]="errors['phone_number'] && isTouched('phone_number')"
-                 [class.border-green-500]="phoneAvailable && !errors['phone_number'] && formData.phone_number && isTouched('phone_number')"
-                 class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                 placeholder="+1234567890"
-                 required>
-          <span *ngIf="phoneAvailable && !errors['phone_number'] && formData.phone_number && isTouched('phone_number')" 
-                class="absolute right-3 top-2.5 text-green-500">
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-          </span>
-        </div>
-        <p *ngIf="errors['phone_number'] && isTouched('phone_number')" class="mt-1 text-sm text-red-600">
-          {{ errors['phone_number'] }}
-        </p>
-        <p *ngIf="!errors['phone_number']" class="mt-1 text-xs text-gray-500">
-          10-15 digits, optional + prefix
-        </p>
-      </div>
-
-      <!-- Date of Birth and Gender (Side by Side) -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        
-        <!-- Date of Birth -->
+      <!-- Form -->
+      <form [formGroup]="roleForm" (ngSubmit)="onSave()" class="space-y-4">
+        <!-- Role Name -->
         <div>
-          <label for="dob" class="block text-sm font-medium text-gray-700 mb-1">
-            Date of Birth <span class="text-red-500">*</span>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">
+            Role Name <span class="text-red-500">*</span>
           </label>
-          <input type="date" id="dob" name="dob"
-                 [(ngModel)]="formData.dob"
-                 (change)="validateDateOfBirth(); markTouched('dob')"
-                 (blur)="validateDateOfBirth(); markTouched('dob')"
-                 [class.border-red-500]="errors['dob'] && isTouched('dob')"
-                 [class.border-green-500]="!errors['dob'] && formData.dob && isTouched('dob')"
-                 class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                 required>
-          <p *ngIf="errors['dob'] && isTouched('dob')" class="mt-1 text-sm text-red-600">
-            {{ errors['dob'] }}
-          </p>
+          <input type="text" 
+                 formControlName="role_name"
+                 placeholder="e.g., Moderator, Editor"
+                 class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                 [class.border-red-500]="hasError('role_name', 'required') || hasError('role_name', 'minlength')"
+                 [class.border-gray-300]="!hasError('role_name', 'required') && !hasError('role_name', 'minlength')">
+          
+          <!-- Error Messages -->
+          <div *ngIf="hasError('role_name', 'required')" class="text-red-500 text-xs mt-1">
+            Role name is required
+          </div>
+          <div *ngIf="hasError('role_name', 'minlength')" class="text-red-500 text-xs mt-1">
+            Role name must be at least 2 characters
+          </div>
         </div>
 
-        <!-- Gender -->
+        <!-- Description -->
         <div>
-          <label for="gender" class="block text-sm font-medium text-gray-700 mb-1">
-            Gender <span class="text-red-500">*</span>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">
+            Description <span class="text-red-500">*</span>
           </label>
-          <select id="gender" name="gender"
-                  [(ngModel)]="formData.gender"
-                  (change)="markTouched('gender')"
-                  [class.border-red-500]="errors['gender'] && isTouched('gender')"
-                  [class.border-green-500]="!errors['gender'] && formData.gender && isTouched('gender')"
-                  class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required>
-            <option *ngFor="let gender of genderOptions" [value]="gender">
-              {{ gender }}
-            </option>
-          </select>
-          <p *ngIf="errors['gender'] && isTouched('gender')" class="mt-1 text-sm text-red-600">
-            {{ errors['gender'] }}
-          </p>
+          <textarea formControlName="role_description"
+                    placeholder="e.g., Can manage user content and moderate comments"
+                    rows="4"
+                    class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition resize-none"
+                    [class.border-red-500]="hasError('role_description', 'required') || hasError('role_description', 'minlength')"
+                    [class.border-gray-300]="!hasError('role_description', 'required') && !hasError('role_description', 'minlength')">
+          </textarea>
+          
+          <!-- Error Messages -->
+          <div *ngIf="hasError('role_description', 'required')" class="text-red-500 text-xs mt-1">
+            Description is required
+          </div>
+          <div *ngIf="hasError('role_description', 'minlength')" class="text-red-500 text-xs mt-1">
+            Description must be at least 5 characters
+          </div>
         </div>
-      </div>
+      </form>
+    </div>
 
-      <!-- Role -->
-      <div>
-        <label for="role_id" class="block text-sm font-medium text-gray-700 mb-1">
-          Role <span class="text-red-500">*</span>
-        </label>
-        <select id="role_id" name="role_id"
-                [(ngModel)]="formData.role_id"
-                (change)="markTouched('role_id')"
-                [class.border-red-500]="errors['role_id'] && isTouched('role_id')"
-                [class.border-green-500]="!errors['role_id'] && formData.role_id && isTouched('role_id')"
-                class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required>
-          <option value="0" disabled>Select a role</option>
-          <option *ngFor="let role of roles" [value]="role.role_id">
-            {{ role.role_name }}
-          </option>
-        </select>
-        <p *ngIf="errors['role_id'] && isTouched('role_id')" class="mt-1 text-sm text-red-600">
-          {{ errors['role_id'] }}
-        </p>
-      </div>
-
-      <!-- Modal Footer / Action Buttons -->
-      <div class="flex justify-end space-x-3 pt-4">
-        <button type="button" (click)="onClose()"
-                [disabled]="isSubmitting"
-                class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 font-medium">
-          Cancel
-        </button>
-        <button type="submit"
-                [disabled]="isSubmitting || !emailAvailable"
-                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center font-medium">
-          <svg *ngIf="isSubmitting" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <span *ngIf="mode === 'create'">
-            {{ isSubmitting ? 'Creating...' : 'Create Admin' }}
-          </span>
-          <span *ngIf="mode === 'edit'">
-            {{ isSubmitting ? 'Saving...' : 'Save Changes' }}
-          </span>
-        </button>
-      </div>
-    </form>
+    <!-- Modal Footer -->
+    <div class="bg-gray-50 px-6 py-4 flex justify-end gap-3 rounded-b-lg border-t">
+      <button type="button" (click)="onClose()"
+              [disabled]="isSubmitting"
+              class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 font-medium">
+        Cancel
+      </button>
+      <button type="button" (click)="onSave()"
+              [disabled]="isSubmitting || roleForm.invalid"
+              class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium">
+        <svg *ngIf="isSubmitting" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>{{ isSubmitting ? 'Creating...' : 'Create Role' }}</span>
+      </button>
+    </div>
   </div>
 </div>

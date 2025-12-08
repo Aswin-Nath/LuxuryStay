@@ -1,15 +1,15 @@
 import { Component, OnInit, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { AdminManagementService, CreateAdminPayload, Role } from '../../../core/services/admin-management/admin-management.service';
-import { RoleManagementService } from '../../../core/services/role-management/role-management.service';
+import { AdminManagementService, CreateAdminPayload, Role } from '../../../../services/admin-management.service';
+import { RoleManagementService } from '../../../../services/role-management.service';
 
 @Component({
   selector: 'app-admin-form-modal',
   standalone: true,
   imports: [CommonModule, FormsModule],
-  templateUrl: './admin-form-modal.component.html',
-  styleUrls: ['./admin-form-modal.component.css']
+  templateUrl: './admin-addition.html',
+  styleUrls: ['./admin-addition.css']
 })
 export class AdminFormModalComponent implements OnInit {
   @Input() isOpen = false;
