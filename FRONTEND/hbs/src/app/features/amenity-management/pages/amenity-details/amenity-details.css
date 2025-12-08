@@ -1,0 +1,11 @@
+/* Room Types & Amenities Management Styles */
+
+:host {
+  display: block;
+}
+
+.material-icons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

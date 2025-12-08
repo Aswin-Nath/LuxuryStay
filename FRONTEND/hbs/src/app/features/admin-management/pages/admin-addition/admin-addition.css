@@ -1,0 +1,77 @@
+/* Admin Form Modal Styles */
+
+/* Custom scrollbar for modal content */
+.overflow-y-auto::-webkit-scrollbar {
+  width: 8px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Input focus states */
+input:focus,
+select:focus {
+  outline: none;
+}
+
+/* Animation for modal */
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.bg-white.rounded-lg {
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+/* Error state for inputs */
+.border-red-500 {
+  border-color: #ef4444;
+}
+
+.border-red-500:focus {
+  border-color: #ef4444;
+}
+
+/* Success state for inputs */
+.border-green-500 {
+  border-color: #10b981;
+}
+
+.border-green-500:focus {
+  border-color: #10b981;
+}
+
+/* Disabled button state */
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .max-w-2xl {
+    max-width: 95vw;
+  }
+  
+  .p-6 {
+    padding: 1rem;
+  }
+}

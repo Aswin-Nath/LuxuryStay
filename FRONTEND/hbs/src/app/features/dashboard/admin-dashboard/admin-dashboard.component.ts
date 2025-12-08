@@ -2,8 +2,8 @@ import { Component, OnInit, AfterViewInit, ViewChild, ElementRef, OnDestroy } fr
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { AdminNavbarComponent } from '../../../core/components/admin-navbar/admin-navbar.component';
-import { AdminSidebarComponent } from '../../../core/components/admin-sidebar/admin-sidebar.component';
+import { AdminNavbarComponent } from '../../../layout/Admin/admin-navbar/admin-navbar.component';
+import { AdminSidebarComponent } from '../../../layout/Admin/admin-sidebar/admin-sidebar.component';
 import { Chart, registerables } from 'chart.js';
 
 Chart.register(...registerables);

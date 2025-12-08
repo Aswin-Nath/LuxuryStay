@@ -4,10 +4,10 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ProfileService,ProfileResponse,ProfileUpdate,ChangePasswordRequest } from '../../../core/services/profile/profile.service';
 // import { ProfileService, ProfileResponse, ProfileUpdate, ChangePasswordRequest } from '../../core/services/profile/profile.service';
-// import { CustomerNavbarComponent } from '../../core/components/customer-navbar/customer-navbar.component';
+// import { CustomerNavbarComponent } from '../../layout/Customer/customer-navbar/customer-navbar.component';
 // import { CustomerSidebarComponent } from '../../core/components/customer-sidebar/customer-sidebar.component';
-import { CustomerNavbarComponent } from '../../../core/components/customer-navbar/customer-navbar.component';
-import { CustomerSidebarComponent } from '../../../core/components/customer-sidebar/customer-sidebar.component';
+import { CustomerNavbarComponent } from '../../../layout/Customer/customer-navbar/customer-navbar.component';
+import { CustomerSidebarComponent } from '../../../layout/Customer/customer-sidebar/customer-sidebar.component';
 @Component({
   selector: 'app-profile',
   standalone: true,

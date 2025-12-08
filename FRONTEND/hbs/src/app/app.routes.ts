@@ -5,7 +5,7 @@ import { ForgotPassword } from './features/forgot-password/forgot-password';
 import { HomePageComponent } from './pages/home_page/home-page/home-page.component';
 import { AuthGuard } from './core/guards/auth.guard';
 import { PublicGuard } from './core/guards/public.guard';
-import { ForbiddenPageComponent } from './core/components/forbidden-page/forbidden-page.component';
+import { ForbiddenPageComponent } from './shared/components/forbidden-page/forbidden-page.component';
 import { PermissionResolver } from './core/resolver/permission.resolver';
 import { PermissionGuard } from './core/guards/permission.guard';
 import { CustomerDashboardComponent } from './features/dashboard/customer-dashboard/customer-dashboard.component';
@@ -34,7 +34,6 @@ import { RoomDisplayComponent } from './features/room-display/room-display.compo
 import { WishlistComponent } from './features/wishlist/wishlist.component';
 import { CustomerRoomDetailComponent } from './features/customer-room-detail/customer-room-detail.component';
 import { CustomerOfferDetailComponent } from './features/customer-offer-detail/customer-offer-detail.component';
-import { OfferClaimComponent } from './features/booking/offer-claim/offer-claim.component';
 import { OfferBookingComponent } from './features/booking/offer-booking.component';
 
 export const routes: Routes = [

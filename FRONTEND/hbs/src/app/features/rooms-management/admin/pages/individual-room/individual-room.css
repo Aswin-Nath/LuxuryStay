@@ -1,0 +1,68 @@
+/* Individual Room Component Styles */
+
+:host {
+  display: block;
+}
+
+/* Review Cards Animation */
+.bg-gray-50 {
+  transition: all 0.3s ease;
+}
+
+.bg-gray-50:hover {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+/* Material Icons */
+.material-icons {
+  font-family: 'Material Icons';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  display: inline-block;
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: normal;
+  word-wrap: normal;
+  white-space: nowrap;
+  direction: ltr;
+}
+
+/* Button Animations */
+button {
+  transition: all 0.2s ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Status Color Badges */
+.px-3 {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+/* Grid Layout Responsiveness */
+@media (max-width: 768px) {
+  .grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .grid-cols-3 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .md\:grid-cols-3 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .lg\:grid-cols-3 {
+    grid-template-columns: 1fr 1fr;
+  }
+}

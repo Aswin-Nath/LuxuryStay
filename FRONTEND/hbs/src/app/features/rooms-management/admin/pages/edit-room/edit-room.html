@@ -1,0 +1,68 @@
+<!-- Edit Room Modal -->
+<div *ngIf="isOpen" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
+    <!-- Modal Header -->
+    <div class="flex items-center justify-between pb-4 border-b">
+      <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+        <span class="material-icons">edit</span>
+        Edit Room
+      </h3>
+      <button (click)="closeModal()" class="hover:bg-gray-100 rounded-lg p-1 transition">
+        <span class="material-icons">close</span>
+      </button>
+    </div>
+
+    <!-- Loading State -->
+    <div *ngIf="loading" class="text-center py-4">
+      <div class="inline-block">
+        <div class="animate-spin h-6 w-6 border-3 border-yellow-600 border-t-transparent rounded-full"></div>
+      </div>
+      <p class="text-gray-600 mt-2 text-sm">Loading...</p>
+    </div>
+
+    <!-- Error State -->
+    <div *ngIf="error && !loading" class="bg-red-50 border border-red-200 p-3 rounded-lg text-red-700 text-sm">
+      {{ error }}
+    </div>
+
+    <!-- Form -->
+    <div *ngIf="!loading && room" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Room Number</label>
+        <input 
+          [(ngModel)]="roomNo" 
+          type="text" 
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+          placeholder="e.g., 101">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Room Type</label>
+        <select 
+          [(ngModel)]="selectedRoomTypeId"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600">
+          <option [value]="null">Select a room type</option>
+          <option *ngFor="let type of roomTypes" [value]="type.room_type_id">
+            {{ type.type_name }}
+          </option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Modal Footer -->
+    <div *ngIf="!loading && room" class="flex gap-3 justify-end pt-4 border-t">
+      <button 
+        (click)="closeModal()"
+        class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition">
+        Cancel
+      </button>
+      <button 
+        (click)="saveChanges()"
+        [disabled]="isSaving"
+        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50">
+        {{ isSaving ? 'Saving...' : 'Save' }}
+      </button>
+    </div>
+  </div>
+</div>
+

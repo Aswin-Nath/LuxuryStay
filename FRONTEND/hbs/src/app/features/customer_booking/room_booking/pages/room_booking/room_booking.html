@@ -1,0 +1,912 @@
+<div class="min-h-screen bg-linear-to-br from-slate-50 via-blue-50 to-indigo-100">
+  <!-- HEADER WITH TIMER (Show after dates are selected) -->
+  <div *ngIf="currentPhase !== 0" class="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-gray-200 shadow-lg">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+      <div>
+        <h1 class="text-3xl font-bold bg-linear-to-r from-yellow-600 to-red-600 bg-clip-text text-transparent">
+          ✨ Book Your Stay
+        </h1>
+        <p class="text-sm text-gray-600 mt-1">
+          {{ currentPhase === 1 ? 'Select rooms & fill guest details' : 'Complete payment to confirm' }}
+        </p>
+      </div>
+      
+      <!-- TIMER DISPLAY (Always visible after dates) -->
+      <div class="flex items-center gap-6">
+        <div class="text-right">
+          <p class="text-xs text-gray-500 font-semibold tracking-wide">SESSION EXPIRES IN</p>
+          <div [ngClass]="'text-4xl font-black font-mono ' + timerColor + ' transition-all'">
+            {{ getTimerDisplay() }}
+          </div>
+          <p class="text-xs text-gray-500 mt-1" [ngClass]="remainingMinutes <= 2 ? 'text-red-500' : ''">
+            {{ remainingMinutes <= 2 ? '⚠️ Hurry!' : '⏱️ ' + remainingMinutes + ' min left' }}
+          </p>
+        </div>
+
+        <!-- BACK BUTTON (Available in all phases except dates) -->
+        <!-- REMOVED: Close button has been removed -->
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-6 py-8">
+    <!-- BREADCRUMB PROGRESS -->
+    <div *ngIf="currentPhase !== 0" class="mb-8 flex items-center gap-2 text-sm">
+      <span [ngClass]="'px-4 py-2 rounded-full font-semibold transition-all ' + (isSearchPhase ? 'bg-linear-to-r from-yellow-600 to-red-600 text-white' : 'bg-gray-200 text-gray-700')">
+        🏨 Room Selection
+      </span>
+      <span class="text-gray-400">→</span>
+      <span [ngClass]="'px-4 py-2 rounded-full font-semibold transition-all ' + (isPaymentPhase ? 'bg-linear-to-r from-yellow-600 to-red-600 text-white' : 'bg-gray-200 text-gray-700')">
+        💳 Payment
+      </span>
+    </div>
+
+    <!-- ===================================================
+         DATE PICKER MODAL (Overlay - Shows when booking starts)
+         =================================================== -->
+    <div *ngIf="showDatePickerModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full animate-fadeIn">
+        <h2 class="text-2xl font-bold text-gray-800 mb-2 text-center">📅 Plan Your Stay</h2>
+        <p class="text-center text-gray-600 mb-6">Select your check-in and check-out dates</p>
+
+        <div class="space-y-6">
+          <!-- Check-in Date -->
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-2">Check-in Date</label>
+            <input 
+              type="date" 
+              [(ngModel)]="checkIn"
+              class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-yellow-600 focus:outline-none transition bg-white"
+              style="color: black;">
+            <p class="text-xs text-gray-600 mt-1">When are you arriving?</p>
+          </div>
+
+          <!-- Check-out Date -->
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-2">Check-out Date</label>
+            <input 
+              type="date" 
+              [(ngModel)]="checkOut"
+              class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-yellow-600 focus:outline-none transition bg-white"
+              style="color: black;">
+            <p class="text-xs text-gray-600 mt-1">When are you leaving?</p>
+          </div>
+
+          <!-- Duration Info -->
+          <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+            <p class="text-gray-700 font-semibold">
+              Duration: <span class="text-yellow-700">{{ calculateNumberOfNights() }} night(s)</span>
+            </p>
+          </div>
+
+          <!-- Error Message -->
+          <div *ngIf="searchError" class="bg-red-50 border-l-4 border-red-500 p-4 rounded">
+            <p class="text-red-700 text-sm">❌ {{ searchError }}</p>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex flex-col gap-3">
+            <!-- Primary: Search Rooms -->
+            <button 
+              (click)="proceedFromDateModal()"
+              class="w-full py-2 bg-linear-to-r from-yellow-600 to-red-600 text-white font-bold rounded-lg hover:from-yellow-700 hover:to-red-700 transition">
+              🔍 Search Rooms
+            </button>
+
+            <!-- Secondary: Close -->
+            <button 
+              (click)="closeeDatePickerModal()"
+              class="w-full py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg transition">
+              ✖️ Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================
+         PHASE 0: PLAN YOUR STAY (Dates Selection) - HIDDEN
+         Kept for backward compatibility but not shown
+         =================================================== -->
+    <!-- <div *ngIf="false && currentPhase === 0" class="max-w-2xl mx-auto animate-fadeIn"> -->
+      <!-- HIDDEN -->
+
+    <!-- ===================================================
+         PHASE 2: SEARCH + GUEST DETAILS + SIDEBAR (Merged)
+         =================================================== -->
+    <div *ngIf="currentPhase === 1" class="grid lg:grid-cols-4 gap-8 animate-fadeIn">
+      <!-- LEFT: Search Content (3 columns) -->
+      <div class="lg:col-span-3 space-y-6">
+        <!-- Dates Info & Search Filters Section -->
+        <div class="bg-white rounded-2xl shadow-lg p-6">
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold text-gray-800">📅 {{ checkIn }} → {{ checkOut }} ({{ calculateNumberOfNights() }} night(s))</h2>
+          </div>
+          
+          <!-- FILTER SECTION -->
+          <div class="bg-linear-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border-2 border-blue-200">
+            <h3 class="text-lg font-bold text-gray-800 mb-4">🔍 Filter Rooms</h3>
+            
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <!-- Room Type Filter -->
+              <div>
+                <label class="block text-sm font-bold text-gray-700 mb-2">Room Type</label>
+                <select 
+                  [(ngModel)]="searchFilters.room_type_id"
+                  class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-white"
+                  style="color: black;">
+                  <option [value]="null">All Types</option>
+                  <option *ngFor="let rt of allRoomTypesForDropdown" [value]="rt.room_type_id">{{ rt.type_name }}</option>
+                </select>
+              </div>
+
+              <!-- Price Range Filter (Min) -->
+              <div>
+                <label class="block text-sm font-bold text-gray-700 mb-2">Min Price (₹)</label>
+                <input 
+                  type="number"
+                  [(ngModel)]="searchFilters.price_per_night_min"
+                  placeholder="Min price"
+                  class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-white"
+                  style="color: black;">
+              </div>
+
+              <!-- Price Range Filter (Max) -->
+              <div>
+                <label class="block text-sm font-bold text-gray-700 mb-2">Max Price (₹)</label>
+                <input 
+                  type="number"
+                  [(ngModel)]="searchFilters.price_per_night_max"
+                  placeholder="Max price"
+                  class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-white"
+                  style="color: black;">
+              </div>
+
+              <!-- Min Adults Filter -->
+              <div>
+                <label class="block text-sm font-bold text-gray-700 mb-2">Min Adults</label>
+                <input 
+                  type="number"
+                  [(ngModel)]="searchFilters.max_adult_count"
+                  placeholder="Min adults capacity needed"
+                  class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-white"
+                  style="color: black;">
+              </div>
+
+              <!-- Min Children Filter -->
+              <div>
+                <label class="block text-sm font-bold text-gray-700 mb-2">Min Children</label>
+                <input 
+                  type="number"
+                  [(ngModel)]="searchFilters.max_child_count"
+                  placeholder="Min children capacity needed"
+                  class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-white"
+                  style="color: black;">
+              </div>
+
+              <!-- Square Ft Filter (Min) -->
+              <div>
+                <label class="block text-sm font-bold text-gray-700 mb-2">Min Sq Ft</label>
+                <input 
+                  type="number"
+                  [(ngModel)]="searchFilters.square_ft_min"
+                  placeholder="Min sq ft"
+                  class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-white"
+                  style="color: black;">
+              </div>
+
+              <!-- Square Ft Filter (Max) -->
+              <div>
+                <label class="block text-sm font-bold text-gray-700 mb-2">Max Sq Ft</label>
+                <input 
+                  type="number"
+                  [(ngModel)]="searchFilters.square_ft_max"
+                  placeholder="Max sq ft"
+                  class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-white"
+                  style="color: black;">
+              </div>
+
+              <!-- Search and Change Dates Buttons -->
+              <div class="flex items-end gap-2">
+                <button 
+                  (click)="searchAvailableRooms()"
+                  class="flex-1 py-2 bg-linear-to-r from-blue-600 to-blue-700 text-white font-bold rounded-lg hover:from-blue-700 hover:to-blue-800 transition">
+                  🔍 Search
+                </button>
+                <button 
+                  (click)="openChangeDatesModal()"
+                  class="py-2 px-4 bg-linear-to-r from-orange-500 to-orange-600 text-white font-bold rounded-lg hover:from-orange-600 hover:to-orange-700 transition"
+                  title="Change your dates">
+                  📅
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Global Booking Error Banner -->
+        <div *ngIf="bookingError && !bookingRoomType" class="bg-red-50 border-l-4 border-red-500 rounded-2xl shadow-lg p-6 mb-6">
+          <div class="flex items-start gap-4">
+            <span class="text-3xl">⚠️</span>
+            <div class="flex-1">
+              <h3 class="text-lg font-bold text-red-800">Room Booking Failed</h3>
+              <p class="text-red-700 mt-2">{{ bookingError }}</p>
+              <p class="text-red-600 text-sm mt-2">Please try again with the same dates or adjust your filters.</p>
+            </div>
+            <button 
+              (click)="clearBookingError()" 
+              class="text-red-400 hover:text-red-600 transition shrink-0"
+              title="Close error message">
+              ✕
+            </button>
+          </div>
+        </div>
+
+        <!-- Loading State -->
+        <div *ngIf="isLoadingRoomTypes" class="bg-white rounded-2xl shadow-lg p-8 text-center">
+          <div class="flex items-center justify-center gap-3">
+            <svg class="animate-spin h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span class="text-lg font-semibold text-gray-700">Searching for available rooms...</span>
+          </div>
+        </div>
+
+        <!-- Room Types with Cart-like Selection -->
+        <div *ngIf="availableRoomTypes.length > 0 && !isLoadingRoomTypes" class="space-y-6">
+          <h2 class="text-2xl font-bold text-gray-800">🛒 Select Room Types</h2>
+          
+          <!-- Room Cards Grid with Spacing -->
+          <div class="pb-4">
+            <div *ngFor="let rt of availableRoomTypes; let last = last" [ngClass]="'mb-10'" >
+              <app-room-card
+                [roomType]="rt"
+                [checkIn]="checkIn"
+                [checkOut]="checkOut"
+                [expiryTime]="bookingSession?.expiry_time || ''"
+                [totalSelectedRooms]="getTotalSelectedRooms()"
+                [isBookingDisabled]="isBookingRoom && bookingRoomType !== rt.type_name"
+                (roomLocked)="onRoomLocked($event, rt)"
+                (bookingError)="onRoomLockError($event, rt)"
+                (bookingSuccess)="onRoomLockSuccess(rt)">
+              </app-room-card>
+            </div>
+          </div>
+        </div>
+
+        <!-- No Rooms Available Message -->
+        <div *ngIf="availableRoomTypes.length === 0 && !isLoadingRoomTypes && isSearchPhase" class="bg-yellow-50 border-l-4 border-yellow-500 rounded-2xl shadow-lg p-8">
+          <div class="flex items-center gap-4">
+            <span class="text-4xl">😢</span>
+            <div>
+              <h3 class="text-xl font-bold text-yellow-800">No Rooms Available</h3>
+              <p class="text-yellow-700 mt-2">Unfortunately, no rooms are available for your selected dates with the current filters.</p>
+              <p class="text-yellow-600 text-sm mt-2">Try changing your dates or adjusting your filter preferences.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stop Booking Section (Search Page) -->
+        <div class="bg-red-50 border-l-4 border-red-500 p-6 rounded-lg mb-8">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-red-700 font-semibold">🚪 Want to cancel?</p>
+              <p class="text-red-600 text-sm mt-2">Click the button to stop booking and go back to home.</p>
+            </div>
+            <button 
+              (click)="stopBooking()"
+              class="px-6 py-2 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition whitespace-nowrap">
+              🚪 Stop Booking
+            </button>
+          </div>
+        </div>
+
+        <!-- GUEST DETAILS SECTION -->
+        <div *ngIf="getTotalSelectedRooms() > 0" class="bg-white rounded-2xl shadow-lg p-8 mt-6">
+          <h2 class="text-2xl font-bold text-gray-800 mb-6">👤 Guest Details (Per Room)</h2>
+          
+          <div class="space-y-6">
+            <div *ngFor="let lock of selectedLocks; let i = index" class="bg-linear-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border-2 border-blue-200">
+              <div class="flex items-start justify-between mb-4">
+                <div>
+                  <h3 class="text-lg font-bold text-gray-800">{{ lock.type_name }}</h3>
+                  <div class="mt-2 space-y-1">
+                    <p class="text-sm text-gray-600">🔒 Lock expires: {{ lock.expires_at | date:'short' }}</p>
+                    <p [ngClass]="'text-sm font-bold ' + getLockExpiryColor(lock)">⏱️ Will Release in: {{ getLockExpiryDisplay(lock) }}</p>
+                  </div>
+                  <p class="text-sm text-gray-700 mt-2 font-semibold">👥 Capacity: {{ lock.max_adult_count }} Adult(s), {{ lock.max_child_count }} Child(ren)</p>
+                </div>
+                <span class="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-full">Room {{ i + 1 }}</span>
+              </div>
+
+              <div class="grid md:grid-cols-3 gap-4">
+                <!-- Adult Name -->
+                <div>
+                  <label class="block text-sm font-bold text-gray-700 mb-2">Adult Name *</label>
+                  <input 
+                    type="text"
+                    [(ngModel)]="getGuestDetailsForRoom(lock.lock_id)!.adultName"
+                    placeholder="Full name"
+                    class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-white"
+                    style="color: black;">
+                  
+                  <!-- Use My Details Button -->
+                  <div class="mt-3 flex gap-2">
+                    <button 
+                      *ngIf="userDetails.hasDob && !isRoomUsingUserDetails(lock.lock_id)"
+                      (click)="applyUserDetailsToRoom(lock.lock_id)"
+                      type="button"
+                      class="flex-1 px-3 py-2 bg-blue-500 text-white text-xs font-semibold rounded-lg hover:bg-blue-600 transition">
+                      👤 Use My Details
+                    </button>
+                    
+                    <button 
+                      *ngIf="!userDetails.hasDob"
+                      disabled
+                      type="button"
+                      class="flex-1 px-3 py-2 bg-gray-300 text-gray-600 text-xs font-semibold rounded-lg cursor-not-allowed">
+                      ⚠️ No DOB
+                    </button>
+                    
+                    <button 
+                      *ngIf="userDetails.hasDob && isRoomUsingUserDetails(lock.lock_id)"
+                      (click)="clearUserDetailsFromRoom(lock.lock_id)"
+                      type="button"
+                      class="flex-1 px-3 py-2 bg-yellow-500 text-white text-xs font-semibold rounded-lg hover:bg-yellow-600 transition">
+                      ✕ Clear
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Adult Age -->
+                <div>
+                  <label class="block text-sm font-bold text-gray-700 mb-2">Adult Age *</label>
+                  <input 
+                    type="number"
+                    [(ngModel)]="getGuestDetailsForRoom(lock.lock_id)!.adultAge"
+                    placeholder="Age"
+                    min="18"
+                    max="120"
+                    class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-white"
+                    style="color: black;">
+                  <p *ngIf="getGuestDetailsForRoom(lock.lock_id)!.adultAge > 0 && getGuestDetailsForRoom(lock.lock_id)!.adultAge < 18" class="text-xs text-red-600 mt-1">❌ Guest must be at least 18 years old</p>
+                  <p *ngIf="getGuestDetailsForRoom(lock.lock_id)!.adultAge >= 18" class="text-xs text-green-600 mt-1">✅ Age verified (18+)</p>
+                </div>
+
+                <!-- Adults Staying Count -->
+                <div>
+                  <label class="block text-sm font-bold text-gray-700 mb-2">
+                    👥 Adults Staying * 
+                    <span class="text-xs text-red-600 font-normal">(Min: 1, Max: {{ lock.max_adult_count }})</span>
+                  </label>
+                  <input 
+                    type="number"
+                    [(ngModel)]="getGuestDetailsForRoom(lock.lock_id)!.adultCount"
+                    (change)="validateAndCorrectGuestCounts(lock.lock_id)"
+                    placeholder="Number of adults"
+                    min="1"
+                    [max]="lock.max_adult_count || 10"
+                    class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-white"
+                    style="color: black;">
+                  <p class="text-xs text-gray-600 mt-1">At least 1 adult must stay in this room</p>
+                </div>
+
+                <!-- Children Staying Count -->
+                <div>
+                  <label class="block text-sm font-bold text-gray-700 mb-2">
+                    👶 Children Staying
+                    <span class="text-xs text-red-600 font-normal">(Min: 0, Max: {{ lock.max_child_count }})</span>
+                  </label>
+                  <input 
+                    type="number"
+                    [(ngModel)]="getGuestDetailsForRoom(lock.lock_id)!.childCount"
+                    (change)="validateAndCorrectGuestCounts(lock.lock_id)"
+                    placeholder="Number of children"
+                    min="0"
+                    [max]="lock.max_child_count || 10"
+                    class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-white"
+                    style="color: black;">
+                  <p class="text-xs text-gray-600 mt-1">Can be 0 if no children are staying</p>
+                </div>
+
+                <!-- Special Requests -->
+                <div class="md:col-span-3">
+                  <label class="block text-sm font-bold text-gray-700 mb-2">Special Requests (Optional)</label>
+                  <textarea 
+                    [(ngModel)]="getGuestDetailsForRoom(lock.lock_id)!.specialRequests"
+                    placeholder="Any special requests for this room?"
+                    rows="3"
+                    class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-white"
+                    style="color: black;"></textarea>
+                </div>
+              </div>
+
+              <!-- Validation Status -->
+              <div class="mt-4 space-y-3">
+                <!-- Guest Count Summary -->
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-3 rounded">
+                  <p class="text-sm font-semibold text-blue-800">
+                    👥 Guest Summary: {{ getGuestDetailsForRoom(lock.lock_id)!.adultCount }} Adult(s), {{ getGuestDetailsForRoom(lock.lock_id)!.childCount }} Child(ren)
+                  </p>
+                </div>
+
+                <!-- Status Indicators -->
+                <div class="flex items-center gap-2 text-sm">
+                  <span *ngIf="getGuestDetailsForRoom(lock.lock_id) && getGuestDetailsForRoom(lock.lock_id)!.adultName && getGuestDetailsForRoom(lock.lock_id)!.adultAge >= 18 && getGuestDetailsForRoom(lock.lock_id)!.adultCount >= 1" class="text-green-600">✅ All details filled & verified</span>
+                  <span *ngIf="!getGuestDetailsForRoom(lock.lock_id) || !getGuestDetailsForRoom(lock.lock_id)!.adultName || getGuestDetailsForRoom(lock.lock_id)!.adultAge < 18 || getGuestDetailsForRoom(lock.lock_id)!.adultCount < 1" class="text-red-600">❌ Please fill all required fields & verify age (18+)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Completion Notice -->
+          <div class="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p class="text-sm text-yellow-800">
+              <span class="font-bold">{{ getCompletedRoomsCount() }} / {{ selectedLocks.length }}</span> rooms completed
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: CART SIDEBAR (1 column) -->
+      <div class="lg:col-span-1">
+        <div class="bg-linear-to-br from-blue-50 to-indigo-50 rounded-2xl shadow-2xl p-6 sticky top-24">
+          <h3 class="text-xl font-bold text-gray-800 mb-4">🛒 Your Cart</h3>
+          
+          <div *ngIf="getTotalSelectedRooms() === 0" class="text-center py-8 text-gray-600">
+            <i class="fas fa-shopping-cart text-4xl mb-4 text-gray-400"></i>
+            <p class="font-semibold">No rooms selected</p>
+            <p class="text-xs text-blue-600">Maximum 5 rooms allowed</p>
+          </div>
+
+          <!-- Cart Items -->
+          <div *ngIf="getTotalSelectedRooms() > 0" class="space-y-4">
+            <!-- Room-Level Display (Direct list of all locked rooms) -->
+            <div *ngIf="getTotalSelectedRooms() > 0" class="space-y-3">
+              <h3 class="text-lg font-bold text-gray-800 mb-4">📍 Selected Rooms</h3>
+              
+              <!-- Iterate through selectedLocks directly for room-level display -->
+              <div *ngFor="let lock of selectedLocks; let i = index" 
+                class="bg-white rounded-lg p-3 border-l-4 border-blue-600 shadow-sm hover:shadow-md transition">
+                
+                <div class="flex items-start justify-between gap-3">
+                  <div class="flex-1">
+                    <!-- Room Type Header (simplified) -->
+                    <h4 class="font-bold text-gray-800 mb-2">🔒 {{ lock.type_name }}</h4>
+                    
+                    <!-- Room Details -->
+                    <div class="text-xs text-gray-600 space-y-1">
+                      <p>👥 {{ lock.max_adult_count }} adults, {{ lock.max_child_count }} children</p>
+                      <p>📐 {{ lock.square_ft }} sq ft</p>
+                      <p class="font-semibold text-blue-600">💰 ₹{{ lock.price_per_night }}/night × {{ calculateNumberOfNights() }} nights = ₹{{ lock.price_per_night * calculateNumberOfNights() | number:'1.0-0' }}</p>
+                      
+                      <!-- Lock Expiry Time - ACCURATE COUNTDOWN -->
+                      <div class="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                        <p class="text-xs text-gray-600 font-semibold">⏱️ Will Release in:</p>
+                        <p [ngClass]="'text-sm font-bold ' + getLockExpiryColor(lock)">{{ getLockExpiryDisplay(lock) }}</p>
+                        <p class="text-xs text-gray-500 mt-1">Expires: {{ lock.expires_at | date:'short' }}</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Remove Button -->
+                  <button 
+                    (click)="removeRoom(lock.lock_id)"
+                    class="w-8 h-8 bg-red-100 hover:bg-red-200 text-red-600 rounded flex items-center justify-center text-lg font-bold shrink-0 transition"
+                    title="Remove this room">
+                    ✕
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Cart Summary -->
+            <div class="bg-white rounded-lg p-4 border-2 border-blue-300 shadow-sm mt-6">
+              <h4 class="text-lg font-bold text-gray-800 mb-3">💳 Total Summary</h4>
+              
+              <div class="space-y-2 text-sm">
+                <div class="flex justify-between pb-2 border-b border-gray-200">
+                  <span class="text-gray-600">Total Rooms:</span>
+                  <span class="font-semibold">{{ getTotalSelectedRooms() }}</span>
+                </div>
+                
+                <div class="flex justify-between pb-2 border-b border-gray-200">
+                  <span class="text-gray-600">Duration:</span>
+                  <span class="font-semibold">{{ calculateNumberOfNights() }} night(s)</span>
+                </div>
+                
+                <div class="flex justify-between pt-2 pb-2 border-b border-gray-200">
+                  <span class="text-gray-800 font-semibold">Per Night Total:</span>
+                  <span class="text-lg font-bold text-blue-600">₹{{ getTotalPrice() | number:'1.0-0' }}</span>
+                </div>
+                
+                <div class="flex justify-between text-base font-bold text-green-600 pt-2">
+                  <span>Total Stay:</span>
+                  <span>₹{{ getTotalPrice() * calculateNumberOfNights() | number:'1.0-0' }}</span>
+                </div>
+              </div>
+
+              <!-- Lock Expiry Warning -->
+              <div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                <p class="text-yellow-800 font-semibold">⏱️ Session Timer</p>
+                <p [ngClass]="timerColor" class="text-lg font-bold">{{ getTimerDisplay() }}</p>
+                <p class="text-yellow-600 mt-1">Complete selection before locks expire</p>
+              </div>
+              
+              <!-- Complete Room Selection Button -->
+              <button 
+                *ngIf="getTotalSelectedRooms() > 0"
+                (click)="completeRoomSelection()"
+                class="w-full mt-4 py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition transform hover:scale-105 shadow-lg">
+                ✅ Complete Room Selection
+                <div class="text-sm font-normal mt-1">
+                  {{ getTotalSelectedRooms() }} room(s) • ₹{{ getTotalPrice() * calculateNumberOfNights() | number:'1.0-0' }}
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- End of max-w-7xl container (Phases 0 & 1) -->
+
+  <!-- ===================================================
+       PHASE 3: PAYMENT (COMPLETELY SEPARATE - Outside max-w-7xl)
+       =================================================== -->
+  <div *ngIf="isPaymentPhase" class="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-blue-900 px-6 py-8">
+    <div class="max-w-3xl mx-auto animate-fadeIn">
+      
+      <div class="bg-white rounded-2xl shadow-2xl p-12">
+        <div class="text-center mb-12">
+          <div class="text-6xl mb-4">💳</div>
+          <h1 class="text-4xl font-bold bg-linear-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
+            Complete Your Payment
+          </h1>
+          <p class="text-gray-600 text-lg">Review your booking details below</p>
+        </div>
+
+        <!-- Booking Summary -->
+        <div class="bg-linear-to-r from-blue-50 to-indigo-50 rounded-2xl p-8 mb-8">
+          <h2 class="text-2xl font-bold text-gray-800 mb-6">📋 Booking Summary</h2>
+          
+          <div class="space-y-4">
+            <!-- Dates -->
+            <div class="flex justify-between items-center pb-4 border-b border-gray-300">
+              <div class="text-gray-700">
+                <p class="font-semibold">📅 Dates</p>
+                <p class="text-sm text-gray-600">{{ checkIn }} → {{ checkOut }}</p>
+              </div>
+              <div class="text-right text-gray-800 font-semibold">
+                {{ calculateNumberOfNights() }} night(s)
+              </div>
+            </div>
+
+            <!-- Room Details -->
+            <div class="pb-4 border-b border-gray-300">
+              <p class="font-semibold text-gray-800 mb-3">🏨 Selected Rooms</p>
+              <div class="space-y-2">
+                <div *ngFor="let lock of selectedLocks" class="flex justify-between text-sm text-gray-700">
+                  <span>{{ lock.type_name }} - {{ lock.room_no }}</span>
+                  <span class="font-semibold">₹{{ lock.price_per_night * calculateNumberOfNights() | number:'1.0-0' }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Room Details -->
+            <div class="space-y-2 text-sm">
+              <div *ngFor="let lock of selectedLocks" class="bg-white rounded p-3">
+                <p class="font-medium text-gray-800">{{ lock.type_name }}</p>
+                <p class="text-gray-600">🧑 {{ getGuestDetailsForRoom(lock.lock_id)?.adultName }} (Age: {{ getGuestDetailsForRoom(lock.lock_id)?.adultAge }})</p>
+                <p *ngIf="getGuestDetailsForRoom(lock.lock_id)?.specialRequests" class="text-gray-600 italic">
+                  💬 {{ getGuestDetailsForRoom(lock.lock_id)?.specialRequests }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Price Breakdown -->
+            <div class="pt-4 space-y-3">
+              <div class="flex justify-between text-gray-700">
+                <span>Room Charges:</span>
+                <span class="font-semibold">₹{{ getTotalRoomCharges() | number:'1.0-0' }}</span>
+              </div>
+              <div class="flex justify-between text-gray-700">
+                <span>GST (18%):</span>
+                <span class="font-semibold">₹{{ calculateTaxes() | number:'1.0-0' }}</span>
+              </div>
+              <div class="flex justify-between pt-3 border-t-2 border-gray-300 text-lg">
+                <span class="font-bold text-gray-800">Total Amount:</span>
+                <span class="text-2xl font-bold text-green-600">₹{{ getTotalAmount() | number:'1.0-0' }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Payment Method Selection -->
+        <div *ngIf="areAllGuestDetailsFilled()" class="bg-linear-to-r from-blue-50 to-indigo-50 rounded-2xl p-8 mb-8 border-2 border-blue-200">
+          <h3 class="text-lg font-bold text-gray-800 mb-4">💰 Payment Method</h3>
+          <p class="text-gray-600 mb-6">Select your preferred payment method to proceed</p>
+          
+          <div class="grid md:grid-cols-3 gap-4">
+            <!-- Credit/Debit Card -->
+            <button 
+              (click)="selectPaymentMethod('card')"
+              [class]="'p-4 border-2 font-semibold rounded-lg transition transform hover:scale-105 ' + (selectedPaymentMethod === 'card' ? 'border-green-600 bg-green-50 text-green-700 shadow-lg' : 'border-gray-300 text-gray-700 hover:bg-gray-100')"
+              [disabled]="isProcessingPayment">
+              <div class="text-2xl mb-2">💳</div>
+              <div class="font-bold">Credit/Debit Card</div>
+              <div class="text-xs mt-1" *ngIf="selectedPaymentMethod === 'card'">✓ Selected</div>
+            </button>
+
+            <!-- UPI -->
+            <button 
+              (click)="selectPaymentMethod('upi')"
+              [class]="'p-4 border-2 font-semibold rounded-lg transition transform hover:scale-105 ' + (selectedPaymentMethod === 'upi' ? 'border-green-600 bg-green-50 text-green-700 shadow-lg' : 'border-gray-300 text-gray-700 hover:bg-gray-100')"
+              [disabled]="isProcessingPayment">
+              <div class="text-2xl mb-2">📱</div>
+              <div class="font-bold">UPI</div>
+              <div class="text-xs mt-1" *ngIf="selectedPaymentMethod === 'upi'">✓ Selected</div>
+            </button>
+
+            <!-- Net Banking -->
+            <button 
+              (click)="selectPaymentMethod('netbanking')"
+              [class]="'p-4 border-2 font-semibold rounded-lg transition transform hover:scale-105 ' + (selectedPaymentMethod === 'netbanking' ? 'border-green-600 bg-green-50 text-green-700 shadow-lg' : 'border-gray-300 text-gray-700 hover:bg-gray-100')"
+              [disabled]="isProcessingPayment">
+              <div class="text-2xl mb-2">🏦</div>
+              <div class="font-bold">Net Banking</div>
+              <div class="text-xs mt-1" *ngIf="selectedPaymentMethod === 'netbanking'">✓ Selected</div>
+            </button>
+          </div>
+
+          <!-- UPI ID Input (Show only when UPI is selected) -->
+          <div *ngIf="selectedPaymentMethod === 'upi'" class="mt-6 p-4 bg-blue-50 border-2 border-blue-300 rounded-lg">
+            <label class="block text-sm font-bold text-gray-700 mb-2">📱 Enter Your UPI ID *</label>
+            <input 
+              type="text"
+              [(ngModel)]="upiId"
+              placeholder="example@upi"
+              class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-white"
+              style="color: black;">
+            <p class="text-xs text-gray-600 mt-2">UPI ID format: yourname@bankname (e.g., user@okhdfcbank)</p>
+            <p *ngIf="upiId && !isValidUPI(upiId)" class="text-xs text-red-600 mt-2">❌ Invalid UPI ID format</p>
+            <p *ngIf="upiId && isValidUPI(upiId)" class="text-xs text-green-600 mt-2">✅ Valid UPI ID</p>
+          </div>
+        </div>
+
+        <!-- Payment Options Not Available Message -->
+        <div *ngIf="!areAllGuestDetailsFilled()" class="bg-amber-50 border-l-4 border-amber-500 p-6 rounded mb-8">
+          <p class="text-amber-700 font-semibold">⏳ Complete all guest details to proceed to payment</p>
+          <p class="text-amber-600 text-sm mt-2">Fill in all required fields for each room including name, age (18+), and guest counts.</p>
+        </div>
+
+        <!-- Important Notice -->
+        <div class="bg-red-50 border-l-4 border-red-500 p-6 rounded mb-8">
+          <p class="text-red-700 font-semibold">⚠️ Important</p>
+          <p class="text-red-600 text-sm mt-2">
+            Please verify all details before proceeding with payment.
+          </p>
+        </div>
+
+        <!-- Stop Booking Section (Payment Page) -->
+        <div class="bg-red-50 border-l-4 border-red-500 p-6 rounded mb-8">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-red-700 font-semibold">🚪 Want to cancel?</p>
+              <p class="text-red-600 text-sm mt-2">
+                Click the button to stop booking. Your room locks will be released and you'll go back to home.
+              </p>
+            </div>
+            <button 
+              (click)="stopBooking()"
+              class="px-6 py-2 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition whitespace-nowrap">
+              🚪 Stop Booking
+            </button>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex gap-4">
+          <button 
+            (click)="goBack()"
+            class="flex-1 py-4 border-2 border-blue-600 text-blue-600 font-bold rounded-lg hover:bg-blue-50 transition">
+            ← Back to Room Selection
+          </button>
+          
+          <button 
+            (click)="completePayment()"
+            [disabled]="!canProcessPayment()"
+            [class]="'flex-1 py-4 font-bold rounded-lg transition transform ' + (canProcessPayment() && !isProcessingPayment ? 'bg-linear-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 hover:scale-105 shadow-lg' : 'bg-gray-300 text-gray-600 cursor-not-allowed')"
+            [title]="getPaymentButtonDisabledReason()">
+            <div *ngIf="isProcessingPayment" class="flex items-center justify-center gap-2">
+              <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>Processing Payment...</span>
+            </div>
+            <div *ngIf="!isProcessingPayment">
+              ✅ Complete Payment & Book
+              <div class="text-sm font-normal mt-1">
+                ₹{{ getTotalAmount() | number:'1.0-0' }}
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================
+       PHASE 3: CONFIRMATION PAGE
+       =================================================== -->
+  <div *ngIf="currentPhase === PHASES.CONFIRMATION" class="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 p-4 lg:p-8">
+    <div class="max-w-4xl mx-auto">
+      <!-- Sticky Header with Timer -->
+      <div class="sticky top-0 z-40 bg-white shadow-md rounded-lg p-4 mb-8">
+        <div class="flex items-center justify-between">
+          <h1 class="text-2xl font-bold text-gray-800">🏨 LuxuryStay</h1>
+          <div class="text-right">
+            <p class="text-sm text-gray-600">Booking Reference</p>
+            <p class="text-xl font-bold text-blue-600">#{{ confirmationData?.booking_id }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Content -->
+      <div class="space-y-8">
+        <!-- Success Icon with Animation -->
+        <div class="flex justify-center">
+          <div class="relative w-24 h-24 bg-linear-to-r from-green-400 to-green-600 rounded-full flex items-center justify-center animate-pulse">
+            <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Success Message -->
+        <div class="text-center">
+          <h2 class="text-4xl font-bold text-gray-800 mb-2">✅ Booking Confirmed!</h2>
+          <p class="text-xl text-gray-600">Thank you for booking with LuxuryStay</p>
+        </div>
+
+        <!-- Booking Details Card -->
+        <div class="bg-white rounded-2xl shadow-lg p-8 border-2 border-green-200">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Left Column -->
+            <div class="space-y-6">
+              <div>
+                <p class="text-gray-600 text-sm font-semibold mb-1">BOOKING ID</p>
+                <p class="text-2xl font-bold text-gray-800">{{ confirmationData?.booking_id }}</p>
+              </div>
+              
+              <div>
+                <p class="text-gray-600 text-sm font-semibold mb-1">TRANSACTION REFERENCE</p>
+                <p class="text-lg font-mono text-gray-700">{{ confirmationData?.transaction_reference }}</p>
+              </div>
+
+              <div>
+                <p class="text-gray-600 text-sm font-semibold mb-1">TOTAL AMOUNT PAID</p>
+                <p class="text-3xl font-bold text-green-600">₹{{ confirmationData?.total_amount | number:'1.0-2' }}</p>
+              </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="space-y-6 bg-gray-50 p-6 rounded-lg">
+              <div>
+                <p class="text-gray-600 text-sm font-semibold mb-1">CHECK-IN</p>
+                <p class="text-xl font-bold text-gray-800">{{ confirmationData?.check_in | date:'MMM dd, yyyy' }}</p>
+              </div>
+
+              <div>
+                <p class="text-gray-600 text-sm font-semibold mb-1">CHECK-OUT</p>
+                <p class="text-xl font-bold text-gray-800">{{ confirmationData?.check_out | date:'MMM dd, yyyy' }}</p>
+              </div>
+
+              <div>
+                <p class="text-gray-600 text-sm font-semibold mb-1">ROOMS BOOKED</p>
+                <p class="text-2xl font-bold text-blue-600">{{ confirmationData?.room_count }} Room<span *ngIf="confirmationData?.room_count !== 1">s</span></p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Confirmation Message -->
+        <div class="bg-blue-50 border-l-4 border-blue-500 p-6 rounded-lg">
+          <p class="text-blue-800 font-semibold mb-2">📧 Confirmation Email</p>
+          <p class="text-blue-700">A detailed confirmation email has been sent to your registered email address with all booking details and hotel information.</p>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <button 
+            (click)="goToDashboard()"
+            class="py-4 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition transform hover:scale-105 shadow-lg">
+            📋 View My Bookings
+          </button>
+          
+          <button 
+            (click)="startNewBooking()"
+            class="py-4 px-6 bg-linear-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold rounded-lg transition transform hover:scale-105 shadow-lg">
+            🏨 Browse More Hotels
+          </button>
+        </div>
+
+        <!-- Support Information -->
+        <div class="bg-gray-50 rounded-lg p-6 text-center">
+          <p class="text-gray-600 mb-2">Need Help?</p>
+          <p class="text-gray-700 font-semibold">Contact our support team at <a href="mailto:support@luxurystay.com" class="text-blue-600 hover:underline">support@luxurystay.com</a></p>
+          <p class="text-gray-600 text-sm mt-2">Available 24/7 to assist you</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================
+       CHANGE DATES MODAL (Overlay)
+       =================================================== -->
+    <div *ngIf="showChangeDatesModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full animate-fadeIn">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">📅 Change Your Dates</h2>
+
+        <div class="space-y-6">
+          <!-- Check-in Date -->
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-2">Check-in Date</label>
+            <input 
+              type="date" 
+              [(ngModel)]="checkIn"
+              class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-white"
+              style="color: black;">
+          </div>
+
+          <!-- Check-out Date -->
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-2">Check-out Date</label>
+            <input 
+              type="date" 
+              [(ngModel)]="checkOut"
+              class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-white"
+              style="color: black;">
+          </div>
+
+          <!-- Duration Info -->
+          <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+            <p class="text-gray-700 font-semibold">
+              Duration: <span class="text-blue-600">{{ calculateNumberOfNights() }} night(s)</span>
+            </p>
+          </div>
+
+          <!-- Error Message -->
+          <div *ngIf="searchError" class="bg-red-50 border-l-4 border-red-500 p-4 rounded">
+            <p class="text-red-700 text-sm">❌ {{ searchError }}</p>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex flex-col gap-3">
+            <!-- Primary: Update Dates -->
+            <button 
+              (click)="confirmDateChange()"
+              class="w-full py-2 bg-linear-to-r from-blue-600 to-blue-700 text-white font-bold rounded-lg hover:from-blue-700 hover:to-blue-800 transition">
+              ✅ Update Dates
+            </button>
+
+            <!-- Secondary: Cancel -->
+            <button 
+              (click)="closeChangeDatesModal()"
+              class="w-full py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg transition">
+              ✖️ Cancel
+            </button>
+
+            <!-- Tertiary: Stop Booking -->
+            <button 
+              (click)="stopBooking()"
+              class="w-full py-2 bg-linear-to-r from-red-500 to-red-600 text-white font-semibold rounded-lg hover:from-red-600 hover:to-red-700 transition">
+              🚪 Stop Booking
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>

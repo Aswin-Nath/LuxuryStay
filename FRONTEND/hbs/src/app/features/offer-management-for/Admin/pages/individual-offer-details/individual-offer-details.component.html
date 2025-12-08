@@ -1,0 +1,160 @@
+<app-admin-navbar></app-admin-navbar>
+
+<div class="bg-gray-50 min-h-screen">
+  <div class="flex flex-col lg:flex-row flex-1 w-full mt-16 md:mt-20">
+    <!-- Sidebar -->
+    <div class="w-full lg:w-64 px-4 md:px-6 lg:px-8 py-4 shrink-0">
+      <app-admin-sidebar></app-admin-sidebar>
+    </div>
+
+    <!-- Main Content -->
+    <main class="flex-1 w-full px-4 md:px-6 lg:px-8 py-4 space-y-4">
+      <!-- Header -->
+      <div class="relative rounded-lg p-[3px] bg-linear-to-r from-yellow-600 to-red-700 shadow">
+        <div class="bg-[#fdfaf4] rounded-lg py-4 md:py-6 px-6">
+          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h2 class="text-2xl md:text-3xl text-gray-800 font-bold">{{ offer?.offer_name || 'Offer Details' }}</h2>
+              <p class="text-gray-600 text-xs md:text-sm mt-1">View and manage offer information</p>
+            </div>
+            <div class="flex gap-2">
+              <button (click)="editOffer(offer?.offer_id)" class="flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition font-medium">
+                <span class="material-icons">edit</span> Edit
+              </button>
+              <button (click)="backToList()" class="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition font-medium">
+                <span class="material-icons">arrow_back</span> Back
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div *ngIf="loading" class="loading-state">
+        <p>Loading offer details...</p>
+      </div>
+
+      <!-- Error State -->
+      <div *ngIf="error && !loading" class="alert alert-error bg-red-50 border border-red-200 p-4 rounded-lg text-red-700">
+        {{ error }}
+      </div>
+
+      <!-- Offer Details -->
+      <div *ngIf="!loading && offer && !error" class="offer-details-container space-y-4">
+        <!-- Status Badges -->
+        <div class="flex gap-2">
+          <span class="badge px-3 py-1 rounded-full font-semibold text-sm" [class]="isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
+            {{ isActive ? '🟢 Active' : '🔴 Inactive' }}
+          </span>
+          <span class="badge px-3 py-1 rounded-full font-semibold text-sm" [class]="isValid ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'">
+            {{ isValid ? '✓ Valid Period' : '✗ Expired' }}
+          </span>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <!-- Left Column: Images -->
+          <div class="lg:col-span-1">
+            <div class="bg-white rounded-lg shadow p-4">
+              <h3 class="text-lg font-semibold mb-3 text-gray-800">Offer Images</h3>
+              
+              <!-- Primary Image -->
+              <div *ngIf="images && images.length > 0" class="mb-4">
+                <div class="relative rounded-lg overflow-hidden bg-gray-100 h-48">
+                  <img [src]="primaryImage?.image_url || images[0].image_url" [alt]="offer.offer_name" class="w-full h-full object-cover" />
+                  <span *ngIf="primaryImage" class="absolute top-2 right-2 bg-yellow-500 text-white px-2 py-1 rounded-full text-xs font-semibold">⭐ Primary</span>
+                </div>
+              </div>
+              <div *ngIf="!images || images.length === 0" class="rounded-lg bg-gray-100 h-48 flex items-center justify-center">
+                <div class="text-center text-gray-500">
+                  <span class="material-icons text-4xl">image_not_supported</span>
+                  <p class="mt-2">No images</p>
+                </div>
+              </div>
+
+              <!-- Image Grid (All Images) -->
+              <div *ngIf="images && images.length > 0" class="mt-4">
+                <h4 class="text-sm font-semibold text-gray-700 mb-2">All Images ({{ images.length }})</h4>
+                <div class="grid grid-cols-3 gap-2">
+                  <div *ngFor="let img of images" class="relative group cursor-pointer rounded-lg overflow-hidden bg-gray-100 h-24" (click)="primaryImage = img">
+                    <img [src]="img.image_url" [alt]="offer!.offer_name" class="w-full h-full object-cover" [class.ring-2]="primaryImage?.image_id === img.image_id" [class.ring-yellow-500]="primaryImage?.image_id === img.image_id" />
+                    <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                      <span class="text-white text-xs font-semibold">Click to view</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Details -->
+          <div class="lg:col-span-2 space-y-4">
+            <!-- Basic Info -->
+            <div class="bg-white rounded-lg shadow p-4">
+              <h3 class="text-lg font-semibold mb-3 text-gray-800">Basic Information</h3>
+              <div class="space-y-3">
+                <div>
+                  <label class="text-sm font-semibold text-gray-600">Description</label>
+                  <p class="text-gray-700 mt-1">{{ offer!.description || 'No description provided' }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Discount Information -->
+            <div class="bg-white rounded-lg shadow p-4">
+              <h3 class="text-lg font-semibold mb-3 text-gray-800">Discount Information</h3>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="text-sm font-semibold text-gray-600">Base Discount</label>
+                  <p class="text-2xl font-bold text-yellow-600 mt-1">{{ offer!.discount_percent }}%</p>
+                </div>
+                <div>
+                  <label class="text-sm font-semibold text-gray-600">Current Usage</label>
+                  <p class="text-lg font-semibold text-gray-700 mt-1">{{ offer!.current_uses }} / {{ offer!.max_uses || '∞' }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Validity Period -->
+            <div class="bg-white rounded-lg shadow p-4">
+              <h3 class="text-lg font-semibold mb-3 text-gray-800">Validity Period</h3>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="text-sm font-semibold text-gray-600">Valid From</label>
+                  <p class="text-gray-700 mt-1 font-medium">{{ offer!.valid_from | date: 'MMM dd, yyyy' }}</p>
+                </div>
+                <div>
+                  <label class="text-sm font-semibold text-gray-600">Valid To</label>
+                  <p class="text-gray-700 mt-1 font-medium">{{ offer!.valid_to | date: 'MMM dd, yyyy' }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Room Types -->
+            <div class="bg-white rounded-lg shadow p-4" *ngIf="offer && offer.room_types && offer.room_types.length > 0">
+              <h3 class="text-lg font-semibold mb-3 text-gray-800">Applicable Room Types</h3>
+              <div class="space-y-2">
+                <div *ngFor="let rt of offer!.room_types" class="flex items-center justify-between p-2 bg-gray-50 rounded">
+                  <span class="font-medium text-gray-700">Room Type {{ rt.room_type_id }}</span>
+                  <span class="text-yellow-600 font-semibold">{{ rt.discount_percent || offer!.discount_percent }}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="bg-white rounded-lg shadow p-4 flex gap-3">
+          <button 
+            class="flex items-center gap-2 px-4 py-2 rounded-lg transition font-medium"
+            [class]="isActive ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'"
+            (click)="toggleOfferStatus()"
+            [disabled]="actionLoading">
+            <span class="material-icons">{{ isActive ? 'pause_circle' : 'play_circle' }}</span>
+            {{ isActive ? 'Deactivate Offer' : 'Activate Offer' }}
+          </button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>

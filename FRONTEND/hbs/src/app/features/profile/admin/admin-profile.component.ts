@@ -2,13 +2,13 @@ import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProfileService, ProfileResponse, ChangePasswordRequest } from '../../../core/services/profile/profile.service';
-// import { AdminNavbarComponent } from '../../core/components/admin-navbar/admin-navbar.component';
-// import { AdminSidebarComponent } from '../../core/components/admin-sidebar/admin-sidebar.component';
+// import { AdminNavbarComponent } from '../../layout/Admin/admin-navbar/admin-navbar.component';
+// import { AdminSidebarComponent } from '../../layout/Admin/admin-sidebar/admin-sidebar.component';
 interface AdminProfile extends ProfileResponse {
   role?: string;
 }
-import { AdminSidebarComponent } from '../../../core/components/admin-sidebar/admin-sidebar.component';
-import { AdminNavbarComponent } from '../../../core/components/admin-navbar/admin-navbar.component';
+import { AdminSidebarComponent } from '../../../layout/Admin/admin-sidebar/admin-sidebar.component';
+import { AdminNavbarComponent } from '../../../layout/Admin/admin-navbar/admin-navbar.component';
 @Component({
   selector: 'app-admin-profile',
   standalone: true,

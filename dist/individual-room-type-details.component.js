@@ -1,0 +1,16 @@
+c: ;
+Users;
+aswin;
+Projects;
+GenworxTraining;
+Phase_3_HBS;
+LuxuryStay;
+FRONTEND;
+hbs;
+src;
+app;
+features;
+room - type - management;
+pages;
+individual - room - type - details;
+individual - room - type - details.component.ts;

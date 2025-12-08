@@ -1,0 +1,89 @@
+/* Cursor improvements */
+:host, body {
+	cursor: default;
+}
+
+input[type="text"], input[type="email"], input[type="tel"], input[type="password"], select, textarea {
+	cursor: text;
+}
+
+button, a, .btn, [role*="button"] {
+	cursor: pointer;
+}
+
+button[disabled], .disabled, .cursor-not-allowed {
+	cursor: not-allowed;
+}
+
+/* Toast improvements: ensure it animates out, left/right placement handled in TS */
+.translate-x-full {
+	transform: translateX(100%);
+	opacity: 0;
+}
+.translate-x-neg-full {
+	transform: translateX(-100%);
+	opacity: 0;
+}
+.opacity-0 {
+	opacity: 0;
+}
+.fixed.top-4.left-4 {
+	left: 1rem;
+}
+.fixed.top-4.right-4 {
+	right: 1rem;
+}
+
+/* Slight hover for interactive areas to feel more responsive */
+.hover\:translate-y-\-0\.5:hover {
+	transform: translateY(-.125rem);
+}
+
+/* Basic animations */
+.animate-fadeStart { animation: fadeStart .6s ease-out both; }
+@keyframes fadeStart { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+.animate-slideUpSmall { animation: slideUpSmall .45s ease-out both; }
+@keyframes slideUpSmall { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+.delay-100 { animation-delay: .1s; }
+.delay-150 { animation-delay: .15s; }
+.delay-200 { animation-delay: .2s; }
+.delay-250 { animation-delay: .25s; }
+.delay-300 { animation-delay: .3s; }
+.delay-400 { animation-delay: .4s; }
+.delay-500 { animation-delay: .5s; }
+
+.animate-slideUp { animation: slideUp .7s ease-out both; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+
+.animate-slideUpDelay { animation: slideUp .9s ease-out both; }
+
+.animate-cardFloat { animation: cardFloat 1s ease-out both; }
+@keyframes cardFloat { from { opacity: 0; transform: scale(.96) translateY(14px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+/* Toast */
+.toast.show { transform: translateX(0) !important; opacity: 1 !important; }
+.toast.hide { transform: translateX(120%) !important; opacity: 0 !important; }
+
+/* Loader */
+.loader { width: 36px; height: 36px; border: 4px solid #fcd34d; border-top-color: #d97706; border-radius: 50%; animation: spin .75s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Fade page for redirect */
+.fade-page { opacity: 0 !important; transition: opacity .6s ease; }
+
+/* Input focus glow */
+input:focus, select:focus, textarea:focus {
+	box-shadow: 0 6px 18px -10px rgba(217, 119, 6, .18), 0 2px 6px -6px rgba(251, 191, 36, .14);
+	outline: none;
+}
+
+button:active, a:active { transform: scale(.995); }
+
+/* Elevated card on hover */
+.shadow-xl:hover { box-shadow: 0 30px 60px rgba(14, 20, 28, .14), 0 12px 40px rgba(245,223,125,.06); }
+
+/* Reduced motion accessibilty */
+@media (prefers-reduced-motion: reduce) { .animate-slideUpSmall, .animate-fadeStart, .animate-cardFloat { animation: none !important; } }
+

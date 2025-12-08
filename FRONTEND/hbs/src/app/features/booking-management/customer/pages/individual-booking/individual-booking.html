@@ -1,0 +1,646 @@
+<body class="bg-gray-50 flex flex-col min-h-screen">
+  <!-- Navbar Component -->
+  <app-customer-navbar></app-customer-navbar>
+
+  <!-- Main Content -->
+  <div class="bg-gray-50 min-h-screen">
+    <div class="w-full px-4 md:px-6 lg:px-8 py-6 mt-16 md:mt-20 max-w-6xl mx-auto">
+      <!-- ✅ Main Content -->
+  
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="flex items-center justify-center py-12">
+    <div class="text-center">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-600 mx-auto"></div>
+      <p class="mt-4 text-gray-600">Loading booking details...</p>
+    </div>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error && !isLoading" class="bg-red-50 border-l-4 border-red-500 p-4 rounded">
+    <p class="text-red-700 font-medium">{{ error }}</p>
+  </div>
+
+  <!-- Main Content -->
+  <div *ngIf="!isLoading && booking && !error">
+    <!-- Header with Back Button -->
+    <div class="flex items-center justify-between mb-8">
+      <button
+        (click)="goBack()"
+        class="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-yellow-500 to-pink-500 text-white rounded-lg hover:opacity-90 transition"
+      >
+        <span class="material-icons text-sm">arrow_back</span>
+        Back to Bookings
+      </button>
+      <button
+        (click)="downloadInvoice()"
+        class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+      >
+        <span class="material-icons text-sm">download</span>
+        Download Invoice
+      </button>
+    </div>
+
+    <!-- Page Title -->
+    <div class="relative rounded-2xl border-2 border-red-400 bg-[#fdfaf4] py-6 sm:py-8 text-center shadow mb-8">
+      <h2 class="text-2xl sm:text-3xl lg:text-4xl text-gray-800 font-bold">Booking Details</h2>
+      <p class="text-sm sm:text-base text-gray-500 mt-2">Booking #{{ booking.booking_id }}</p>
+    </div>
+
+        <div class="bg-white rounded-2xl border-2 border-yellow-400 p-6 shadow-sm mb-7">
+          <div class="flex items-center justify-between mb-6">
+            <h3 class="text-lg font-semibold text-yellow-700">Booking Information</h3>
+            <span
+              [ngClass]="'inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ' + getStatusBadgeClass(booking.status)"
+            >
+              <span class="material-icons text-sm mr-1">{{ getStatusIcon(booking.status) }}</span>
+              {{ booking.status | uppercase }}
+            </span>
+          </div>
+
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div>
+              <p class="text-xs font-medium text-gray-600">Check-in</p>
+              <p class="text-lg font-semibold text-gray-800 mt-1">{{ formatDate(booking.check_in) }}</p>
+              <p class="text-sm text-gray-500">{{ booking.check_in_time }}</p>
+            </div>
+
+            <div>
+              <p class="text-xs font-medium text-gray-600">Check-out</p>
+              <p class="text-lg font-semibold text-gray-800 mt-1">{{ formatDate(booking.check_out) }}</p>
+              <p class="text-sm text-gray-500">{{ booking.check_out_time }}</p>
+            </div>
+
+            <div>
+              <p class="text-xs font-medium text-gray-600">Duration</p>
+              <p class="text-lg font-semibold text-gray-800 mt-1">{{ calculateNights() }} night(s)</p>
+            </div>
+
+            <div>
+              <p class="text-xs font-medium text-gray-600">Number of Rooms</p>
+              <p class="text-lg font-semibold text-gray-800 mt-1">{{ booking.room_count }}</p>
+            </div>
+
+            <div>
+              <p class="text-xs font-medium text-gray-600">Booking Date</p>
+              <p class="text-lg font-semibold text-gray-800 mt-1">{{ formatBookingDateTime(booking.booking_time || booking.created_at || '') }}</p>
+            </div>
+
+            <div>
+              <p class="text-xs font-medium text-gray-600">Last Updated</p>
+              <p class="text-lg font-semibold text-gray-800 mt-1">{{ formatDate(booking.updated_at || '') }}</p>
+            </div>
+          </div>
+        </div>
+
+    <!-- Guest Information -->
+    <div class="bg-white rounded-2xl border-2 border-yellow-400 p-6 shadow-sm mb-8">
+      <h3 class="text-lg font-semibold text-yellow-700 mb-4">Primary Guest Information</h3>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div>
+          <p class="text-xs font-medium text-gray-600 mb-1">Name</p>
+          <p class="text-lg font-semibold text-gray-800">{{ booking.primary_customer_name || 'Not provided' }}</p>
+        </div>
+
+        <div>
+          <p class="text-xs font-medium text-gray-600 mb-1">Phone Number</p>
+          <p class="text-lg font-semibold text-gray-800">{{ booking.primary_customer_phone_number || 'Not provided' }}</p>
+        </div>
+
+        <div>
+          <p class="text-xs font-medium text-gray-600 mb-1">Date of Birth</p>
+          <p class="text-lg font-semibold text-gray-800">
+            {{ booking.primary_customer_dob ? formatDate(booking.primary_customer_dob) : 'Not provided' }}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rooms Details Table -->
+    <div *ngIf="booking.rooms && booking.rooms.length > 0" class="bg-white rounded-2xl border-2 border-yellow-400 p-6 shadow-sm mb-8">
+      <h3 class="text-lg font-semibold text-yellow-700 mb-4">Room Allocation Details</h3>
+
+      <div class="overflow-x-auto">
+        <table class="w-full border-collapse">
+          <thead>
+            <tr class="bg-yellow-50 border-b-2 border-yellow-300">
+              <th class="text-left px-4 py-3 font-semibold text-yellow-700">Room #</th>
+              <th class="text-left px-4 py-3 font-semibold text-yellow-700">Room Type</th>
+              <th class="text-left px-4 py-3 font-semibold text-yellow-700">Guest Name</th>
+              <th class="text-center px-4 py-3 font-semibold text-yellow-700">Age</th>
+              <th class="text-center px-4 py-3 font-semibold text-yellow-700">Guests</th>
+              <th class="text-left px-4 py-3 font-semibold text-yellow-700">Special Requests</th>
+              <th class="text-right px-4 py-3 font-semibold text-yellow-700">Rating</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let room of booking.rooms; let i = index" class="border-b border-gray-200 hover:bg-gray-50 transition">
+              <td class="px-4 py-3 font-medium text-gray-800">{{ room.room_id }}</td>
+              <td class="px-4 py-3 text-gray-700">Room Type {{ room.room_type_id }}</td>
+              <td class="px-4 py-3 text-gray-700">{{ room.guest_name || 'Not specified' }}</td>
+              <td class="px-4 py-3 text-center text-gray-700">{{ room.guest_age || '-' }}</td>
+              <td class="px-4 py-3 text-center text-gray-700">{{ room.adults }}A{{ room.children && room.children > 0 ? ', ' + room.children + 'C' : '' }}</td>
+              <td class="px-4 py-3 text-gray-700 text-sm">{{ room.special_requests && room.special_requests.trim() !== '' ? room.special_requests : '-' }}</td>
+              <td class="px-4 py-3 text-right">
+                <span *ngIf="room.rating_given && room.rating_given > 0" class="text-yellow-500 font-semibold">{{ room.rating_given }}/5 ⭐</span>
+                <span *ngIf="!room.rating_given || room.rating_given === 0" class="text-gray-400">-</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+          <!-- Room Cost Summary Table -->
+      <div class="bg-white rounded-2xl border-2 border-yellow-400 p-6 shadow-sm mb-8">
+        <h4 class="text-sm font-semibold text-yellow-700 mb-3">Room Cost Breakdown</h4>
+        <div class="overflow-x-auto">
+          <table class="w-full border-collapse">
+            <thead>
+              <tr class="bg-yellow-50 border-b-2 border-yellow-300">
+                <th class="text-left px-4 py-3 font-semibold text-yellow-700 text-sm">Room #</th>
+                <th class="text-left px-4 py-3 font-semibold text-yellow-700 text-sm">Room Type</th>
+                <th class="text-right px-4 py-3 font-semibold text-yellow-700 text-sm">Room Type Price</th>
+                <th class="text-center px-4 py-3 font-semibold text-yellow-700 text-sm">Nights</th>
+                <th class="text-right px-4 py-3 font-semibold text-yellow-700 text-sm">Total Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let room of booking.rooms" class="border-b border-gray-100 hover:bg-gray-50 transition">
+  <td class="px-4 py-3 font-medium text-gray-800">{{ room.room_id }}</td>
+
+  <td class="px-4 py-3 text-gray-700">Room Type {{ room.room_type_id }}</td>
+
+  <td class="px-4 py-3 text-right text-gray-700"> 
+    ₹{{ room.price_per_night ?? 0 | number:'1.2-2' }}
+  </td>
+
+  <td class="px-4 py-3 text-center text-gray-700">
+    {{ calculateNights() }}
+  </td>
+
+  <td class="px-4 py-3 text-right font-semibold text-gray-800">
+    ₹{{ (room.price_per_night ?? 0) * calculateNights() | number:'1.2-2' }}
+  </td>
+</tr>
+
+            </tbody>
+            <tfoot>
+              <!-- Subtotal Row -->
+              <tr class="bg-gray-50 border-t-2 border-yellow-300">
+                <td colspan="4" class="px-4 py-3 text-right font-semibold text-yellow-700">Subtotal:</td>
+                <td class="px-4 py-3 text-right font-bold text-gray-800">₹{{ (getTotalRoomPrice() | number:'1.2-2') }}</td>
+              </tr>
+              <!-- GST Row -->
+              <tr class="bg-gray-50 border-b-2 border-yellow-300">
+                <td colspan="4" class="px-4 py-3 text-right font-semibold text-yellow-700">GST (18%):</td>
+                <td class="px-4 py-3 text-right font-bold text-gray-800">₹{{ (calculateGST() | number:'1.2-2') }}</td>
+              </tr>
+              <!-- Total Price Row -->
+              <tr class="bg-yellow-50 border-t-2 border-yellow-300">
+                <td colspan="4" class="px-4 py-3 text-right font-semibold text-yellow-700 text-lg">Total Price:</td>
+                <td class="px-4 py-3 text-right font-bold text-lg text-yellow-700">₹{{ (getTotalAmount() | number:'1.2-2') }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+    <!-- No Rooms -->
+    <div
+      *ngIf="!booking.rooms || booking.rooms.length === 0"
+      class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded mb-8 text-blue-700"
+    >
+      No room details available for this booking.
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex flex-col sm:flex-row justify-end items-center gap-3 mb-8">
+      <button
+        *ngIf="canShowCancelButton()"
+        (click)="openCancelBookingModal()"
+        class="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg shadow hover:bg-red-700 transition"
+      >
+        <span class="material-icons text-sm">cancel</span>
+        Cancel Booking
+      </button>
+      <button
+        *ngIf="canShowIssueForm()"
+        (click)="openRaiseIssueModal()"
+        class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition"
+      >
+        <span class="material-icons text-sm">report_problem</span>
+        Raise Issue
+      </button>
+    </div>
+
+    <!-- Reported Issues Section -->
+    <div class="bg-white rounded-2xl border-2 border-pink-400 p-6 shadow-sm mb-8">
+      <h3 class="text-lg font-semibold text-yellow-700 mb-4">Reported Issues</h3>
+      <div *ngIf="booking.issues && booking.issues.length > 0" class="space-y-3">
+        <div *ngFor="let issue of booking.issues" class="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors">
+          <div class="flex items-center gap-3">
+            <span class="material-icons text-red-500">error</span>
+            <div>
+              <p class="font-medium text-gray-800">{{ issue.title }}</p>
+              <p class="text-sm text-gray-500">Issue ID: {{ issue.id }}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span 
+              [ngClass]="{
+                'bg-green-100 text-green-700': issue.status === 'Resolved',
+                'bg-yellow-100 text-yellow-700': issue.status === 'Pending',
+                'bg-gray-100 text-gray-700': issue.status === 'Reported'
+              }"
+              class="px-3 py-1 rounded-full text-sm"
+            >
+              {{ issue.status }}
+            </span>
+          </div>
+        </div>
+      </div>
+      <div *ngIf="!booking.issues || booking.issues.length === 0" class="text-center py-6 text-gray-500">
+        <p class="material-icons text-4xl mb-2 opacity-50">check_circle</p>
+        <p>No issues reported for this booking.</p>
+      </div>
+    </div>
+
+    <!-- Payment Information -->
+    <div class="bg-white rounded-2xl border-2 border-pink-400 p-6 shadow-sm mb-8">
+      <h3 class="text-lg font-semibold text-yellow-700 mb-4">Payment Information</h3>
+      
+      <!-- If payments array exists and has items -->
+      <div *ngIf="booking.payments && booking.payments.length > 0" class="space-y-6">
+        <div *ngFor="let payment of booking.payments; let i = index" class="border-b pb-4 last:border-b-0">
+          <div *ngIf="booking.payments.length > 1" class="text-sm font-semibold text-gray-600 mb-3">
+            Payment {{ i + 1 }}
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p class="text-xs font-medium text-gray-600 mb-1">Amount</p>
+              <p class="text-lg font-semibold text-gray-800">₹{{ (payment.amount | number:'1.2-2') }}</p>
+            </div>
+            <div>
+              <p class="text-xs font-medium text-gray-600 mb-1">Payment Date</p>
+              <p class="text-lg font-semibold text-gray-800">{{ formatDate(payment.payment_date) }}</p>
+            </div>
+            <div>
+              <p class="text-xs font-medium text-gray-600 mb-1">Payment Method</p>
+              <p class="text-sm text-gray-700">{{ getPaymentMethodName(payment.method_id) }}</p>
+            </div>
+            <div>
+              <p class="text-xs font-medium text-gray-600 mb-1">Status</p>
+              <span 
+                [ngClass]="{
+                  'bg-green-100 text-green-800': payment.status === 'SUCCESS',
+                  'bg-yellow-100 text-yellow-800': payment.status === 'PENDING',
+                  'bg-red-100 text-red-800': payment.status === 'FAILED'
+                }"
+                class="inline-block px-3 py-1 rounded-full text-sm font-semibold"
+              >
+                {{ payment.status }}
+              </span>
+            </div>
+            <div *ngIf="payment.transaction_reference">
+              <p class="text-xs font-medium text-gray-600 mb-1">Transaction Reference</p>
+              <p class="text-sm text-gray-700">{{ payment.transaction_reference }}</p>
+            </div>
+            <div *ngIf="payment.remarks">
+              <p class="text-xs font-medium text-gray-600 mb-1">Remarks</p>
+              <p class="text-sm text-gray-700">{{ payment.remarks }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty state if no payments -->
+      <div *ngIf="!booking.payments || booking.payments.length === 0" class="text-center py-6 text-gray-500">
+        <p class="material-icons text-4xl mb-2 opacity-50">payment</p>
+        <p>No payment information available.</p>
+      </div>
+    </div>
+
+    <!-- Review Section (Only for Staying or Checked Out) -->
+    <div *ngIf="canShowReview()" class="space-y-6 mb-8">
+      <!-- Existing Review Display (Google-style) -->
+      <div *ngIf="existingReview && !reviewsLoading" class="bg-white rounded-2xl border-2 border-blue-400 p-6 shadow-sm">
+        <h3 class="text-lg font-semibold text-blue-700 mb-4">Your Review</h3>
+        <div class="space-y-4">
+          <!-- Customer Review Card -->
+          <div class="bg-gray-50 rounded-lg p-4">
+            <div class="flex items-start justify-between mb-3">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center font-bold text-white">
+                  {{ (existingReview.user?.full_name || 'U')[0].toUpperCase() }}
+                </div>
+                <div>
+                  <p class="font-semibold text-gray-800">{{ existingReview.user?.full_name || 'You' }}</p>
+                  <p class="text-xs text-gray-500">{{ existingReview.created_at | date: 'short' }}</p>
+                </div>
+              </div>
+              <div class="flex gap-1">
+                <span *ngFor="let i of [1,2,3,4,5]" class="text-lg" [ngClass]="i <= existingReview.rating ? 'text-yellow-400' : 'text-gray-300'">★</span>
+              </div>
+            </div>
+            <p class="text-gray-700 mb-3">{{ existingReview.comment }}</p>
+
+            <!-- User Review Images -->
+            <div *ngIf="existingReview.images && existingReview.images.length > 0" class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+              <div *ngFor="let image of existingReview.images" class="relative group">
+                <img [src]="image.image_url" alt="Review image" class="w-full h-24 object-cover rounded-lg">
+              </div>
+            </div>
+          </div>
+
+          <!-- Admin Response (if exists) -->
+          <div *ngIf="existingReview.admin_response" class="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-500">
+            <div class="flex items-start gap-3 mb-3">
+              <div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center font-bold text-white">
+                A
+              </div>
+              <div>
+                <p class="font-semibold text-blue-800">Admin Response</p>
+                <p class="text-xs text-blue-600">{{ existingReview.responded_at | date: 'short' }}</p>
+              </div>
+            </div>
+            <p class="text-gray-700 mb-3">{{ existingReview.admin_response }}</p>
+
+            <!-- Admin Response Images -->
+            <div *ngIf="existingReview.admin_response_images && existingReview.admin_response_images.length > 0" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div *ngFor="let image of existingReview.admin_response_images" class="relative group">
+                <img [src]="image.image_url" alt="Admin response image" class="w-full h-24 object-cover rounded-lg">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Review Loading State -->
+      <div *ngIf="reviewsLoading" class="bg-white rounded-2xl border-2 border-yellow-400 p-6 shadow-sm">
+        <div class="flex items-center justify-center py-4">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600 mr-3"></div>
+          <p class="text-gray-600">Loading reviews...</p>
+        </div>
+      </div>
+
+      <!-- Review Submission Form (only show if no review exists) -->
+      <div *ngIf="!existingReview && !reviewsLoading" class="bg-white rounded-2xl border-2 border-yellow-400 p-6 shadow-sm">
+        <h3 class="text-lg font-semibold text-yellow-700 mb-4">Write a Review</h3>
+        <form (ngSubmit)="submitReview()" #reviewForm="ngForm" class="space-y-4">
+          <!-- Rating Input -->
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Your Rating</label>
+            <div class="flex gap-2" id="starRating">
+              <button
+                *ngFor="let star of [1, 2, 3, 4, 5]"
+                type="button"
+                (click)="setRating(star)"
+                [ngClass]="star <= (selectedRating || 0) ? 'text-yellow-400' : 'text-gray-300'"
+                class="text-4xl cursor-pointer hover:text-yellow-400 transition-colors"
+              >
+                ★
+              </button>
+            </div>
+            <p class="text-sm text-gray-500">
+              {{ selectedRating > 0 ? ratingTexts[selectedRating] : 'Click to rate your experience' }}
+            </p>
+          </div>
+
+          <!-- Review Text -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Your Review</label>
+            <textarea
+              [(ngModel)]="reviewText"
+              name="reviewText"
+              maxlength="200"
+              rows="3"
+              placeholder="Share your experience (max 200 characters)"
+              class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 resize-none"
+            ></textarea>
+            <p class="text-sm text-gray-500 text-right mt-1">
+              {{ (reviewText || '').length }}/200
+            </p>
+          </div>
+
+          <!-- Image Upload -->
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Upload Images (Optional)</label>
+            <label class="block">
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                (change)="onReviewImageSelect($event)"
+                class="hidden"
+              />
+              <div class="border-2 border-dashed border-yellow-300 rounded-lg p-4 text-center cursor-pointer hover:bg-yellow-50 transition">
+                <span class="material-icons text-3xl text-yellow-600 block mb-2">image</span>
+                <p class="text-sm font-medium text-gray-700">Click to upload images</p>
+                <p class="text-xs text-gray-500">Max 5 images, 5MB each</p>
+              </div>
+            </label>
+
+            <!-- Image Previews -->
+            <div *ngIf="reviewImagePreviews.length > 0" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div *ngFor="let preview of reviewImagePreviews; let i = index" class="relative group">
+                <img [src]="preview" alt="Preview" class="w-full h-24 object-cover rounded-lg">
+                <button
+                  type="button"
+                  (click)="removeReviewImage(i)"
+                  class="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
+                >
+                  <span class="material-icons text-sm">close</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-3">
+            <button
+              type="button"
+              (click)="resetReview()"
+              class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg shadow"
+            >
+              Reset
+            </button>
+            <button
+              type="submit"
+              [disabled]="selectedRating === 0 || !reviewText || reviewText.trim().length === 0 || isSubmittingReview"
+              class="bg-linear-to-r from-yellow-500 to-pink-500 text-white px-6 py-2 rounded-lg shadow hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              <span *ngIf="!isSubmittingReview">Submit Review</span>
+              <span *ngIf="isSubmittingReview" class="flex items-center gap-2">
+                <span class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                Submitting...
+              </span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    </div>
+
+    </div>
+  </div>
+</body>
+
+<!-- ✅ Cancel Policy Modal -->
+<div id="cancelPolicyModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4">
+  <div class="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-lg overflow-y-auto max-h-[90vh]">
+    <div class="flex items-start justify-between mb-4">
+      <h3 class="text-xl font-semibold text-gray-800">Cancellation Policy</h3>
+      <button (click)="closeCancelPolicyModal()" class="text-gray-500 hover:text-gray-800 text-2xl">✕</button>
+    </div>
+
+    <!-- Warning Alert for Checked-In Bookings -->
+    <div *ngIf="isBookingStaying()" class="mb-4 p-4 bg-red-50 border-l-4 border-red-500 rounded">
+      <p class="text-red-700 font-semibold">⚠️ IMPORTANT: No Refund After Check-In</p>
+      <p class="text-red-600 text-sm mt-2">You are currently checked-in. Cancelling now means you will NOT receive any refund and will be charged for the entire stay.</p>
+    </div>
+
+    <div class="mt-4 space-y-4 text-gray-700 text-sm leading-relaxed">
+      <p><span class="font-bold">Free Cancellation:</span> Cancel up to 48 hours before check-in for a full refund.</p>
+      <p><span class="font-bold">Late Cancellation:</span> Within 48 hours → charged one night's stay.</p>
+      <p><span class="font-bold">No Show:</span> Charged for the entire reservation, no refund.</p>
+      <p><span class="font-bold">Refunds:</span> Processed within 7–10 business days.</p>
+      <p><span class="font-bold">Non-Refundable Rates:</span> No cancellation or refund allowed.</p>
+      <p *ngIf="isBookingStaying()" class="bg-red-100 p-3 rounded border border-red-300"><span class="font-bold text-red-700">After Check-In:</span> No refunds will be issued. Rooms will be unlocked and made available for other guests.</p>
+    </div>
+
+    <div class="mt-6 flex justify-end gap-3">
+      <button (click)="closeCancelPolicyModal()" class="px-4 py-2 rounded-lg border text-gray-700 hover:bg-gray-50">
+        Cancel
+      </button>
+      <button (click)="proceedToCancel()" [ngClass]="isBookingStaying() ? 'bg-red-600 hover:bg-red-700' : 'bg-red-600 hover:bg-red-700'" class="px-4 py-2 rounded-lg text-white shadow-lg">
+        {{ isBookingStaying() ? 'I Understand — No Refund' : 'I\'m Okay — Proceed to Cancel' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ Unified Cancel Modal -->
+<div id="unifiedCancelModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4">
+  <div class="bg-white rounded-2xl w-full max-w-lg p-6 shadow-lg">
+    <div class="flex items-start justify-between mb-4">
+      <div>
+        <h3 class="text-xl font-semibold text-gray-800">Cancel Booking</h3>
+        <p class="text-sm text-gray-500 mt-1">Please provide a reason (optional)</p>
+      </div>
+      <button (click)="closeUnifiedCancelModal()" class="text-gray-500 hover:text-gray-800 text-2xl">✕</button>
+    </div>
+
+    <div class="mt-4">
+      <label class="block text-sm font-medium text-gray-700 mb-2">Cancellation Reason (Optional)</label>
+      <textarea
+        [(ngModel)]="cancellationReason"
+        rows="4"
+        placeholder="Tell us why you're cancelling (optional)"
+        class="w-full border rounded-lg p-3 focus:ring-2 focus:ring-red-500 focus:border-red-500"
+      ></textarea>
+    </div>
+
+    <div class="mt-5 flex gap-3 justify-between">
+      <button (click)="closeUnifiedCancelModal()" class="px-4 py-2 rounded-lg border text-gray-700 hover:bg-gray-50">
+        No, go back
+      </button>
+      <button (click)="confirmCancel()" class="px-4 py-2 rounded-lg bg-red-600 text-white shadow-lg hover:bg-red-700">
+        Yes — Cancel Booking
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ Raise Issue Modal -->
+<div id="raiseIssueModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4">
+  <div class="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-lg overflow-y-auto max-h-[90vh]">
+    <div class="flex items-start justify-between mb-4">
+      <div>
+        <h3 class="text-xl font-semibold text-gray-800">Raise an Issue</h3>
+        <p class="text-sm text-gray-500 mt-1">Report a problem with your stay</p>
+      </div>
+      <button (click)="closeRaiseIssueModal()" class="text-gray-500 hover:text-gray-800 text-2xl">✕</button>
+    </div>
+
+    <form (ngSubmit)="submitIssue()" #issueForm="ngForm" class="mt-6 space-y-6">
+      <!-- Issue Details -->
+      <div class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Issue Title <span class="text-red-500">*</span></label>
+            <input
+              [(ngModel)]="issueTitle"
+              name="issueTitle"
+              type="text"
+              required
+              class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+              placeholder="Brief title for your issue"
+            >
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Room Numbers</label>
+            <input
+              [value]="getRoomNumbers()"
+              type="text"
+              readonly
+              class="w-full p-3 border rounded-lg bg-gray-100 text-gray-700"
+            >
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Issue Description <span class="text-red-500">*</span></label>
+          <textarea
+            [(ngModel)]="issueDescription"
+            name="issueDescription"
+            rows="4"
+            required
+            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+            placeholder="Please describe the issue in detail..."
+          ></textarea>
+        </div>
+      </div>
+
+      <!-- Optional Image Upload -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Upload Images (Optional)</label>
+        <input
+          #fileInput
+          type="file"
+          multiple
+          accept="image/*"
+          (change)="onImageSelect($event)"
+          class="w-full border rounded-lg p-3 text-gray-600 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+        >
+        <p class="text-xs text-gray-500 mt-1">You can upload multiple images to help explain the issue</p>
+
+        <!-- Image Preview -->
+        <div id="imagePreview" class="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4" [ngClass]="selectedImages.length === 0 ? 'hidden' : ''">
+          <div *ngFor="let image of selectedImages; let i = index" class="relative">
+            <img [src]="image.preview" class="h-24 w-full object-cover rounded-lg shadow">
+            <button
+              type="button"
+              (click)="removeImage(i)"
+              class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex justify-end gap-3 pt-4 border-t">
+        <button (click)="closeRaiseIssueModal()" type="button" class="px-5 py-2 rounded-lg border text-gray-700 hover:bg-gray-50">
+          Cancel
+        </button>
+        <button type="submit" [disabled]="!issueTitle || !issueDescription" class="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
+          Submit Issue
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ✅ Toast Container -->
+<div id="unifiedToast" class="fixed top-6 right-6 z-50 space-y-2"></div>

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LuxuryStay - Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body class="bg-gray-50 font-sans">
+
+<!-- Header -->
+<header class="flex justify-between items-center bg-white shadow-md px-6 py-4 sticky top-0 z-9999">
+  <a routerLink="/Features/LandingPages/Customer/index.html" class="flex items-center space-x-2">
+    <img src="/assets/images/Hotel_logo.png" alt="Hotel Logo"
+         class="h-8 sm:h-10 rounded-full border-2 border-yellow-600 p-1">
+    <h1 class="text-lg sm:text-xl font-bold text-yellow-700">LuxuryStay</h1>
+  </a>
+</header>
+
+<!-- FULLSCREEN LOADER -->
+<div *ngIf="loading" class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-99999 animate-fadeIn">
+  <div class="bg-white px-7 py-6 rounded-2xl shadow-2xl flex flex-col items-center">
+    <div class="loader mb-3"></div>
+    <p class="text-gray-700 font-semibold text-sm tracking-wide">Signing you in…</p>
+  </div>
+</div>
+
+<div class="flex min-h-[calc(100vh-64px)] animate-fadeStart">
+  <!-- Left Image -->
+  <div class="hidden md:flex w-1/2 bg-cover bg-center relative"
+       style="background-image: url('/assets/images/hotel_luxury.jpg');">
+    <div class="absolute inset-0 bg-linear-to-t from-black/80 via-black/40 to-transparent"></div>
+    <div class="relative z-10 flex flex-col justify-center items-center text-center px-8 text-white">
+      <h2 class="text-4xl font-extrabold mb-4 animate-slideUp">Experience Luxury</h2>
+      <p class="text-lg text-gray-200 leading-relaxed animate-slideUpDelay">
+        Discover elegance, comfort, and premium hospitality at LuxuryStay.<br>
+        Enjoy exclusive offers, world-class amenities, and an unforgettable stay.
+      </p>
+    </div>
+  </div>
+
+  <div class="hidden md:block w-px bg-gray-300"></div>
+
+  <!-- Right Form -->
+  <div class="flex justify-center items-center w-full md:w-1/2 p-6">
+    <div class="relative w-full max-w-xl bg-white rounded-2xl overflow-hidden border-4 border-amber-400 shadow-xl hover:shadow-amber-300/30 hover:shadow-2xl transition-all duration-500 animate-cardFloat">
+
+      <!-- Back Arrow -->
+      <a routerLink="/Features/LandingPages/Customer/index.html"
+        class="absolute top-3 left-3 text-gray-700 hover:text-gray-900 transition cursor-pointer hover:-translate-y-0.5 animate-cardFloat active:scale-95">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+      </a>
+
+      <!-- Top Banner -->
+      <div class="bg-linear-to-r from-amber-600 to-yellow-500 text-white text-center py-6 animate-slideUpSmall">
+        <h2 class="text-2xl font-bold">Welcome Back</h2>
+        <p class="text-sm opacity-90">Log in to continue your LuxuryStay journey</p>
+      </div>
+
+      <!-- Form -->
+      <form (ngSubmit)="onSubmit()" (reset)="onReset()" class="px-8 py-6 space-y-5" novalidate>
+
+        <!-- Email or Mobile -->
+        <div class="animate-slideUpSmall">
+          <label class="block text-sm font-medium text-gray-700">
+            Email or Mobile <span class="text-red-500">*</span>
+          </label>
+          <div class="relative">
+            <input type="text" [(ngModel)]="userInput" name="userInput"
+                   (input)="validateIdentifierFormatOnInput()" (blur)="validateIdentifierFormatOnInput()"
+                   placeholder="example@email.com or +91 98765 43210"
+                   class="w-full mt-1 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition">
+            <span *ngIf="userError"
+                  class="absolute right-2 top-2 text-[10px] text-red-500 bg-white px-1 rounded">
+              {{ userError }}
+            </span>
+          </div>
+        </div>
+
+                <!-- Password -->
+<div class="animate-slideUpSmall delay-150">
+  <label class="block text-sm font-medium text-gray-700">
+    Password <span class="text-red-500">*</span>
+  </label>
+
+  <div class="relative">
+    <input
+      [type]="showPassword ? 'text' : 'password'"
+      [(ngModel)]="password"
+      name="password"
+      [disabled]="passwordDisabled"
+      placeholder="••••••••"
+      class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition"
+      [ngClass]="{ 'bg-gray-100 cursor-not-allowed': passwordDisabled }"
+    />
+    <span *ngIf="passwordError"
+          class="absolute right-2 top-2 text-[10px] text-red-500 bg-white px-1 rounded">
+      {{ passwordError }}
+    </span>
+
+    <!-- Toggle Button -->
+    <button
+      type="button"
+      (click)="togglePassword()"
+      class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+      [disabled]="passwordDisabled"
+    >
+      <!-- Eye Icon -->
+      <svg *ngIf="!showPassword"
+           xmlns="http://www.w3.org/2000/svg"
+           class="h-5 w-5"
+           fill="none"
+           viewBox="0 0 24 24"
+           stroke="currentColor"
+           stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round"
+              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        <path stroke-linecap="round" stroke-linejoin="round"
+              d="M2.458 12C3.732 7.943 7.523 5 12 
+                 5c4.477 0 8.268 2.943 9.542 
+                 7-1.274 4.057-5.065 7-9.542 
+                 7-4.477 0-8.268-2.943-9.542-7z" />
+      </svg>
+
+      <!-- Eye Slash Icon -->
+      <svg *ngIf="showPassword"
+           xmlns="http://www.w3.org/2000/svg"
+           class="h-5 w-5"
+           fill="none"
+           viewBox="0 0 24 24"
+           stroke="currentColor"
+           stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round"
+              d="M13.875 18.825A10.05 10.05 0 0112 
+                 19c-4.478 0-8.268-2.943-9.542-7a9.956 
+                 9.956 0 012.886-4.249M6.18 6.18A9.956 
+                 9.956 0 0012 5c4.478 0 8.268 2.943 
+                 9.542 7a9.958 9.958 0 01-4.132 
+                 5.411M15 12a3 3 0 11-6 0 3 3 
+                 0 016 0zM3 3l18 18" />
+      </svg>
+    </button>
+  </div>
+
+        <!-- Buttons -->
+</div>
+
+        <!-- Forgot password link right below password field -->
+        <div class="mt-2 text-right animate-slideUpSmall delay-250">
+          <a routerLink="/forgot-password" class="text-amber-600 text-sm hover:underline">Forgot password?</a>
+        </div>
+
+        <!-- Buttons -->
+        <div class="flex gap-3 animate-slideUpSmall delay-300">
+          <button type="submit"
+                  class="flex-1 bg-linear-to-r from-amber-600 to-yellow-500 text-white py-2.5 rounded-lg
+                         hover:from-amber-700 hover:to-yellow-600 shadow-md transition">
+            Sign In
+          </button>
+        </div>
+
+        
+
+        <p class="text-sm text-center text-gray-600 animate-slideUpSmall delay-350">
+          Don't have an account?
+          <a type="button" routerLink="/signup" routerLinkActive="text-amber-700 font-semibold"
+             class="text-amber-600 font-medium hover:underline">Sign up</a>
+        </p>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Notification -->
+<div #toast class="fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg transform translate-x-full opacity-0 transition-all duration-300 z-50">
+  <div class="flex items-center gap-2 text-white">
+    <span id="toastIcon" class="material-icons text-sm">check_circle</span>
+    <span id="toastMessage">Action completed!</span>
+  </div>
+</div>
+
+</body>
+</html>
