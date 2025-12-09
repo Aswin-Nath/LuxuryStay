@@ -1,9 +1,9 @@
 
-import { PermissionService } from "../services/permissions/permissions";
+import { PermissionService } from "../../services/permissions";
 import { Injectable } from "@angular/core";
 import { Resolve } from "@angular/router";
 import {map,tap} from "rxjs/operators";
-import { AuthenticationService } from "../services/authentication/authentication.service";
+import { AuthenticationService } from "../../services/authentication.service";
 @Injectable({ providedIn: 'root' })
 export class PermissionResolver implements Resolve<boolean> {
 

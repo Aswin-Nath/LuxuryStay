@@ -9,11 +9,11 @@ import { RoomsService } from '../../../../shared/services/rooms.service';
 import { AdminNavbarComponent } from '../../../../layout/Admin/admin-navbar/admin-navbar.component';
 import { AdminSidebarComponent } from '../../../../layout/Admin/admin-sidebar/admin-sidebar.component';
 // import { EditRoomComponent } from '../edit-room/edit-room';
-import { EditRoomComponent } from '../../../rooms-management/admin/pages/edit-room/edit-room';
+import { EditRoomComponent } from '../../../rooms-management/pages/edit-room/edit-room';
 import { EditAmenityComponent } from '../edit-amenity/edit-amenity';
 import { AddAmenityComponent } from '../add-amenity/add-amenity';
-import { AddRoomComponent } from '../../../rooms-management/admin/pages/add-room/add-room';
-import { AddRoomTypeComponent } from '../../../room-type-management/pages/add-room-type/add-room-type';
+import { AddRoomComponent } from '../../../rooms-management/pages/add-room/add-room';
+import { AddRoomTypeComponent } from '../../../rooms-management/pages/add-room-type/add-room-type';
 // import { AddRoomComponent } from '../add-room/add-room';
 // import { AddRoomTypeComponent } from '../add-room-type/add-room-type';
 

@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router, NavigationEnd } from '@angular/router';
 import { HasPermissionDirective } from '../../../core/directives/has-permission.directive';
-import { PermissionService } from '../../../core/services/permissions/permissions';
+import { PermissionService } from '../../../services/permissions';
 import { filter } from 'rxjs/operators';
 
 interface SidebarLink {

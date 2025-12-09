@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router, RouterLink, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Subject, Observable } from 'rxjs';
-import { AuthenticationService } from '../../../core/services/authentication/authentication.service';
+import { AuthenticationService } from '../../../services/authentication.service';
 import { BookingStateService } from '../../../shared/services/booking-state.service';
 import { DatePickerModalComponent } from '../../../shared/components/date-picker-modal/date-picker-modal.component';
 interface Notification {

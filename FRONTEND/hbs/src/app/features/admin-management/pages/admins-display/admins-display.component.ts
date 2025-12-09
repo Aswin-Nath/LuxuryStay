@@ -4,10 +4,10 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
 import { AdminNavbarComponent } from '../../../../layout/Admin/admin-navbar/admin-navbar.component';
 import { AdminSidebarComponent } from '../../../../layout/Admin/admin-sidebar/admin-sidebar.component';
-import { AdminManagementService, AdminUser, Role } from '../../../../core/services/admin-management/admin-management.service';
+import { AdminManagementService, AdminUser, Role } from '../../../../services/admin-management.service';
 // import { AdminFormModalComponent } from '../users-management/admin-form-modal.component';
+// import { AdminFormModalComponent } from '../admin-addition.component';
 import { AdminFormModalComponent } from '../admin-addition/admin-addition.component';
-
 @Component({
   selector: 'app-admin-management',
   standalone: true,
