@@ -7,7 +7,6 @@ import { PublicGuard } from './core/guards/public.guard';
 import { AuthGuard } from './core/guards/auth.guard';
 import { PermissionResolver } from './core/resolver/permission.resolver';
 import { ForbiddenPageComponent } from './shared/components/forbidden-page/forbidden-page.component';
-import { HomePageComponent } from './pages/home_page/home-page/home-page.component';
 // import { CustomerDashboardComponent } from './features/dashboard/customer-dashboard/customer-dashboard.component';
 // import { AdminDashboardComponent } from './features/dashboard/admin-dashboard/admin-dashboard.component';
 // import { ProfileComponent } from './features/profile/customer/profile.component';
@@ -66,12 +65,6 @@ export const routes: Routes = [
 		canActivate: [AuthGuard],
 		resolve: { permissions: PermissionResolver },
 		children: [
-			{
-				path: 'home_page',
-				component: HomePageComponent,
-				canActivate: [PermissionGuard]
-			},
-			// Customer Routes
 			{
 				path: '',
 				children: [

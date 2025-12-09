@@ -301,7 +301,7 @@ export class Signup implements AfterViewInit {
         setTimeout(() => document.body.classList.add('fade-page'), 300);
         setTimeout(() => {
           this.loading = false;
-          this.router.navigate(['/home_page']);
+          // this.router.navigate(['/home_page']);
         }, 900);
       },
       error: (err: HttpErrorResponse) => {
