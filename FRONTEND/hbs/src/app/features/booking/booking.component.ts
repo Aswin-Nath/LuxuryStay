@@ -266,8 +266,8 @@ export class BookingComponent implements OnInit, OnDestroy {
 
         console.log('Booking state received:', { checkIn, checkOut, roomTypeId, offerId, phase: this.currentPhase });
 
-    // Only act if we have valid dates AND we haven't already processed them
-        if (checkIn && checkOut && !this.datesSelected) {
+    // Only act if we have valid dates (ALWAYS accept new dates, even if datesSelected was true from previous booking)
+        if (checkIn && checkOut) {
           console.log('Valid dates found in state → applying and proceeding');
           this.checkIn = checkIn;
           this.checkOut = checkOut;

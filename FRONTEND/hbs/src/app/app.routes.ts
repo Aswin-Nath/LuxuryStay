@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
-import { Signup } from './features/Auth/signup/pages/signup-form/signup-form.component';
-import { Login } from './features/Auth/login/pages/login-form/login-form.component';
-import { ForgotPassword } from './features/Auth/forgot-password/pages/forgot-password-form/forgot-password-form.component';
+import { Signup } from './features/auth/signup/pages/signup-form/signup-form.component';
+import { Login } from './features/auth/login/pages/login-form/login-form.component';
+import { ForgotPassword } from './features/auth/forgot-password/pages/forgot-password-form/forgot-password-form.component';
 import { PermissionGuard } from './core/guards/permission.guard';
 import { PublicGuard } from './core/guards/public.guard';
 import { AuthGuard } from './core/guards/auth.guard';
