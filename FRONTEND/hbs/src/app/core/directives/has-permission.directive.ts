@@ -1,5 +1,6 @@
 import { Directive, Input, TemplateRef, ViewContainerRef } from "@angular/core";
-import { PermissionService } from "../services/permissions/permissions";
+// import { PermissionService } from "../services/permissions/permissions";
+import { PermissionService } from "../../services/permissions";
 
 @Directive({
     selector:"[appHasPermission]",

@@ -2,7 +2,7 @@ import { Component, Input, Output, EventEmitter, OnInit, ChangeDetectionStrategy
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { OfferBookingService } from '../../../services/offer-booking.service';
-import { SharedOfferBookingService } from '../../../services/shared-offer-booking.service';
+import { SharedOfferBookingService } from '../../../shared/services/shared-offer-booking.service';
 import { ToastService } from '../../../services/toast.service';
 
 /**

@@ -9,7 +9,7 @@ import {
 
 import { Observable, BehaviorSubject, throwError } from 'rxjs';
 import { catchError, filter, switchMap, take, finalize } from 'rxjs/operators';
-import { AuthenticationService } from '../services/authentication/authentication.service';
+import { AuthenticationService } from '../../services/authentication.service';
 import { Router } from '@angular/router';
 
 @Injectable({ providedIn: 'root' })

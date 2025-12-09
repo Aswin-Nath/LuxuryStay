@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RoomsService, RoomType, Room, PaginatedRoomsResponse } from '../../../core/services/rooms/rooms.service';
+import { RoomsService, RoomType, Room, PaginatedRoomsResponse } from '../../../shared/services/rooms.service';
 import { HasPermissionDirective } from "../../../core/directives/has-permission.directive";
 
 @Component({
