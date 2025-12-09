@@ -11,7 +11,7 @@ import { ReviewsService,Review } from '../../../../../services/reviews.service';
 import { DatePickerModalComponent } from '../../../../../shared/components/date-picker-modal/date-picker-modal.component';
 import { RoomTypeService } from '../../../../../services/room-types.service';
 import { WishlistService } from '../../../../wishlist-management/wishlist.service';
-import { BookingStateService } from '../../../../../services/booking-state.service';
+import { BookingStateService } from '../../../../../shared/services/booking-state.service';
 // import { RoomTypeService } from '../../services/room-types.service';
 // import { ImageService } from '../../services/image.service';
 // import { WishlistService } from '../../services/wishlist.service';

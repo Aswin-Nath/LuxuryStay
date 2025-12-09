@@ -10,7 +10,7 @@ import { ProfileService } from '../../../core/services/profile/profile.service';
 import { WishlistService } from '../../../services/wishlist.service';
 import { takeUntil } from 'rxjs/operators';
 import { Subject } from 'rxjs';
-import { BookingStateService } from '../../../services/booking-state.service';
+import { BookingStateService } from '../../../shared/services/booking-state.service';
 import { DatePickerModalComponent } from '../../../shared/components/date-picker-modal/date-picker-modal.component';
 interface Booking {
   booking_id: string;

@@ -4,7 +4,7 @@ import { Router, RouterLink, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Subject, Observable } from 'rxjs';
 import { AuthenticationService } from '../../../core/services/authentication/authentication.service';
-import { BookingStateService } from '../../../services/booking-state.service';
+import { BookingStateService } from '../../../shared/services/booking-state.service';
 import { DatePickerModalComponent } from '../../../shared/components/date-picker-modal/date-picker-modal.component';
 interface Notification {
   type: 'booking' | 'issue' | 'refund' | 'offer';

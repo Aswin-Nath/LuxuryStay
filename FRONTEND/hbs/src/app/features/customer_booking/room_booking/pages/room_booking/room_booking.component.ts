@@ -5,7 +5,6 @@ import { Router, RouterModule, ActivatedRoute } from '@angular/router';
 import { BookingService, RoomLock, BookingSession, Room } from '../../../../../shared/services/booking.service';
 import { BookingStateService } from '../../../../../shared/services/booking-state.service';
 import { ToastService } from '../../../../../shared/services/toast.service';
-// import { RoomCardComponent } from './room-card/room-card.component';
 import { RoomCardComponent } from '../../../room_card/pages/room-card/room-card.component';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';

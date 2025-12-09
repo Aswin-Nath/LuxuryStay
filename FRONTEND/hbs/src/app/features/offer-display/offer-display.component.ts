@@ -7,7 +7,7 @@ import { takeUntil } from 'rxjs/operators';
 import { OfferService } from '../../services/offer.service';
 import { WishlistService } from '../../services/wishlist.service';
 import { RoomsService } from '../../core/services/rooms/rooms.service';
-import { BookingStateService } from '../../services/booking-state.service';
+import { BookingStateService } from '../../shared/services/booking-state.service';
 import { CustomerNavbarComponent } from '../../layout/Customer/customer-navbar/customer-navbar.component';
 import { OfferDatePickerModalComponent } from '../../shared/components/offer-date-picker-modal/offer-date-picker-modal.component';
 

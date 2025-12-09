@@ -17,19 +17,7 @@ class   UserCreate(BaseModel):
     phone_number: str = Field(..., pattern=PHONE_REGEX)
     dob: date
     gender: str
-    role_id: int = Field(..., gt=1)
-
-    @field_validator("role_id", mode="before")
-    def validate_role_id(cls, value):
-        # Convert string to int if needed
-        if isinstance(value, str):
-            try:
-                value = int(value)
-            except (ValueError, TypeError):
-                raise ValueError("role_id must be a valid integer")
-        if value <= 1:
-            raise ValueError("role_id must be greater than 1")
-        return value
+    role_id: int = Field(default=1, ge=1)
     
     # --- DOB VALIDATION ---
     @field_validator('dob')
