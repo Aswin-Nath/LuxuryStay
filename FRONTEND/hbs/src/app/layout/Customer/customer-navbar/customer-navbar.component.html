@@ -16,76 +16,90 @@
   <!-- Desktop Nav -->
   <nav class="hidden md:flex space-x-9 font-medium text-sm sm:text-base">
     <a routerLink="/home" routerLinkActive="text-yellow-600" class="hover:text-yellow-600">Home</a>
-    <a routerLink="/rooms" routerLinkActive="text-yellow-600" class="hover:text-yellow-600">Rooms</a>
-    <a routerLink="/offers" routerLinkActive="text-yellow-600" class="hover:text-yellow-600">Offers</a>
-    <a routerLink="/facilities" routerLinkActive="text-yellow-600" class="hover:text-yellow-600">Facilities</a>
-    <a routerLink="/faqs" routerLinkActive="text-yellow-600" class="hover:text-yellow-600">FAQs</a>
-    <a routerLink="/destinations" routerLinkActive="text-yellow-600"
-      class="hover:text-yellow-600">Destinations</a>
+    <a (click)="navigateOrScroll('/rooms', 'rooms')" class="cursor-pointer hover:text-yellow-600">Rooms</a>
+    <a (click)="navigateOrScroll('/offers', 'offers')" class="cursor-pointer hover:text-yellow-600">Offers</a>
+    <a (click)="navigateOrScroll('/facilities', 'facilities')" class="cursor-pointer hover:text-yellow-600">Facilities</a>
+    <a *ngIf="isLoggedIn$ | async" routerLink="/faqs" routerLinkActive="text-yellow-600" class="cursor-pointer hover:text-yellow-600">FAQs</a>
+    <a (click)="navigateOrScroll('/destinations', 'destinations')" class="cursor-pointer hover:text-yellow-600">Destinations</a>
   </nav>
 
   <!-- Desktop Buttons -->
   <div class="hidden md:flex items-center space-x-3 text-sm sm:text-base relative">
-    <!-- Book Now -->
-    <button (click)="openBookingModal()"
-      class="text-center px-4 py-2 bg-linear-to-r from-yellow-500 to-red-500 text-white font-medium rounded-lg hover:opacity-90 transition glow-btn cursor-pointer">
-      Book Now
-    </button>
-
-    <!-- 🔔 Notification Dropdown -->
-    <div class="relative notif-dropdown-container">
-      <button (click)="toggleNotifDropdown($event)" class="relative focus:outline-none">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600 hover:text-yellow-600 transition"
-          fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-        </svg>
-        <!-- Red Dot -->
-        <span *ngIf="notifications.length > 0"
-          class="absolute top-0 right-0 block h-2.5 w-2.5 rounded-full bg-red-500"></span>
+    <!-- When User is Logged In -->
+    <ng-container *ngIf="isLoggedIn$ | async; else notLoggedIn">
+      <!-- Book Now -->
+      <button (click)="openBookingModal()"
+        class="text-center px-4 py-2 bg-linear-to-r from-yellow-500 to-red-500 text-white font-medium rounded-lg hover:opacity-90 transition glow-btn cursor-pointer">
+        Book Now
       </button>
 
-      <!-- ✅ Dropdown Panel -->
-      <div *ngIf="isNotifDropdownOpen"
-        class="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+      <!-- 🔔 Notification Dropdown -->
+      <div class="relative notif-dropdown-container">
+        <button (click)="toggleNotifDropdown($event)" class="relative focus:outline-none">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600 hover:text-yellow-600 transition"
+            fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+          <!-- Red Dot -->
+          <span *ngIf="notifications.length > 0"
+            class="absolute top-0 right-0 block h-2.5 w-2.5 rounded-full bg-red-500"></span>
+        </button>
 
-        <!-- Header -->
-        <div class="px-4 py-2 border-b flex justify-between items-center">
-          <span class="font-semibold text-gray-700">Notifications</span>
-          <a routerLink="/customer/notifications" class="text-sm text-blue-600 hover:underline">View All</a>
-        </div>
+        <!-- ✅ Dropdown Panel -->
+        <div *ngIf="isNotifDropdownOpen"
+          class="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
 
-        <!-- List -->
-        <div class="divide-y max-h-72 overflow-y-auto">
-          <div *ngFor="let notif of notifications" class="px-4 py-3 flex items-start space-x-3 hover:bg-gray-50">
-            <div>
-              <i class="fas" [ngClass]="getNotifIcon(notif.type)"></i>
-            </div>
-            <div class="flex-1">
-              <p class="text-sm text-gray-700">{{ notif.msg }}</p>
-              <span class="text-xs text-gray-400">{{ notif.time }}</span>
+          <!-- Header -->
+          <div class="px-4 py-2 border-b flex justify-between items-center">
+            <span class="font-semibold text-gray-700">Notifications</span>
+            <a routerLink="/customer/notifications" class="text-sm text-blue-600 hover:underline">View All</a>
+          </div>
+
+          <!-- List -->
+          <div class="divide-y max-h-72 overflow-y-auto">
+            <div *ngFor="let notif of notifications" class="px-4 py-3 flex items-start space-x-3 hover:bg-gray-50">
+              <div>
+                <i class="fas" [ngClass]="getNotifIcon(notif.type)"></i>
+              </div>
+              <div class="flex-1">
+                <p class="text-sm text-gray-700">{{ notif.msg }}</p>
+                <span class="text-xs text-gray-400">{{ notif.time }}</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- Footer -->
-        <div class="px-4 py-2 border-t text-center">
-          <a routerLink="/customer/notifications" class="text-sm text-gray-500 hover:underline">Go to Notifications</a>
+          <!-- Footer -->
+          <div class="px-4 py-2 border-t text-center">
+            <a routerLink="/customer/notifications" class="text-sm text-gray-500 hover:underline">Go to Notifications</a>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Account -->
-    <a routerLink="/customer/dashboard"
-      class="px-4 py-2 bg-gray-600 text-center text-white font-medium rounded-lg hover:bg-gray-700 transition">
-      Account
-    </a>
+      <!-- Account -->
+      <a routerLink="/customer/dashboard"
+        class="px-4 py-2 bg-gray-600 text-center text-white font-medium rounded-lg hover:bg-gray-700 transition">
+        Account
+      </a>
 
-    <!-- Logout -->
-    <button (click)="logout()"
-      class="px-4 py-2 bg-red-600 text-center text-white font-medium rounded-lg hover:bg-red-700 transition">
-      Logout
-    </button>
+      <!-- Logout -->
+      <button (click)="logout()"
+        class="px-4 py-2 bg-red-600 text-center text-white font-medium rounded-lg hover:bg-red-700 transition">
+        Logout
+      </button>
+    </ng-container>
+
+    <!-- When User is Not Logged In -->
+    <ng-template #notLoggedIn>
+      <a routerLink="/login" 
+        class="px-4 py-2 bg-yellow-500 text-white font-medium rounded-lg hover:bg-yellow-600 transition">
+        Login
+      </a>
+      <a routerLink="/signup"
+        class="px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition">
+        Signup
+      </a>
+    </ng-template>
   </div>
 </header>
 
@@ -106,68 +120,82 @@
   [class.max-h-0]="!isMobileMenuOpen" [class.max-h-screen]="isMobileMenuOpen"
   [class.overflow-hidden]="!isMobileMenuOpen" [class.py-4]="isMobileMenuOpen">
 
-  <a routerLink="/customer/home" routerLinkActive="text-yellow-600" class="hover:text-yellow-600">Home</a>
-  <a routerLink="/customer/rooms" routerLinkActive="text-yellow-600" class="hover:text-yellow-600">Rooms</a>
-  <a routerLink="/customer/offers" routerLinkActive="text-yellow-600" class="hover:text-yellow-600">Offers</a>
-  <a routerLink="/customer/facilities" routerLinkActive="text-yellow-600" class="hover:text-yellow-600">Facilities</a>
-  <a routerLink="/customer/faqs" routerLinkActive="text-yellow-600" class="hover:text-yellow-600">FAQs</a>
-  <a routerLink="/customer/destinations" routerLinkActive="text-yellow-600"
-    class="hover:text-yellow-600">Destinations</a>
+  <a routerLink="/home" routerLinkActive="text-yellow-600" class="hover:text-yellow-600">Home</a>
+  <a (click)="navigateOrScroll('/rooms', 'rooms')" class="cursor-pointer hover:text-yellow-600">Rooms</a>
+  <a (click)="navigateOrScroll('/offers', 'offers')" class="cursor-pointer hover:text-yellow-600">Offers</a>
+  <a (click)="navigateOrScroll('/facilities', 'facilities')" class="cursor-pointer hover:text-yellow-600">Facilities</a>
+  <a *ngIf="isLoggedIn$ | async" routerLink="/faqs" routerLinkActive="text-yellow-600" class="cursor-pointer hover:text-yellow-600">FAQs</a>
+  <a (click)="navigateOrScroll('/destinations', 'destinations')" class="cursor-pointer hover:text-yellow-600">Destinations</a>
 
   <!-- Mobile Buttons -->
   <div class="flex flex-col space-y-2 pt-2">
-    <!-- Book Now -->
-    <button (click)="openBookingModal()"
-      class="text-center px-4 py-2 bg-linear-to-r from-yellow-500 to-red-500 text-white font-medium rounded-lg hover:opacity-90 transition glow-btn">
-      Book Now
-    </button>
-
-    <!-- 🔔 Notification Dropdown Mobile -->
-    <div class="relative flex items-center justify-center notif-dropdown-container">
-      <button (click)="toggleNotifDropdownMobile($event)" class="relative focus:outline-none">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600 hover:text-yellow-600 transition"
-          fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-        </svg>
-        <span *ngIf="notifications.length > 0"
-          class="absolute top-0 right-0 block h-2.5 w-2.5 rounded-full bg-red-500"></span>
+    <!-- When User is Logged In -->
+    <ng-container *ngIf="isLoggedIn$ | async; else notLoggedInMobile">
+      <!-- Book Now -->
+      <button (click)="openBookingModal()"
+        class="text-center px-4 py-2 bg-linear-to-r from-yellow-500 to-red-500 text-white font-medium rounded-lg hover:opacity-90 transition glow-btn">
+        Book Now
       </button>
 
-      <!-- Mobile Notif Panel -->
-      <div *ngIf="isNotifDropdownMobileOpen"
-        class="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-        <div class="px-4 py-2 border-b flex justify-between items-center">
-          <span class="font-semibold text-gray-700">Notifications</span>
-          <a routerLink="/customer/notifications" class="text-sm text-blue-600 hover:underline">View All</a>
-        </div>
-        <div class="divide-y max-h-72 overflow-y-auto">
-          <div *ngFor="let notif of notifications" class="px-4 py-3 flex items-start space-x-3 hover:bg-gray-50">
-            <div>
-              <i class="fas" [ngClass]="getNotifIcon(notif.type)"></i>
-            </div>
-            <div class="flex-1">
-              <p class="text-sm text-gray-700">{{ notif.msg }}</p>
-              <span class="text-xs text-gray-400">{{ notif.time }}</span>
+      <!-- 🔔 Notification Dropdown Mobile -->
+      <div class="relative flex items-center justify-center notif-dropdown-container">
+        <button (click)="toggleNotifDropdownMobile($event)" class="relative focus:outline-none">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600 hover:text-yellow-600 transition"
+            fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+          <span *ngIf="notifications.length > 0"
+            class="absolute top-0 right-0 block h-2.5 w-2.5 rounded-full bg-red-500"></span>
+        </button>
+
+        <!-- Mobile Notif Panel -->
+        <div *ngIf="isNotifDropdownMobileOpen"
+          class="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+          <div class="px-4 py-2 border-b flex justify-between items-center">
+            <span class="font-semibold text-gray-700">Notifications</span>
+            <a routerLink="/customer/notifications" class="text-sm text-blue-600 hover:underline">View All</a>
+          </div>
+          <div class="divide-y max-h-72 overflow-y-auto">
+            <div *ngFor="let notif of notifications" class="px-4 py-3 flex items-start space-x-3 hover:bg-gray-50">
+              <div>
+                <i class="fas" [ngClass]="getNotifIcon(notif.type)"></i>
+              </div>
+              <div class="flex-1">
+                <p class="text-sm text-gray-700">{{ notif.msg }}</p>
+                <span class="text-xs text-gray-400">{{ notif.time }}</span>
+              </div>
             </div>
           </div>
-        </div>
-        <div class="px-4 py-2 border-t text-center">
-          <a routerLink="/customer/notifications" class="text-sm text-gray-500 hover:underline">Go to Notifications</a>
+          <div class="px-4 py-2 border-t text-center">
+            <a routerLink="/customer/notifications" class="text-sm text-gray-500 hover:underline">Go to Notifications</a>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Account -->
-    <a routerLink="/customer/dashboard"
-      class="px-4 py-2 bg-gray-600 text-center text-white font-medium rounded-lg hover:bg-gray-700 transition">
-      Account
-    </a>
+      <!-- Account -->
+      <a routerLink="/customer/dashboard"
+        class="px-4 py-2 bg-gray-600 text-center text-white font-medium rounded-lg hover:bg-gray-700 transition">
+        Account
+      </a>
 
-    <!-- Logout -->
-    <button (click)="logout()"
-      class="px-4 py-2 bg-red-600 text-center text-white font-medium rounded-lg hover:bg-red-700 transition">
-      Logout
-    </button>
+      <!-- Logout -->
+      <button (click)="logout()"
+        class="px-4 py-2 bg-red-600 text-center text-white font-medium rounded-lg hover:bg-red-700 transition">
+        Logout
+      </button>
+    </ng-container>
+
+    <!-- When User is Not Logged In -->
+    <ng-template #notLoggedInMobile>
+      <a routerLink="/login" 
+        class="text-center px-4 py-2 bg-yellow-500 text-white font-medium rounded-lg hover:bg-yellow-600 transition">
+        Login
+      </a>
+      <a routerLink="/signup"
+        class="text-center px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition">
+        Signup
+      </a>
+    </ng-template>
   </div>
 </nav>

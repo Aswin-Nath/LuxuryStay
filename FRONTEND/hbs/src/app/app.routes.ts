@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { Signup } from './features/auth/pages/signup-form/signup-form.component';
 import { Login } from './features/auth/pages/login-form/login-form.component';
 import { ForgotPassword } from './features/auth/pages/forgot-password-form/forgot-password-form.component';
+import { HomepageComponent } from './pages/homepage/homepage.page';
 import { PermissionGuard } from './core/guards/permission.guard';
 import { PublicGuard } from './core/guards/public.guard';
 import { AuthGuard } from './core/guards/auth.guard';
@@ -60,12 +61,30 @@ import { IssueDetailsCustomerComponent } from './features/reporting-issues/pages
 import { EditIssueComponent } from './features/reporting-issues/pages/edit-issue/edit-issue.component';
 import { AdminIssuesComponent } from './features/issue-management/pages/individual-issues/admin-issues.component';
 import { AdminIssueDetailsComponent } from './features/issue-management/pages/issues-details/admin-issue-details.component';
+import { AboutUsComponent } from './pages/about_us/about-us.page';
+import { FaqsComponent } from './pages/faqs/faqs.page';
+import { FacilitiesComponent } from './pages/facilities/facilities.page';
+import { HotelInformationComponent } from './pages/hotel_information/hotel-information.page';
+import { CancellationPolicyComponent } from './pages/cancellation_policy/cancellation-policy.page';
+import { PrivacyPolicyComponent } from './pages/privacy_policy/privacy-policy.page';
+import { TermsAndConditionsComponent } from './pages/terms_and_conditions/terms-and-conditions.page';
+import { DestinationsComponent } from './pages/destinations/destinations.page';
 
 export const routes: Routes = [
-	{ path: '', redirectTo: 'login', pathMatch: 'full' },
+	{ path: '', component: HomepageComponent },
+	{ path: 'home', component: HomepageComponent },
 	{ path: 'login', component: Login, canActivate: [PublicGuard] },
 	{ path: 'forgot-password', component: ForgotPassword, canActivate: [PublicGuard] },
 	{ path: 'signup', component: Signup, canActivate: [PublicGuard] },
+	// Public pages (no auth required)
+	{ path: 'about-us', component: AboutUsComponent },
+	{ path: 'faqs', component: FaqsComponent },
+	{ path: 'facilities', component: FacilitiesComponent },
+	{ path: 'hotel-information', component: HotelInformationComponent },
+	{ path: 'cancellation-policy', component: CancellationPolicyComponent },
+	{ path: 'privacy-policy', component: PrivacyPolicyComponent },
+	{ path: 'terms-and-conditions', component: TermsAndConditionsComponent },
+	{ path: 'destinations', component: DestinationsComponent },
 	{
 		path: '',
 		canActivate: [AuthGuard],

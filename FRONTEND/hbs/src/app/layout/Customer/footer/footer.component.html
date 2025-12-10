@@ -1,0 +1,121 @@
+<footer class="bg-slate-900 text-gray-300 py-16 px-6 mt-16">
+  <div class="max-w-7xl mx-auto grid md:grid-cols-4 gap-12">
+    
+    <!-- About Section -->
+    <div>
+      <h3 class="text-white text-xl font-bold mb-4">LuxuryStay</h3>
+      <p class="text-sm leading-relaxed text-gray-400">
+        Discover elegance and comfort at LuxuryStay. Whether for business or leisure, our premium rooms, fine dining, and world-class facilities ensure an unforgettable experience.
+      </p>
+    </div>
+
+    <!-- Contact Section -->
+    <div>
+      <h3 class="text-white text-xl font-bold mb-4">Contact Us</h3>
+      <div class="space-y-3 text-sm">
+        <div>
+          <span class="font-semibold text-white">Email:</span>
+          <p class="text-gray-400">info@luxurystay.com</p>
+        </div>
+        <div>
+          <span class="font-semibold text-white">Phone:</span>
+          <p class="text-gray-400">+1 234 567 890</p>
+        </div>
+        <div>
+          <span class="font-semibold text-white">Address:</span>
+          <p class="text-gray-400">123 Luxury Street, New York, USA</p>
+        </div>
+      </div>
+      <button 
+        (click)="getDirections()"
+        class="mt-4 px-6 py-2 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded transition">
+        Get Directions
+      </button>
+    </div>
+
+    <!-- Quick Links Section -->
+    <div>
+      <h3 class="text-white text-xl font-bold mb-4">Quick Links</h3>
+      <ul class="space-y-2 text-sm">
+        <li>
+          <a (click)="navigateTo('/facilities')" class="text-gray-400 hover:text-yellow-500 transition cursor-pointer">
+            Facilities
+          </a>
+        </li>
+        <li>
+          <a (click)="navigateTo('/hotel-information')" class="text-gray-400 hover:text-yellow-500 transition cursor-pointer">
+            Hotel Information
+          </a>
+        </li>
+        <li>
+          <a (click)="navigateTo('/faqs')" class="text-gray-400 hover:text-yellow-500 transition cursor-pointer">
+            FAQs
+          </a>
+        </li>
+        <li>
+          <a (click)="navigateTo('/privacy-policy')" class="text-gray-400 hover:text-yellow-500 transition cursor-pointer">
+            Privacy Policy
+          </a>
+        </li>
+        <li>
+          <a (click)="navigateTo('/cancellation-policy')" class="text-gray-400 hover:text-yellow-500 transition cursor-pointer">
+            Cancellation Policy
+          </a>
+        </li>
+        <li>
+          <a (click)="navigateTo('/terms-and-conditions')" class="text-gray-400 hover:text-yellow-500 transition cursor-pointer">
+            Terms and Conditions
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Newsletter Section -->
+    <div>
+      <h3 class="text-white text-xl font-bold mb-4">Stay Connected</h3>
+      <p class="text-sm text-gray-400 mb-4">
+        Subscribe to our newsletter for exclusive offers & updates.
+      </p>
+      <div class="flex gap-2 mb-4">
+        <input 
+          type="email" 
+          [(ngModel)]="email"
+          placeholder="Enter your email"
+          class="flex-1 px-4 py-2 rounded text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500">
+        <button 
+          (click)="subscribe()"
+          class="px-6 py-2 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded transition">
+          Subscribe
+        </button>
+      </div>
+      <p *ngIf="subscriptionMessage" class="text-sm text-green-400">{{ subscriptionMessage }}</p>
+      
+      <!-- Social Links -->
+      <div class="flex gap-4 mt-6">
+        <a href="https://facebook.com" target="_blank" title="Facebook" class="text-gray-400 hover:text-yellow-500 transition text-xl">
+          <i class="fab fa-facebook"></i>
+        </a>
+        <a href="https://instagram.com" target="_blank" title="Instagram" class="text-gray-400 hover:text-yellow-500 transition text-xl">
+          <i class="fab fa-instagram"></i>
+        </a>
+        <a href="https://twitter.com" target="_blank" title="Twitter" class="text-gray-400 hover:text-yellow-500 transition text-xl">
+          <i class="fab fa-twitter"></i>
+        </a>
+        <a href="https://linkedin.com" target="_blank" title="LinkedIn" class="text-gray-400 hover:text-yellow-500 transition text-xl">
+          <i class="fab fa-linkedin"></i>
+        </a>
+        <a href="https://youtube.com" target="_blank" title="YouTube" class="text-gray-400 hover:text-yellow-500 transition text-xl">
+          <i class="fab fa-youtube"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Divider -->
+  <div class="border-t border-gray-700 mt-8"></div>
+
+  <!-- Bottom Bar -->
+  <div class="mt-8 pt-6 text-center text-sm text-gray-400">
+    <p>&copy; {{ currentYear }} LuxuryStay Hotel. All rights reserved. | Designed with <span class="text-red-500">❤</span> for your comfort</p>
+  </div>
+</footer>

@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 from fastapi import (
     APIRouter,
@@ -106,7 +106,7 @@ async def get_admin_booking_by_id(
 # ==========================================================
 # 🔹 READ - Customer: List own bookings
 # ==========================================================
-@router.get("/customer", response_model=List[BookingResponse])
+@router.get("/customer")
 async def get_customer_bookings(
     status: Optional[str] = Query(None, description="Filter by booking status (CONFIRMED, PENDING, CANCELLED, CHECKED_IN, CHECKED_OUT)"),
     min_price: Optional[float] = Query(None, description="Filter bookings with total_price >= min_price"),
@@ -119,11 +119,12 @@ async def get_customer_bookings(
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
     token_payload: dict = Security(check_permission, scopes=["BOOKING:READ", "CUSTOMER"]),
-):
+) -> Dict[str, Any]:
     """
     Retrieve current user's bookings with advanced filtering.
     
     Supports filtering by status, price range, room types, and date range.
+    Returns paginated response with total count and page info.
     
     Query Parameters:
         - status: Filter by booking status (CONFIRMED, PENDING, CANCELLED, CHECKED_IN, CHECKED_OUT)
@@ -133,9 +134,14 @@ async def get_customer_bookings(
         - check_out_date: Filter bookings until this date (YYYY-MM-DD)
         - limit/offset: Pagination parameters
     
-    Examples:
-        GET /bookings/customer?status=CONFIRMED&min_price=100&max_price=500
-        GET /bookings/customer?room_type_id=1,2&check_in_date=2025-12-01
+    Returns:
+        {
+            "data": [...BookingResponse items...],
+            "total": total_count,
+            "page": current_page_number,
+            "page_size": limit,
+            "total_pages": calculated_total_pages
+        }
     """
 
     # Parse dates
@@ -164,8 +170,25 @@ async def get_customer_bookings(
     min_price_decimal = Decimal(str(min_price)) if min_price is not None else None
     max_price_decimal = Decimal(str(max_price)) if max_price is not None else None
     
-    # Query with filters
-    items = await svc_query_bookings(
+    # Query with filters (without limit/offset first to get total count)
+    all_items = await svc_query_bookings(
+        db, 
+        user_id=current_user.user_id, 
+        status=status,
+        min_price=min_price_decimal,
+        max_price=max_price_decimal,
+        room_type_id=room_type_id,
+        check_in_date=check_in_date_parsed,
+        check_out_date=check_out_date_parsed,
+        limit=None,  # Get all for counting
+        offset=None,
+    )
+    
+    # Get total count
+    total_count = len(all_items) if all_items else 0
+    
+    # Now fetch paginated results
+    paginated_items = await svc_query_bookings(
         db, 
         user_id=current_user.user_id, 
         status=status,
@@ -178,13 +201,26 @@ async def get_customer_bookings(
         offset=offset,
     )
     
-    return [BookingResponse.model_validate(i).model_dump(exclude={"created_at"}) for i in items]
+    # Calculate page number and total pages
+    page = (offset // limit) + 1 if limit > 0 else 1
+    total_pages = (total_count + limit - 1) // limit if limit > 0 else 0
+    
+    # Format response
+    response_data = [BookingResponse.model_validate(item).model_dump(exclude={"created_at"}) for item in (paginated_items or [])]
+    
+    return {
+        "data": response_data,
+        "total": total_count,
+        "page": page,
+        "page_size": limit,
+        "total_pages": total_pages
+    }
 
 
 # ==========================================================
 # 🔹 READ - Admin: List all bookings (filterable)
 # ==========================================================
-@router.get("/admin", response_model=List[BookingResponse])
+@router.get("/admin")
 async def get_admin_bookings(
     min_price:Optional[int]=Query(None),
     max_price:Optional[int]=Query(None),
@@ -197,19 +233,74 @@ async def get_admin_bookings(
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
     token_payload: dict = Security(check_permission, scopes=["BOOKING:READ", "ADMIN"]),
-):
+) -> Dict[str, Any]:
+    """
+    Retrieve all bookings for admin with advanced filtering.
+    Returns paginated response with total count and page info.
+    """
+    # Parse dates if provided
+    check_in_date_parsed = None
+    check_out_date_parsed = None
+    
+    if check_in_date:
+        try:
+            check_in_date_parsed = datetime.strptime(check_in_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="check_in_date must be in YYYY-MM-DD format"
+            )
+    
+    if check_out_date:
+        try:
+            check_out_date_parsed = datetime.strptime(check_out_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="check_out_date must be in YYYY-MM-DD format"
+            )
+    
+    # Get total count first
+    all_items = await svc_query_bookings(
+        db,
+        room_type_id=room_type_id,
+        status=status,
+        min_price=min_price,
+        max_price=max_price,
+        check_in_date=check_in_date_parsed,
+        check_out_date=check_out_date_parsed,
+        limit=None,
+        offset=None,
+    )
+    
+    total_count = len(all_items) if all_items else 0
+    
+    # Get paginated results
     items = await svc_query_bookings(
         db,
         room_type_id=room_type_id,
         status=status,
         min_price=min_price,
         max_price=max_price,
-        check_in_date=check_in_date,
-        check_out_date=check_out_date,
+        check_in_date=check_in_date_parsed,
+        check_out_date=check_out_date_parsed,
         limit=limit,
         offset=offset,
     )
-    return [BookingResponse.model_validate(i).model_dump(exclude={"created_at"}) for i in items]
+    
+    # Calculate page number and total pages
+    page = (offset // limit) + 1 if limit > 0 else 1
+    total_pages = (total_count + limit - 1) // limit if limit > 0 else 0
+    
+    response_data = [BookingResponse.model_validate(i).model_dump(exclude={"created_at"}) for i in (items or [])]
+    
+    return {
+        "data": response_data,
+        "total": total_count,
+        "page": page,
+        "page_size": limit,
+        "total_pages": total_pages
+    }
 
 
 # ==========================================================

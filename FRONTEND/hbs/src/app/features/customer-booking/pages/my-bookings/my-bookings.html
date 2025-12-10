@@ -10,7 +10,7 @@
     </div>
 
     <!-- ✅ Main Content -->
-<main class="flex-1 w-full mx-auto px-4 md:px-6 lg:px-8 py-6 space-y-8 max-w-5xl">
+<main class="flex-1 w-full mx-auto px-4 md:px-6 lg:px-8 py-6 space-y-8 max-w-6xl">
 
       <!-- ✅ Welcome Header -->
       <div class="relative rounded-2xl p-[3px] bg-linear-to-r from-yellow-600 to-red-700 shadow">
@@ -134,12 +134,12 @@
         </div>
 
         <!-- No Results -->
-        <div *ngIf="!isLoading && filteredBookings.length === 0" class="bg-blue-50 border-l-4 border-blue-500 p-6 rounded text-center">
+        <div *ngIf="!isLoading && bookings.length === 0" class="bg-blue-50 border-l-4 border-blue-500 p-6 rounded text-center">
           <p class="text-blue-700 font-medium">No bookings found</p>
         </div>
 
         <!-- Bookings Table -->
-        <div *ngIf="!isLoading && filteredBookings.length > 0" class="overflow-x-auto bg-white shadow-lg border border-gray-200 rounded-xl">
+        <div *ngIf="!isLoading && bookings.length > 0" class="overflow-x-auto bg-white shadow-lg border border-gray-200 rounded-xl">
           <table class="w-full text-sm">
             <thead class="bg-linear-to-r from-yellow-600 to-red-600 text-white">
               <tr>
@@ -195,40 +195,54 @@
           </table>
         </div>
 
-        <!-- Pagination -->
-        <nav *ngIf="!isLoading && totalPages > 1" class="flex justify-between items-center mt-6">
-          <button
-            (click)="prevPage()"
-            [disabled]="currentPage === 1"
-            class="px-4 py-2 border rounded-lg bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            <span class="material-icons text-sm">chevron_left</span>
-            Prev
-          </button>
-
-          <div class="flex gap-2">
-            <button
-              *ngFor="let page of [].constructor(totalPages); let i = index"
-              (click)="goToPage(i + 1)"
-              [ngClass]="{
-                'bg-yellow-600 text-white': currentPage === i + 1,
-                'bg-gray-200 hover:bg-yellow-100': currentPage !== i + 1
-              }"
-              class="px-3 py-2 rounded-lg transition"
-            >
-              {{ i + 1 }}
-            </button>
+        <!-- Page Size Selector & Pagination -->
+        <div class="bg-white shadow-md border border-gray-200 rounded-lg p-4 flex flex-col sm:flex-row items-center justify-between gap-4" *ngIf="!isLoading && bookings.length > 0">
+          <!-- Page Size Selector -->
+          <div class="flex items-center gap-3">
+            <label class="text-sm font-medium text-gray-700">Items per page:</label>
+            <select [(ngModel)]="itemsPerPage" (change)="changePageSize(itemsPerPage)" class="px-3 py-2 border border-gray-300 rounded-md text-sm bg-white hover:border-gray-400 focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500">
+              <option *ngFor="let size of pageSizeOptions" [value]="size">{{ size }}</option>
+            </select>
           </div>
 
-          <button
-            (click)="nextPage()"
-            [disabled]="currentPage === totalPages"
-            class="px-4 py-2 border rounded-lg bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            Next
-            <span class="material-icons text-sm">chevron_right</span>
-          </button>
-        </nav>
+          <!-- Pagination Info -->
+          <div class="text-sm text-gray-600 font-medium">
+            Showing <span class="font-semibold">{{ ((currentPage - 1) * itemsPerPage) + 1 }}</span> to 
+            <span class="font-semibold">{{ Math.min(currentPage * itemsPerPage, totalItems) }}</span> of 
+            <span class="font-semibold">{{ totalItems }}</span> bookings
+          </div>
+
+          <!-- Page Navigation -->
+          <div class="flex items-center gap-2">
+            <!-- Previous Button -->
+            <button (click)="previousPage()" 
+              [disabled]="currentPage === 1"
+              class="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition">
+              <span class="material-icons text-sm">chevron_left</span>
+            </button>
+
+            <!-- Page Numbers -->
+            <div class="flex items-center gap-1">
+              <button *ngFor="let page of getPageNumbers()"
+                (click)="goToPage(page)"
+                [class.bg-yellow-600]="currentPage === page"
+                [class.text-white]="currentPage === page"
+                [class.bg-white]="currentPage !== page"
+                [class.text-gray-700]="currentPage !== page"
+                class="px-3 py-2 text-sm font-medium border border-gray-300 rounded hover:bg-gray-50"
+              >
+                {{ page }}
+              </button>
+            </div>
+
+            <!-- Next Button -->
+            <button (click)="nextPage()" 
+              [disabled]="currentPage === totalPages"
+              class="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition">
+              <span class="material-icons text-sm">chevron_right</span>
+            </button>
+          </div>
+        </div>
 
       </main>
     </div>

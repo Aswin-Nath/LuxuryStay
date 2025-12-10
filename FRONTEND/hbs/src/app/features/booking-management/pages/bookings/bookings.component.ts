@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { BookingsService, BookingResponse } from '../../../../shared/services/bookings.service';
+import { BookingsService, BookingResponse, PaginatedBookingResponse } from '../../../../shared/services/bookings.service';
 import { AdminNavbarComponent } from '../../../../layout/Admin/admin-navbar/admin-navbar.component';
 import { AdminSidebarComponent } from '../../../../layout/Admin/admin-sidebar/admin-sidebar.component';
 
@@ -17,7 +17,6 @@ import { AdminSidebarComponent } from '../../../../layout/Admin/admin-sidebar/ad
 })
 export class AdminBookingsComponent implements OnInit, OnDestroy {
   bookings: BookingResponse[] = [];
-  filteredBookings: BookingResponse[] = [];
   loading = false;
   error = '';
   Math = Math;  // Expose Math to template
@@ -35,6 +34,8 @@ export class AdminBookingsComponent implements OnInit, OnDestroy {
   currentPage = 1;
   bookingsPerPage = 10;
   totalBookings = 0;
+  totalPages = 0;
+  pageSizeOptions = [5, 10, 25, 50];
 
   // Status options
   statusOptions = ['Active', 'Completed', 'Cancelled', 'Pending', 'No Show'];
@@ -61,13 +62,14 @@ export class AdminBookingsComponent implements OnInit, OnDestroy {
     this.loading = true;
     this.error = '';
 
+    const offset = (this.currentPage - 1) * this.bookingsPerPage;
+
     // Call API to get all bookings (admin view)
-    // For now, we'll use the customer endpoint with admin context
     this.bookingsService
       .getAdminBookings(
         this.filterStatus !== 'all' ? this.filterStatus : undefined,
         this.bookingsPerPage,
-        (this.currentPage - 1) * this.bookingsPerPage,
+        offset,
         this.minAmount || undefined,
         this.maxAmount || undefined,
         this.filterRoomType !== 'all' ? this.filterRoomType : undefined,
@@ -76,11 +78,10 @@ export class AdminBookingsComponent implements OnInit, OnDestroy {
       )
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (data: any) => {
-            console.log("data",data);
-          this.bookings = data
-          this.totalBookings =  data.length;
-          this.applyFilters();
+        next: (response: PaginatedBookingResponse) => {
+          this.bookings = response.data;
+          this.totalBookings = response.total;
+          this.totalPages = response.total_pages;
           this.loading = false;
         },
         error: (err) => {
@@ -105,20 +106,6 @@ export class AdminBookingsComponent implements OnInit, OnDestroy {
       });
   }
 
-  applyFilters(): void {
-    this.filteredBookings = this.bookings.filter((booking) => {
-      const matchesSearch =
-        !this.searchQuery ||
-        booking.booking_id.toString().includes(this.searchQuery) ||
-        booking.primary_customer_name?.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-        booking.primary_customer_phone_number?.includes(this.searchQuery);
-
-      const matchesStatus = this.filterStatus === 'all' || booking.status === this.filterStatus;
-
-      return matchesSearch && matchesStatus;
-    });
-  }
-
   onFilterChange(): void {
     this.currentPage = 1;
     this.loadBookings();
@@ -132,6 +119,12 @@ export class AdminBookingsComponent implements OnInit, OnDestroy {
     this.filterRoomType = 'all';
     this.dateFrom = '';
     this.dateTo = '';
+    this.currentPage = 1;
+    this.loadBookings();
+  }
+
+  changePageSize(newSize: number): void {
+    this.bookingsPerPage = newSize;
     this.currentPage = 1;
     this.loadBookings();
   }
@@ -192,30 +185,41 @@ export class AdminBookingsComponent implements OnInit, OnDestroy {
     }).format(price);
   }
 
+  // Pagination methods
   get paginatedBookings(): BookingResponse[] {
-    const start = (this.currentPage - 1) * this.bookingsPerPage;
-    return this.filteredBookings.slice(start, start + this.bookingsPerPage);
+    return this.bookings;
   }
 
-  get totalPages(): number {
-    return Math.ceil(this.filteredBookings.length / this.bookingsPerPage);
+  getPageNumbers(): number[] {
+    const pages: number[] = [];
+    const startPage = Math.max(1, this.currentPage - 2);
+    const endPage = Math.min(this.totalPages, this.currentPage + 2);
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+
+    return pages;
   }
 
   goToPage(page: number): void {
     if (page >= 1 && page <= this.totalPages) {
       this.currentPage = page;
+      this.loadBookings();
     }
   }
 
   previousPage(): void {
     if (this.currentPage > 1) {
       this.currentPage--;
+      this.loadBookings();
     }
   }
 
   nextPage(): void {
     if (this.currentPage < this.totalPages) {
       this.currentPage++;
+      this.loadBookings();
     }
   }
 }

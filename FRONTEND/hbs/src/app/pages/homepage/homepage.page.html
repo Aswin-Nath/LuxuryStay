@@ -1,0 +1,71 @@
+<!-- ✅ Customer Navbar -->
+<app-customer-navbar></app-customer-navbar>
+
+<!-- ✅ Hero Section -->
+<section id="home">
+  <app-hero-section (bookNow)="onHeroBookNow()"></app-hero-section>
+</section>
+
+<!-- ✅ About Section -->
+<section id="about">
+  <app-about-section (learnMore)="onAboutLearnMore()"></app-about-section>
+</section>
+
+<!-- ✅ Rooms Section -->
+<section id="rooms">
+  <app-rooms-section 
+    [rooms]="rooms"
+    (viewAll)="onRoomsViewAll()"
+    (addToWishlist)="onRoomsAddToWishlist($event)"></app-rooms-section>
+</section>
+
+<!-- ✅ Offers Section -->
+<section id="offers">
+  <app-offers-section 
+    [offers]="offers"
+    (learnMore)="onOffersLearnMore()"></app-offers-section>
+</section>
+
+<!-- ✅ Facilities Section -->
+<section id="facilities">
+  <app-facilities-section 
+    [facilities]="facilities"
+    (explore)="onFacilitiesExplore()"></app-facilities-section>
+</section>
+
+<!-- ✅ Testimonials Section -->
+<section id="testimonials">
+  <app-testimonials-section [testimonials]="testimonials"></app-testimonials-section>
+</section>
+
+<!-- ✅ Destinations Section -->
+<section id="destinations">
+  <app-destinations-section 
+    [destinations]="destinations"
+    (viewAll)="onDestinationsViewAll()"
+    (explore)="onDestinationsExplore($event)"></app-destinations-section>
+</section>
+
+<!-- ✅ Hotel Info Section -->
+<section id="hotel-info">
+  <app-hotel-info-section></app-hotel-info-section>
+</section>
+
+<!-- ✅ Footer Section -->
+<app-footer></app-footer>
+
+<!-- ✅ Date Picker Modal -->
+<app-date-picker-modal 
+  *ngIf="showDatePickerModal"
+  [checkIn]="datePickerCheckIn"
+  [checkOut]="datePickerCheckOut"
+  [error]="datePickerError"
+  (close)="onDatePickerClose()"
+  (proceed)="onDatePickerProceed($event)"></app-date-picker-modal>
+
+<!-- ✅ Toast Notification -->
+<div id="toast" class="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 transform translate-x-full opacity-0 transition-all duration-300">
+  <i id="toastIcon" class="fas fa-check-circle"></i>
+  <span id="toastMessage"></span>
+</div>
+

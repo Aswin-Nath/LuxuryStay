@@ -1,0 +1,129 @@
+<!-- ✅ Customer Navbar -->
+<app-customer-navbar></app-customer-navbar>
+
+<!-- ✅ Hero Section -->
+<section class="relative h-[50vh] bg-cover bg-center" style="background-image: url('/assets/hotel_luxury.jpg');">
+  <!-- Dark Overlay -->
+  <div class="absolute inset-0 bg-gradient-to-r from-yellow-600/70 to-red-600/70"></div>
+
+  <!-- Pattern Overlay -->
+  <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20"></div>
+
+  <!-- Content -->
+  <div class="absolute inset-0 flex items-center justify-center">
+    <h1 class="text-4xl sm:text-5xl font-extrabold text-white text-center drop-shadow-2xl">
+      About LuxuryStay
+    </h1>
+  </div>
+</section>
+
+<!-- ✅ Who We Are -->
+<section class="py-10 px-6 max-w-6xl mx-auto text-center">
+  <h2 class="text-3xl font-extrabold text-gray-800 mb-4 cursive-heading">Who We Are</h2>
+  <p class="text-gray-700 max-w-3xl mx-auto text-lg leading-relaxed">
+    LuxuryStay is a premier 5-star hotel dedicated to delivering exceptional hospitality and unforgettable experiences. 
+    With over 20 years of industry expertise, we've established ourselves as a beacon of luxury and comfort in the heart of the city.
+  </p>
+</section>
+
+<!-- ✅ Vision & Mission Combined -->
+<section class="py-10 px-6 bg-gradient-to-r from-yellow-50 to-red-50">
+  <div class="max-w-5xl mx-auto text-center">
+    <h2 class="text-3xl font-extrabold text-gray-800 mb-10 cursive-heading">Our Vision & Mission</h2>
+    <div class="grid md:grid-cols-2 gap-8">
+      <div class="bg-white p-8 rounded-lg shadow-md">
+        <h3 class="text-xl font-bold text-yellow-600 mb-4">Vision</h3>
+        <p class="text-gray-700">To be the world's most trusted luxury hotel brand, synonymous with elegance, excellence, and exceptional guest experiences.</p>
+      </div>
+      <div class="bg-white p-8 rounded-lg shadow-md">
+        <h3 class="text-xl font-bold text-red-600 mb-4">Mission</h3>
+        <p class="text-gray-700">To provide unparalleled hospitality by combining world-class amenities with personalized service and a commitment to guest satisfaction.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ✅ Why Choose Us -->
+<section class="py-10 px-6">
+  <div class="max-w-6xl mx-auto text-center">
+    <h2 class="text-3xl font-extrabold text-gray-800 mb-10 cursive-heading">Why Choose Us</h2>
+    <div class="grid sm:grid-cols-2 md:grid-cols-3 gap-8">
+      <div class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition">
+        <div class="text-4xl font-bold text-yellow-600 mb-2">✓</div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">Luxury Rooms</h3>
+        <p class="text-gray-700">250+ elegantly designed rooms with state-of-the-art amenities and breathtaking views.</p>
+      </div>
+      <div class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition">
+        <div class="text-4xl font-bold text-yellow-600 mb-2">✓</div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">World-Class Service</h3>
+        <p class="text-gray-700">24/7 concierge, multilingual staff, and personalized attention to every guest.</p>
+      </div>
+      <div class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition">
+        <div class="text-4xl font-bold text-yellow-600 mb-2">✓</div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">Prime Location</h3>
+        <p class="text-gray-700">Centrally located near major attractions, shopping districts, and business hubs.</p>
+      </div>
+      <div class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition">
+        <div class="text-4xl font-bold text-yellow-600 mb-2">✓</div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">Fine Dining</h3>
+        <p class="text-gray-700">Award-winning restaurants offering cuisines from around the world.</p>
+      </div>
+      <div class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition">
+        <div class="text-4xl font-bold text-yellow-600 mb-2">✓</div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">Spa & Wellness</h3>
+        <p class="text-gray-700">Comprehensive wellness programs, spa facilities, and fitness center.</p>
+      </div>
+      <div class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition">
+        <div class="text-4xl font-bold text-yellow-600 mb-2">✓</div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">Loyalty Rewards</h3>
+        <p class="text-gray-700">Exclusive member benefits, discounts, and personalized rewards program.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ✅ Meet Our Team -->
+<section class="py-10 px-6 max-w-6xl mx-auto text-center">
+  <h2 class="cursive-heading text-3xl font-extrabold text-gray-800 mb-8">Meet Our Team</h2>
+  <div class="grid sm:grid-cols-2 md:grid-cols-3 gap-6">
+    <div *ngFor="let member of teamMembers" class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition">
+      <img [src]="member.image" [alt]="member.name" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+      <h3 class="text-lg font-bold text-gray-800">{{ member.name }}</h3>
+      <p class="text-yellow-600 font-semibold">{{ member.position }}</p>
+    </div>
+  </div>
+</section>
+
+<!-- ✅ Contact + FAQ Section -->
+<section class="py-16 px-6 bg-gray-50">
+  <div class="max-w-6xl mx-auto grid md:grid-cols-2 gap-12 items-start">
+    <!-- Contact Form -->
+    <div class="bg-white p-8 rounded-lg shadow-md">
+      <h3 class="text-2xl font-bold text-gray-800 mb-6">Get In Touch</h3>
+      <form class="space-y-4">
+        <input type="text" placeholder="Your Name" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500">
+        <input type="email" placeholder="Your Email" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500">
+        <textarea placeholder="Your Message" rows="4" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"></textarea>
+        <button type="submit" class="w-full px-6 py-3 bg-gradient-to-r from-yellow-500 to-red-500 text-white font-semibold rounded-lg hover:opacity-90 transition">
+          Send Message
+        </button>
+      </form>
+    </div>
+
+    <!-- FAQ -->
+    <div class="space-y-4">
+      <h3 class="text-2xl font-bold text-gray-800 mb-6">Frequently Asked Questions</h3>
+      <div *ngFor="let faq of faqs; let i = index" class="border-b pb-4">
+        <button 
+          (click)="toggleFaq(i)"
+          class="w-full text-left font-semibold text-gray-800 hover:text-yellow-600 py-2">
+          {{ faq.question }}
+        </button>
+        <p *ngIf="faqExpandedIndex === i" class="text-gray-700 mt-2">{{ faq.answer }}</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ✅ Footer -->
+<app-footer></app-footer>

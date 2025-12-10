@@ -26,6 +26,14 @@ export interface BookingResponse {
   issues?: any[];
 }
 
+export interface PaginatedBookingResponse {
+  data: BookingResponse[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
 export interface BookingRoomMapResponse {
   booking_id: number;
   room_id: number;
@@ -70,6 +78,7 @@ export class BookingsService {
 
   // Get all bookings for current customer with advanced filtering
   // API: GET /bookings/customer (from booking.py - NORMAL endpoint)
+  // Returns paginated response
   getCustomerBookings(
     status?: string,
     limit: number = 20,
@@ -79,7 +88,7 @@ export class BookingsService {
     roomTypeId?: string, // Comma-separated room type IDs
     checkInDate?: string, // YYYY-MM-DD format
     checkOutDate?: string // YYYY-MM-DD format
-  ): Observable<BookingResponse[]> {
+  ): Observable<PaginatedBookingResponse> {
     let params = new HttpParams()
       .set('limit', limit.toString())
       .set('offset', offset.toString());
@@ -108,7 +117,7 @@ export class BookingsService {
       params = params.set('check_out_date', checkOutDate);
     }
 
-    return this.http.get<BookingResponse[]>(`${this.bookingApiUrl}/customer`, { params });
+    return this.http.get<PaginatedBookingResponse>(`${this.bookingApiUrl}/customer`, { params });
   }
 
   // Get individual booking details
@@ -181,7 +190,8 @@ export class BookingsService {
   }
 
   // Get all bookings for admin (including all users)
-  // API: GET /bookings/admin/list (new admin endpoint)
+  // API: GET /bookings/admin (new admin endpoint)
+  // Returns paginated response
   getAdminBookings(
     status?: string,
     limit: number = 20,
@@ -191,7 +201,7 @@ export class BookingsService {
     roomTypeId?: string,
     checkInDate?: string,
     checkOutDate?: string,
-  ): Observable<any> {
+  ): Observable<PaginatedBookingResponse> {
     let params = new HttpParams()
       .set('limit', limit.toString())
       .set('offset', offset.toString());
@@ -220,8 +230,7 @@ export class BookingsService {
       params = params.set('check_out_date', checkOutDate);
     }
 
-
-    return this.http.get<any>(`${this.bookingApiUrl}/admin`, { params });
+    return this.http.get<PaginatedBookingResponse>(`${this.bookingApiUrl}/admin`, { params });
   }
 
   // Get admin booking details with full information

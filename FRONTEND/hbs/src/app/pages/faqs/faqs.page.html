@@ -1,0 +1,63 @@
+<!-- ✅ Navbar -->
+<app-customer-navbar></app-customer-navbar>
+
+<!-- ✅ Header -->
+<header class="bg-linear-to-r from-yellow-600 to-red-600 py-12 sm:py-16 md:py-20 text-center text-white shadow-md mt-16 sm:mt-20">
+  <h1 class="text-2xl sm:text-3xl md:text-4xl font-bold">Frequently Asked Questions</h1>
+  <p class="text-xs sm:text-sm mt-2 opacity-90">Click on a question to see the answer</p>
+</header>
+
+<!-- ✅ Switcher -->
+<div class="flex justify-center mt-4 sm:mt-6 space-x-2 sm:space-x-4 px-4">
+  <button 
+    (click)="switchTab('rooms')"
+    [class.bg-yellow-500]="activeTab === 'rooms'"
+    [class.bg-gray-200]="activeTab !== 'rooms'"
+    [class.text-white]="activeTab === 'rooms'"
+    [class.text-gray-700]="activeTab !== 'rooms'"
+    class="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base rounded-lg font-medium hover:bg-yellow-600 transition">
+    Rooms
+  </button>
+  <button 
+    (click)="switchTab('amenities')"
+    [class.bg-yellow-500]="activeTab === 'amenities'"
+    [class.bg-gray-200]="activeTab !== 'amenities'"
+    [class.text-white]="activeTab === 'amenities'"
+    [class.text-gray-700]="activeTab !== 'amenities'"
+    class="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base rounded-lg font-medium hover:bg-yellow-600 transition">
+    Amenities
+  </button>
+</div>
+
+<!-- ✅ FAQs Container -->
+<div class="max-w-3xl mx-auto mt-6 sm:mt-8 px-4 mb-6">
+
+  <!-- Rooms FAQs -->
+  <div *ngIf="activeTab === 'rooms'" class="space-y-3 sm:space-y-4">
+    <div *ngFor="let faq of roomsFaqs; let i = index" 
+      (click)="toggleFaq(i)"
+      class="border rounded-lg p-3 sm:p-4 bg-white shadow hover:shadow-md cursor-pointer transition">
+      <div class="flex items-center justify-between">
+        <h3 class="font-semibold text-gray-800">{{ faq.question }}</h3>
+        <span class="text-yellow-600 font-bold">{{ expandedIndex === i ? '-' : '+' }}</span>
+      </div>
+      <p *ngIf="expandedIndex === i" class="text-gray-700 mt-3">{{ faq.answer }}</p>
+    </div>
+  </div>
+
+  <!-- Amenities FAQs -->
+  <div *ngIf="activeTab === 'amenities'" class="space-y-3 sm:space-y-4">
+    <div *ngFor="let faq of amenitiesFaqs; let i = index" 
+      (click)="toggleFaq(i)"
+      class="border rounded-lg p-3 sm:p-4 bg-white shadow hover:shadow-md cursor-pointer transition">
+      <div class="flex items-center justify-between">
+        <h3 class="font-semibold text-gray-800">{{ faq.question }}</h3>
+        <span class="text-yellow-600 font-bold">{{ expandedIndex === i ? '-' : '+' }}</span>
+      </div>
+      <p *ngIf="expandedIndex === i" class="text-gray-700 mt-3">{{ faq.answer }}</p>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ Footer -->
+<app-footer></app-footer>

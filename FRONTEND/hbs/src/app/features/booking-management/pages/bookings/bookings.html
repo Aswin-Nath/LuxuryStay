@@ -172,40 +172,50 @@
         </table>
       </div>
 
-      <!-- Pagination -->
-      <div class="flex flex-col items-center justify-center gap-4 pb-8" *ngIf="!loading && totalPages > 1">
-        <div class="text-sm text-gray-600 font-medium">
-          Showing {{ (currentPage - 1) * bookingsPerPage + 1 }}-{{ (currentPage * bookingsPerPage > filteredBookings.length) ? filteredBookings.length : (currentPage * bookingsPerPage) }} of {{ filteredBookings.length }} bookings
+      <!-- Page Size Selector & Pagination -->
+      <div class="bg-white shadow-md border border-gray-200 rounded-lg p-4 flex flex-col sm:flex-row items-center justify-between gap-4" *ngIf="!loading && paginatedBookings.length > 0">
+        <!-- Page Size Selector -->
+        <div class="flex items-center gap-3">
+          <label class="text-sm font-medium text-gray-700">Rows per page:</label>
+          <select [(ngModel)]="bookingsPerPage" (change)="changePageSize(bookingsPerPage)" class="px-3 py-2 border border-gray-300 rounded-md text-sm bg-white hover:border-gray-400 focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500">
+            <option *ngFor="let size of pageSizeOptions" [value]="size">{{ size }}</option>
+          </select>
         </div>
 
-        <div class="flex items-center justify-center gap-2 bg-white p-2 rounded-lg shadow-sm">
-          <button
-            (click)="previousPage()"
+        <!-- Pagination Info -->
+        <div class="text-sm text-gray-600 font-medium">
+          Showing <span class="font-semibold">{{ (currentPage - 1) * bookingsPerPage + 1 }}</span> to 
+          <span class="font-semibold">{{ Math.min(currentPage * bookingsPerPage, totalBookings) }}</span> of 
+          <span class="font-semibold">{{ totalBookings }}</span> bookings
+        </div>
+
+        <!-- Page Navigation -->
+        <div class="flex items-center gap-2">
+          <!-- Previous Button -->
+          <button (click)="previousPage()" 
             [disabled]="currentPage === 1"
-            class="px-3 py-2 text-sm font-medium text-yellow-700 bg-white border-2 border-yellow-200 rounded-lg hover:bg-yellow-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
+            class="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition">
             <span class="material-icons text-sm">chevron_left</span>
           </button>
 
-          <div class="flex gap-1">
-            <button
-              *ngFor="let page of [].constructor(totalPages); let i = index"
-              (click)="goToPage(i + 1)"
-              [class.bg-yellow-600]="currentPage === i + 1"
-              [class.text-white]="currentPage === i + 1"
-              [class.bg-white]="currentPage !== i + 1"
-              [class.text-gray-700]="currentPage !== i + 1"
+          <!-- Page Numbers -->
+          <div class="flex items-center gap-1">
+            <button *ngFor="let page of getPageNumbers()"
+              (click)="goToPage(page)"
+              [class.bg-yellow-600]="currentPage === page"
+              [class.text-white]="currentPage === page"
+              [class.bg-white]="currentPage !== page"
+              [class.text-gray-700]="currentPage !== page"
               class="px-3 py-2 text-sm font-medium border border-gray-300 rounded hover:bg-gray-50"
             >
-              {{ i + 1 }}
+              {{ page }}
             </button>
           </div>
 
-          <button
-            (click)="nextPage()"
+          <!-- Next Button -->
+          <button (click)="nextPage()" 
             [disabled]="currentPage === totalPages"
-            class="px-3 py-2 text-sm font-medium text-yellow-700 bg-white border-2 border-yellow-200 rounded-lg hover:bg-yellow-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
+            class="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition">
             <span class="material-icons text-sm">chevron_right</span>
           </button>
         </div>

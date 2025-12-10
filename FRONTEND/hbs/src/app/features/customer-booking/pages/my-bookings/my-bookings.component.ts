@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
-import { BookingsService, BookingResponse } from '../../../../shared/services/bookings.service';
+import { BookingsService, BookingResponse, PaginatedBookingResponse } from '../../../../shared/services/bookings.service';
 import { RoomsService, RoomType } from '../../../../shared/services/rooms.service';
 import { CustomerNavbarComponent } from '../../../../layout/Customer/customer-navbar/customer-navbar.component';
 import { Subject } from 'rxjs';
@@ -18,7 +18,6 @@ import { takeUntil } from 'rxjs/operators';
 })
 export class MyBookingsComponent implements OnInit, OnDestroy {
   bookings: BookingResponse[] = [];
-  filteredBookings: BookingResponse[] = [];
   isLoading = false;
   isLoadingRoomTypes = false;
   isLoadingStatuses = false;
@@ -35,12 +34,17 @@ export class MyBookingsComponent implements OnInit, OnDestroy {
 
   // Pagination
   currentPage = 1;
-  itemsPerPage = 5;
+  itemsPerPage = 10;
   totalItems = 0;
+  totalPages = 0;
+  pageSizeOptions = [5, 10, 25, 50];
 
   // Dynamic options from API
   statusOptions: string[] = [];
   roomTypeOptions: RoomType[] = [];
+
+  // Expose Math to template
+  Math = Math;
 
   private destroy$ = new Subject<void>();
 
@@ -118,10 +122,10 @@ export class MyBookingsComponent implements OnInit, OnDestroy {
       )
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (data: BookingResponse[]) => {
-          this.bookings = data;
-          this.totalItems = data.length;
-          this.applyFilters();
+        next: (response: PaginatedBookingResponse) => {
+          this.bookings = response.data;
+          this.totalItems = response.total;
+          this.totalPages = response.total_pages;
           this.isLoading = false;
         },
         error: (err: any) => {
@@ -133,24 +137,8 @@ export class MyBookingsComponent implements OnInit, OnDestroy {
   }
 
   applyFilters(): void {
-    this.filteredBookings = this.bookings.filter((booking) => {
-      const matchesSearch =
-        this.searchTerm === '' ||
-        booking.booking_id.toString().includes(this.searchTerm) ||
-        (booking.primary_customer_name || '')
-          .toLowerCase()
-          .includes(this.searchTerm.toLowerCase());
-
-      const matchesStatus = this.selectedStatus === '' || booking.status === this.selectedStatus;
-
-      const matchesAmount =
-        (this.minAmount === null || booking.total_price >= this.minAmount) &&
-        (this.maxAmount === null || booking.total_price <= this.maxAmount);
-
-      return matchesSearch && matchesStatus && matchesAmount;
-    });
-
     this.currentPage = 1;
+    this.loadBookings();
   }
 
   clearFilters(): void {
@@ -165,16 +153,25 @@ export class MyBookingsComponent implements OnInit, OnDestroy {
     this.loadBookings();
   }
 
+  changePageSize(newSize: number): void {
+    this.itemsPerPage = newSize;
+    this.currentPage = 1;
+    this.loadBookings();
+  }
+
   onSearchChange(): void {
-    this.applyFilters();
+    this.currentPage = 1;
+    this.loadBookings();
   }
 
   onStatusChange(): void {
+    this.currentPage = 1;
     this.loadBookings();
   }
 
   onFilterChange(): void {
-    this.applyFilters();
+    this.currentPage = 1;
+    this.loadBookings();
   }
 
   viewBookingDetails(bookingId: number): void {
@@ -204,32 +201,41 @@ export class MyBookingsComponent implements OnInit, OnDestroy {
   }
 
   // Pagination methods
-  get totalPages(): number {
-    return Math.ceil(this.filteredBookings.length / this.itemsPerPage);
+  get paginatedBookings(): BookingResponse[] {
+    return this.bookings;
   }
 
-  get paginatedBookings(): BookingResponse[] {
-    const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-    const endIndex = startIndex + this.itemsPerPage;
-    return this.filteredBookings.slice(startIndex, endIndex);
+  previousPage(): void {
+    if (this.currentPage > 1) {
+      this.currentPage--;
+      this.loadBookings();
+    }
   }
 
   nextPage(): void {
     if (this.currentPage < this.totalPages) {
       this.currentPage++;
-    }
-  }
-
-  prevPage(): void {
-    if (this.currentPage > 1) {
-      this.currentPage--;
+      this.loadBookings();
     }
   }
 
   goToPage(page: number): void {
     if (page >= 1 && page <= this.totalPages) {
       this.currentPage = page;
+      this.loadBookings();
     }
+  }
+
+  getPageNumbers(): number[] {
+    const pages: number[] = [];
+    const startPage = Math.max(1, this.currentPage - 2);
+    const endPage = Math.min(this.totalPages, this.currentPage + 2);
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+
+    return pages;
   }
 
   formatDate(dateString: string): string {

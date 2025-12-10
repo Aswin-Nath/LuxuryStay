@@ -1,0 +1,31 @@
+<!-- ✅ Navbar -->
+<app-customer-navbar></app-customer-navbar>
+
+<!-- ✅ Header -->
+<header class="bg-linear-to-r from-yellow-600 to-red-600 py-20 text-center text-white shadow-md mt-16 sm:mt-20">
+  <h1 class="text-4xl font-extrabold">Popular Destinations</h1>
+  <p class="text-sm sm:text-base mt-2 opacity-90">Explore amazing places around the world</p>
+</header>
+
+<!-- ✅ Destinations Section -->
+<section class="py-16 px-6 bg-gray-50">
+  <h2 class="text-3xl font-extrabold text-center mb-12 bg-linear-to-r from-yellow-600 to-red-600 bg-clip-text text-transparent">
+    Our Featured Destinations
+  </h2>
+  <div class="grid sm:grid-cols-2 md:grid-cols-3 gap-12 max-w-6xl mx-auto text-left">
+    <div *ngFor="let dest of destinations" class="group cursor-pointer hover:scale-105 transition-transform duration-300">
+      <div class="relative overflow-hidden rounded-lg">
+        <img [src]="dest.image" [alt]="dest.name" class="h-64 w-full object-cover group-hover:scale-110 transition-transform duration-300">
+        <div class="absolute inset-0 bg-opacity-40 group-hover:bg-opacity-50 transition flex items-end p-6">
+          <div class="text-white">
+            <h3 class="text-2xl font-bold">{{ dest.name }}</h3>
+            <p class="text-sm text-gray-200">{{ dest.description }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ✅ Footer -->
+<app-footer></app-footer>

@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { Subject, Observable } from 'rxjs';
+import { Subject, Observable, takeUntil } from 'rxjs';
 import { AuthenticationService } from '../../../services/authentication.service';
 import { BookingStateService } from '../../../shared/services/booking-state.service';
 import { DatePickerModalComponent } from '../../../shared/components/date-picker-modal/date-picker-modal.component';
@@ -174,6 +174,29 @@ export class CustomerNavbarComponent implements OnInit, OnDestroy {
     this.authService.logout().subscribe({
       next: () => this.router.navigate(['/login']),
       error: () => this.router.navigate(['/login'])
+    });
+  }
+
+  // Scroll to section on homepage
+  scrollToSection(sectionId: string): void {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  }
+
+  // Navigate to page or scroll to section based on login status
+  navigateOrScroll(path: string, sectionId?: string): void {
+    this.isLoggedIn$.pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(isLoggedIn => {
+      if (isLoggedIn || path === '/faqs') {
+        // If logged in or it's FAQs page, navigate to the page
+        this.router.navigate([path]);
+      } else if (sectionId) {
+        // If not logged in, scroll to section on homepage
+        this.scrollToSection(sectionId);
+      }
     });
   }
 }
