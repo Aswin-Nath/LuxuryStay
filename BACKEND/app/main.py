@@ -28,9 +28,41 @@ from app.routes.v2_booking import router as v2_booking_router
 from app.routes.offers import router as offers_router
 from app.routes.images import router as images_router
 from app.workers.release_room_holds_worker import run_hold_release_scheduler
+from app.workers.booking_lifecycle_hourly_worker import run_hourly_booking_lifecycle_scheduler
+from app.workers.room_lifecycle_daily_worker import run_daily_checkout_scheduler_at_1159pm
+from app.workers.offers_expiry_worker import run_offer_expiry_scheduler_at_1159pm
 import os
 import logging
+from contextlib import asynccontextmanager
 _logger = logging.getLogger(__name__)
+
+# ---- lifespan: safe startup & worker bootstrap ----
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Use FastAPI lifespan so background workers start after the async runtime
+    (and SQLAlchemy/greenlet hooks) are fully initialized.
+    """
+    # give the event loop one tick so all greenlet hooks can attach reliably
+    await asyncio.sleep(0)
+
+    # start background workers as tasks (they must be async functions)
+    hold_task = asyncio.create_task(run_hold_release_scheduler(interval_seconds=60))
+    hourly_task = asyncio.create_task(run_hourly_booking_lifecycle_scheduler(interval_seconds=3600))
+    daily_task = asyncio.create_task(run_daily_checkout_scheduler_at_1159pm())
+    offers_task = asyncio.create_task(run_offer_expiry_scheduler_at_1159pm())
+
+    app.state._worker_tasks = [hold_task, hourly_task, daily_task, offers_task]
+    _logger.info("[LIFESPAN] Background workers started safely")
+
+    try:
+        yield  # app is running
+    finally:
+        # graceful shutdown: cancel worker tasks on app shutdown
+        for t in getattr(app.state, "_worker_tasks", []):
+            t.cancel()
+        _logger.info("[LIFESPAN] Background workers cancelled on shutdown")
+
 
 # -------------------------------------------------
 # ✅ FastAPI App Configuration
@@ -40,8 +72,9 @@ app = FastAPI(
     version="1.0.0",
     description="Hybrid Hotel Booking Platform (PostgreSQL + MongoDB)",
     openapi_url="/openapi.json",
-    docs_url=None,         # disable default /docs
-    redoc_url="/redoc",    # keep redoc enabled
+    docs_url=None,
+    redoc_url="/redoc",
+    lifespan=lifespan,   # <- important
 )
 
 # -------------------------------------------------
@@ -95,12 +128,23 @@ def custom_docs():
 @app.on_event("startup")
 async def startup_event():
     """
-    Run background workers when the app starts.
-    - Unlock expired room reservations worker
-    - Release expired room holds worker (5 + 2×n minute holds)
-    - Revoke expired sessions worker
+    Run background workers when the app starts:
+    1. Release expired room holds worker - runs every 60 seconds
+    2. Booking lifecycle hourly worker - runs every hour to mark confirmed bookings as checked-in
+    3. Room lifecycle daily worker - runs at 11:59 PM to mark checked-in bookings as checked-out
     """
+    # Worker 1: Release expired room holds (every 60 seconds)
     asyncio.create_task(run_hold_release_scheduler(interval_seconds=60))
+    _logger.info("[STARTUP] Room holds release worker started")
+    
+    # Worker 2: Hourly booking lifecycle updates (every 3600 seconds = 1 hour)
+    asyncio.create_task(run_hourly_booking_lifecycle_scheduler(interval_seconds=3600))
+    _logger.info("[STARTUP] Hourly booking lifecycle worker started")
+    
+    # Worker 3: Daily checkout at 11:59 PM
+    asyncio.create_task(run_daily_checkout_scheduler_at_1159pm())
+    _logger.info("[STARTUP] Daily checkout (11:59 PM) worker started")
+    
     # Print out auth config (debug)
     try:
         _logger.info('Auth config - ACCESS_TOKEN_EXPIRE_MINUTES=%s REFRESH_TOKEN_EXPIRE_DAYS=%s', os.getenv('ACCESS_TOKEN_EXPIRE_MINUTES'), os.getenv('REFRESH_TOKEN_EXPIRE_DAYS'))

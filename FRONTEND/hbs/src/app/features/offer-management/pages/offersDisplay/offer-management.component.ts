@@ -19,6 +19,7 @@ export class OfferManagementComponent implements OnInit {
   loading = false;
   error: string | null = null;
   successMessage: string | null = null;
+  Math = Math;  // Expose Math to template
 
   // Basic Filters
 
@@ -36,7 +37,10 @@ export class OfferManagementComponent implements OnInit {
 
   // Pagination
   currentPage = 1;
-  itemsPerPage = 10;
+  pageSize = 10;
+  pageSizeOptions = [5, 10, 15, 20];
+  totalRecords = 0;
+  totalPages = 0;
 
   constructor(private offerService: OfferService, private router: Router) {}
 
@@ -80,9 +84,12 @@ export class OfferManagementComponent implements OnInit {
       roomTypeId: this.selectedRoomTypeId || undefined,
     };
 
+    // Load all offers (large limit for client-side pagination)
     this.offerService.listOffersAdmin(0, 500, filters).subscribe({
       next: (data) => {
         this.offers = data;
+        this.totalRecords = data.length;
+        this.totalPages = Math.ceil(this.totalRecords / this.pageSize);
         this.applyFiltersAndSort();
         this.loading = false;
       },
@@ -221,20 +228,58 @@ export class OfferManagementComponent implements OnInit {
   // ============================================================
 
   get paginatedOffers(): OfferListItem[] {
-    const start = (this.currentPage - 1) * this.itemsPerPage;
-    return this.filteredOffers.slice(start, start + this.itemsPerPage);
+    const start = (this.currentPage - 1) * this.pageSize;
+    return this.filteredOffers.slice(start, start + this.pageSize);
   }
 
-  get totalPages(): number {
-    return Math.ceil(this.filteredOffers.length / this.itemsPerPage);
+  changePageSize(size: number): void {
+    this.pageSize = size;
+    this.currentPage = 1;
+    this.totalPages = Math.ceil(this.totalRecords / this.pageSize);
+    this.loadOffers();
+  }
+
+  getPageNumbers(): number[] {
+    const pages: number[] = [];
+    const maxPages = 5;
+    
+    if (this.totalPages <= maxPages) {
+      for (let i = 1; i <= this.totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      const startPage = Math.max(1, this.currentPage - 2);
+      const endPage = Math.min(this.totalPages, this.currentPage + 2);
+      
+      if (startPage > 1) pages.push(1);
+      if (startPage > 2) pages.push(-1); // -1 represents ellipsis
+      
+      for (let i = startPage; i <= endPage; i++) {
+        pages.push(i);
+      }
+      
+      if (endPage < this.totalPages - 1) pages.push(-1);
+      if (endPage < this.totalPages) pages.push(this.totalPages);
+    }
+    
+    return pages;
+  }
+
+  goToPage(page: number): void {
+    if (page >= 1 && page <= this.totalPages) {
+      this.currentPage = page;
+      this.loadOffers();
+    }
   }
 
   previousPage(): void {
     if (this.currentPage > 1) this.currentPage--;
+    this.loadOffers();
   }
 
   nextPage(): void {
     if (this.currentPage < this.totalPages) this.currentPage++;
+    this.loadOffers();
   }
 
   // ============================================================

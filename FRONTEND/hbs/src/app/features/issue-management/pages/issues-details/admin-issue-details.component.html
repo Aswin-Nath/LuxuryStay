@@ -1,0 +1,236 @@
+<app-admin-navbar></app-admin-navbar>
+
+<div class="bg-gray-50 min-h-screen">
+    <div class="flex flex-col lg:flex-row flex-1 w-full mt-16 md:mt-20">
+        <div class="w-full lg:w-64 px-4 md:px-6 lg:px-8 py-4 shrink-0">
+            <app-admin-sidebar></app-admin-sidebar>
+        </div>
+
+        <main class="flex-1 w-full px-4 md:px-6 lg:px-8 py-4 space-y-4">
+            <header class="relative rounded-lg p-[3px] bg-linear-to-r from-yellow-600 to-red-700 shadow">
+                <div class="bg-[#fdfaf4] rounded-lg py-4 md:py-6 px-6">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <div>
+                            <h1 class="text-2xl md:text-3xl text-gray-800 font-bold">Issue Details #{{ issue?.issue_id }}</h1>
+                            <p class="text-gray-600 text-xs md:text-sm mt-1">Admin View: Investigation and resolution details</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button
+                                (click)="goBack()"
+                                class="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition font-medium text-sm"
+                            >
+                                <span class="material-icons text-sm">arrow_back</span> Back to List
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+            
+            <div *ngIf="isLoadingIssue" class="text-center py-8">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600"></div>
+                <p class="text-gray-600 mt-2">Loading issue details...</p>
+            </div>
+
+            <div *ngIf="errorMessage" class="bg-red-100 border-l-4 border-red-500 text-red-800 p-4 rounded-lg font-medium">
+                <span class="material-icons text-lg mr-2 inline align-middle">error</span>
+                <span class="align-middle">{{ errorMessage }}</span>
+            </div>
+
+            <div *ngIf="successMessage" class="bg-green-100 border-l-4 border-green-500 text-green-800 p-4 rounded-lg font-medium">
+                <span class="material-icons text-lg mr-2 inline align-middle">check_circle</span>
+                <span class="align-middle">{{ successMessage }}</span>
+            </div>
+
+            <div *ngIf="!isLoadingIssue && issue" class="space-y-4">
+                <section class="bg-white rounded-lg shadow border border-gray-200 p-6">
+                    <div class="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
+                        <span class="material-icons text-2xl text-yellow-600">assignment_ind</span>
+                        <h2 class="text-xl font-bold text-gray-800">Core Issue Data</h2>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-6">
+                        <div class="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                            <p class="text-xs text-yellow-600 uppercase font-semibold tracking-wider">Issue ID</p>
+                            <p class="text-2xl text-gray-800 font-extrabold mt-1">#{{ issue.issue_id }}</p>
+                        </div>
+
+                        <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                            <p class="text-xs text-blue-600 uppercase font-semibold tracking-wider">Customer ID</p>
+                            <p class="text-xl text-gray-800 font-bold mt-1">{{ issue.user_id }}</p>
+                        </div>
+
+                        <div class="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                            <p class="text-xs text-purple-600 uppercase font-semibold tracking-wider">Booking ID</p>
+                            <p class="text-xl text-gray-800 font-bold mt-1">{{ issue.booking_id }}</p>
+                        </div>
+
+                        <div class="p-4 bg-green-50 rounded-lg border border-green-200 lg:col-span-2">
+                            <p class="text-xs text-green-600 uppercase font-semibold tracking-wider">Rooms Affected</p>
+                            <p class="text-base text-gray-800 mt-1 font-semibold">{{ issue.room_ids ? (issue.room_ids | json) : 'N/A' }}</p>
+                        </div>
+
+                        <div class="p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+                            <p class="text-xs text-indigo-600 uppercase font-semibold tracking-wider">Current Status</p>
+                            <span [ngClass]="getStatusColor(issue.status)" class="inline-block px-4 py-2 rounded-full text-sm font-bold mt-1 shadow-sm">
+                                {{ issue.status }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4 pt-4 border-t border-gray-100">
+                        <div class="p-4 bg-gray-100 rounded-lg border border-gray-200">
+                            <p class="text-sm text-gray-600 uppercase font-semibold tracking-wider mb-1">Issue Title</p>
+                            <p class="text-xl text-gray-800 font-bold">{{ issue.title }}</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="p-4 bg-cyan-50 rounded-lg border border-cyan-200">
+                                <p class="text-xs text-cyan-600 uppercase font-semibold tracking-wider">Reported On</p>
+                                <p class="text-sm text-gray-800 mt-1 font-medium">{{ formatDate(issue.reported_at) }}</p>
+                            </div>
+
+                            <div *ngIf="issue.resolved_at" class="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
+                                <p class="text-xs text-emerald-600 uppercase font-semibold tracking-wider">Resolved On</p>
+                                <p class="text-sm text-gray-800 mt-1 font-medium">{{ formatDate(issue.resolved_at) }}</p>
+                            </div>
+
+                            <div class="p-4 bg-pink-50 rounded-lg border border-pink-200">
+                                <p class="text-xs text-pink-600 uppercase font-semibold tracking-wider">Last Updated</p>
+                                <p class="text-sm text-gray-800 mt-1 font-medium">{{ formatDate(issue.last_updated) }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 pt-6 border-t border-gray-100">
+                        <h4 class="text-xl font-bold text-gray-800 mb-3 flex items-center gap-2">
+                            <span class="material-icons text-yellow-600 text-2xl">description</span>
+                            Customer Description
+                        </h4>
+                        <div class="bg-gray-50 p-5 rounded-lg border border-gray-200 text-base text-gray-700 whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
+                            {{ issue.description }}
+                        </div>
+                    </div>
+                </section>
+
+                <section class="bg-white rounded-lg shadow border border-gray-200 p-6 border-l-4 border-cyan-500">
+                    <div class="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
+                        <span class="material-icons text-2xl text-cyan-600">check_circle_outline</span>
+                        <h2 class="text-xl font-bold text-gray-800">Action: Update Issue Status</h2>
+                    </div>
+                    
+                    <div class="bg-cyan-50 border border-cyan-200 rounded-lg p-6">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                            <div class="md:col-span-2">
+                                <label class="text-sm font-bold text-gray-700 mb-2 block uppercase tracking-wide">Select New Status</label>
+                                <select [(ngModel)]="newStatus" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-600 focus:border-cyan-600 font-semibold bg-white text-base">
+                                    <option *ngFor="let status of statusOptions" [value]="status">{{ status }}</option>
+                                </select>
+                            </div>
+                            <button 
+                                (click)="updateStatus()" 
+                                [disabled]="isUpdatingStatus || newStatus === issue.status"
+                                class="w-full h-full px-6 py-3 bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg shadow-md transition font-bold flex items-center justify-center gap-2">
+                                <span class="material-icons text-lg">{{ isUpdatingStatus ? 'schedule' : 'cached' }}</span>
+                                {{ isUpdatingStatus ? 'Updating...' : 'Apply Status' }}
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-600 mt-3 italic">Current Status: **{{ issue.status }}**</p>
+                    </div>
+                </section>
+
+                <section class="bg-white rounded-lg shadow border border-gray-200 p-6" *ngIf="images && images.length > 0">
+                    <div class="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
+                        <span class="material-icons text-2xl text-purple-600">collections</span>
+                        <h2 class="text-xl font-bold text-gray-800">Attached Media ({{ images.length }})</h2>
+                    </div>
+                    <div id="issueMediaGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                        <div *ngFor="let img of images" (click)="openLightbox(img)" class="cursor-pointer group relative aspect-video rounded-lg overflow-hidden shadow-md transition transform hover:scale-[1.02]">
+                            <img [src]="img.image_url" [alt]="img.caption || 'Issue image'" class="w-full h-full object-cover bg-gray-200 transition duration-300 group-hover:opacity-80">
+                            <div class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-300">
+                                <span class="material-icons text-white text-3xl">zoom_in</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="bg-white rounded-lg shadow border border-gray-200 p-6">
+                    <div class="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
+                        <span class="material-icons text-2xl text-green-600">chat_bubble</span>
+                        <h2 class="text-xl font-bold text-gray-800">Chat with Customer</h2>
+                    </div>
+                    
+                    <div id="chatMessages" class="bg-gray-50 rounded-lg border border-gray-200 h-96 p-4 overflow-y-auto space-y-4 mb-6 shadow-inner">
+                        <div *ngIf="isLoadingChats" class="text-center text-gray-500 py-12">
+                            <span class="material-icons animate-spin text-2xl">hourglass_empty</span>
+                            <p class="mt-2">Loading messages...</p>
+                        </div>
+                        
+                        <div *ngIf="!isLoadingChats && chats.length === 0" class="text-center text-gray-400 py-12">
+                            <span class="material-icons text-4xl">message</span>
+                            <p class="mt-2 font-medium">No messages yet. Start communicating!</p>
+                        </div>
+
+                        <div *ngFor="let chat of chats" [ngClass]="{'justify-end': chat.sender_id !== issue.user_id, 'justify-start': chat.sender_id === issue.user_id}" class="flex w-full">
+                            <div [ngClass]="chat.sender_id === issue.user_id ? 'bg-blue-100 text-gray-800 rounded-tl-none' : 'bg-green-600 text-white rounded-br-none'" 
+                                 class="max-w-md px-4 py-3 rounded-xl shadow-md">
+                                <p class="text-xs font-bold mb-1" [ngClass]="chat.sender_id === issue.user_id ? 'text-blue-700' : 'text-green-200'">
+                                    {{ chat.sender_id === issue.user_id ? 'Customer' : 'You (Admin)' }}
+                                </p>
+                                <p class="text-sm whitespace-pre-wrap">{{ chat.message }}</p>
+                                <p class="text-xs mt-1 italic" [ngClass]="chat.sender_id === issue.user_id ? 'text-gray-500' : 'text-green-300'">
+                                    {{ formatDate(chat.sent_at) }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3">
+                        <input 
+                            [(ngModel)]="newChatMessage" 
+                            (keyup.enter)="postChat()"
+                            placeholder="Type your response..." 
+                            class="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 text-base transition">
+                        <button 
+                            (click)="postChat()" 
+                            [disabled]="isPostingChat || !newChatMessage.trim()"
+                            class="px-6 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg shadow-md transition font-bold flex items-center gap-2">
+                            <span class="material-icons text-lg">{{ isPostingChat ? 'schedule' : 'send' }}</span>
+                            {{ isPostingChat ? 'Sending...' : 'Send Message' }}
+                        </button>
+                    </div>
+                </section>
+        
+                <div class="flex justify-end pt-4 border-t border-gray-200">
+                    <button (click)="goBack()" class="flex items-center gap-2 px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg shadow-md transition font-bold">
+                        <span class="material-icons">exit_to_app</span>
+                        Exit View
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<div *ngIf="showLightbox && selectedImage" id="mediaLightbox" class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" (click)="closeLightbox()">
+    <div class="relative max-w-4xl w-full" (click)="$event.stopPropagation()">
+        <img [src]="selectedImage.image_url" class="w-full h-auto rounded-lg">
+        
+        <button (click)="closeLightbox()" class="absolute top-4 right-4 bg-white text-black rounded-full p-2 hover:bg-gray-200 transition">
+          <span class="material-icons">close</span>
+        </button>
+    
+        <button *ngIf="currentImageIndex > 0" (click)="prevImage()" class="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white text-black rounded-full p-2 hover:bg-gray-200 transition">
+          <span class="material-icons">chevron_left</span>
+        </button>
+    
+        <button *ngIf="currentImageIndex < images.length - 1" (click)="nextImage()" class="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white text-black rounded-full p-2 hover:bg-gray-200 transition">
+          <span class="material-icons">chevron_right</span>
+        </button>
+    
+        <button (click)="downloadImage()" class="absolute bottom-4 right-4 bg-white text-black rounded-full p-2 hover:bg-gray-200 transition">
+          <span class="material-icons">download</span>
+        </button>
+    
+        <p class="text-white text-center mt-4">Image {{ currentImageIndex + 1 }} of {{ images.length }}</p>
+    </div>
+</div>

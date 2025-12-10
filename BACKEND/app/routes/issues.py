@@ -20,9 +20,10 @@ from app.services.issues_service import (
     add_chat as svc_add_chat,
     list_chats as svc_list_chats,
 )
+from app.crud.issues import get_issue_images, get_issue_by_id
 from app.schemas.pydantic_models.issues import IssueResponse, IssueCreate
 from app.schemas.pydantic_models.images import ImageResponse
-from app.utils.images_util import create_image
+from app.utils.images_util import create_image, soft_delete_image, get_image_by_id_and_entity
 from app.core.cache import invalidate_pattern
 from app.core.exceptions import ForbiddenException
 from app.utils.audit_util import log_audit
@@ -92,33 +93,54 @@ async def create_issue(
 async def list_issues_admin(
     limit: int = 50,
     offset: int = 0,
+    status: Optional[str] = Query(None, description="Filter by status: OPEN, IN_PROGRESS, RESOLVED, CLOSED"),
+    room_id: Optional[int] = Query(None, description="Filter by room ID"),
+    search: Optional[str] = Query(None, description="Search in title and description"),
+    date_from: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
+    sort_by: str = Query("recent", description="Sort by: recent, oldest, title"),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
     token_payload: dict = Security(check_permission, scopes=["BOOKING:READ", "ADMIN"]),
 ):
     """
-    Fetch paginated list of all issues (ADMIN only - light response for tables).
+    Fetch paginated list of all issues (ADMIN only - with filters).
     
-    Admin users can list all issues in the system. Returns lightweight response for table display.
+    Admin users can list all issues in the system with advanced filtering options.
+    Returns lightweight response for table display.
     Use GET /issues/admin/{issue_id} for detailed view with full data.
     
     **Authorization:** Requires BOOKING:READ permission AND ADMIN role.
     
-    Args:
-        limit (int): Page size for list (default 50, max 100).
-        offset (int): Pagination offset (default 0).
-        db (AsyncSession): Database session dependency.
-        current_user (Users): Authenticated admin user.
-        token_payload (dict): Security token payload validating BOOKING:READ and ADMIN.
+    Query Parameters:
+        - limit (int): Page size for list (default 50)
+        - offset (int): Pagination offset (default 0)
+        - status (str): Filter by status (OPEN, IN_PROGRESS, RESOLVED, CLOSED)
+        - room_id (int): Filter by room ID
+        - search (str): Search in title and description
+        - date_from (str): Filter from date (YYYY-MM-DD)
+        - date_to (str): Filter to date (YYYY-MM-DD)
+        - sort_by (str): Sort by recent, oldest, or title
     
     Returns:
-        List[IssueResponse]: List of all issue objects (light response).
+        List[IssueResponse]: List of filtered issue objects.
     
     Examples:
         GET /issues/admin/ → All issues
-        GET /issues/admin/?limit=100 → First 100 issues
+        GET /issues/admin/?status=OPEN&room_id=5 → Open issues in room 5
+        GET /issues/admin/?search=leak&sort_by=recent → Recent issues with 'leak' in title/description
     """
-    items = await svc_list_issues(db, limit=limit, offset=offset)
+    items = await svc_list_issues(
+        db,
+        limit=limit,
+        offset=offset,
+        status=status,
+        room_id=room_id,
+        search=search,
+        date_from=date_from,
+        date_to=date_to,
+        sort_by=sort_by,
+    )
     result = [IssueResponse.model_validate(i).model_dump() for i in items]
     return result
 
@@ -167,33 +189,55 @@ async def get_issue_admin(
 async def list_issues_customer(
     limit: int = 50,
     offset: int = 0,
+    status: Optional[str] = Query(None, description="Filter by status: OPEN, IN_PROGRESS, RESOLVED, CLOSED"),
+    room_id: Optional[int] = Query(None, description="Filter by room ID"),
+    search: Optional[str] = Query(None, description="Search in title and description"),
+    date_from: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
+    sort_by: str = Query("recent", description="Sort by: recent, oldest, title"),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
     token_payload: dict = Security(check_permission, scopes=["BOOKING:READ", "CUSTOMER"]),
 ):
     """
-    Fetch paginated list of customer's own issues (CUSTOMER only - light response for tables).
+    Fetch paginated list of customer's own issues (CUSTOMER only - with filters).
     
-    Customer users can only list their own issues. Returns lightweight response for table display.
+    Customer users can only list their own issues with filtering options.
+    Returns lightweight response for table display.
     Use GET /issues/customer/{issue_id} for detailed view with full data.
     
     **Authorization:** Requires BOOKING:READ permission AND CUSTOMER role.
     
-    Args:
-        limit (int): Page size for list (default 50, max 100).
-        offset (int): Pagination offset (default 0).
-        db (AsyncSession): Database session dependency.
-        current_user (Users): Authenticated customer user.
-        token_payload (dict): Security token payload validating BOOKING:READ and CUSTOMER.
+    Query Parameters:
+        - limit (int): Page size for list (default 50)
+        - offset (int): Pagination offset (default 0)
+        - status (str): Filter by status (OPEN, IN_PROGRESS, RESOLVED, CLOSED)
+        - room_id (int): Filter by room ID
+        - search (str): Search in title and description
+        - date_from (str): Filter from date (YYYY-MM-DD)
+        - date_to (str): Filter to date (YYYY-MM-DD)
+        - sort_by (str): Sort by recent, oldest, or title
     
     Returns:
-        List[IssueResponse]: List of customer's issues (light response).
+        List[IssueResponse]: List of customer's issues with filters applied.
     
     Examples:
         GET /issues/customer/ → All my issues
-        GET /issues/customer/?limit=20 → First 20 of my issues
+        GET /issues/customer/?status=OPEN → My open issues
+        GET /issues/customer/?search=leak&sort_by=recent → Recent issues with 'leak'
     """
-    items = await svc_list_issues(db, user_id=current_user.user_id, limit=limit, offset=offset)
+    items = await svc_list_issues(
+        db,
+        user_id=current_user.user_id,
+        limit=limit,
+        offset=offset,
+        status=status,
+        room_id=room_id,
+        search=search,
+        date_from=date_from,
+        date_to=date_to,
+        sort_by=sort_by,
+    )
     result = [IssueResponse.model_validate(i).model_dump() for i in items]
     return result
 
@@ -690,3 +734,103 @@ async def add_issue_images(
         pass
 
     return [ImageResponse.model_validate(i) for i in images]
+
+
+# ============================================================================
+# 🔹 READ - Get all images for an issue
+# ============================================================================
+@router.get("/{issue_id}/images", response_model=List[ImageResponse], status_code=status.HTTP_200_OK)
+async def fetch_issue_images(
+    issue_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:READ"]),
+):
+    """
+    Retrieve all images attached to an issue.
+    
+    Fetches all images linked to a specific issue. Images are returned in the order
+    they were uploaded. Only non-deleted images are returned.
+    
+    **Authorization:** Requires BOOKING:READ permission.
+    
+    Args:
+        issue_id (int): The issue ID to get images for.
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user.
+    
+    Returns:
+        List[ImageResponse]: List of image records with URLs and metadata.
+    
+    Raises:
+        HTTPException (404): If issue_id not found.
+    """
+    # Verify issue exists
+    issue_record = await get_issue_by_id(db, issue_id)
+    if not issue_record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found")
+    
+    # Get images for the issue
+    images = await get_issue_images(db, issue_id)
+    return [ImageResponse.model_validate(i) for i in images]
+
+
+# ============================================================================
+# 🔹 DELETE - Remove an image from an issue
+# ============================================================================
+@router.delete("/{issue_id}/images/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_issue_image(
+    issue_id: int,
+    image_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    token_payload: dict = Security(check_permission, scopes=["BOOKING:WRITE", "CUSTOMER"]),
+):
+    """
+    Delete an image from an issue.
+    
+    Allows issue owner to remove attached images. Images are soft-deleted (marked is_deleted=True).
+    Only the issue owner can delete images from their issues.
+    
+    **Authorization:** Requires BOOKING:WRITE permission AND CUSTOMER role.
+    
+    Args:
+        issue_id (int): The issue ID that owns the image.
+        image_id (int): The image ID to delete.
+        db (AsyncSession): Database session dependency.
+        current_user (Users): Authenticated user (must be issue owner).
+        token_payload (dict): Security token payload validating BOOKING:WRITE and CUSTOMER.
+    
+    Returns:
+        None (204 No Content)
+    
+    Raises:
+        HTTPException (403): If user doesn't own the issue.
+        HTTPException (404): If issue_id or image_id not found.
+    
+    Side Effects:
+        - Soft-deletes image record (sets is_deleted=True).
+        - Audit log entry created for DELETE action.
+    """
+    issue_record = await svc_get_issue(db, issue_id)
+    if not issue_record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found")
+
+    # Verify ownership
+    if issue_record.user_id != current_user.user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to delete images for this issue")
+
+    # Check if image exists and belongs to this issue
+    image_record = await get_image_by_id_and_entity(db, image_id, "issue", issue_id)
+    if not image_record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found for this issue")
+
+    # Soft delete the image
+    await soft_delete_image(db, image_id)
+    
+    # audit image deletion
+    try:
+        entity_id = f"issue:{issue_id}:image:{image_id}"
+        await log_audit(entity="issue_image", entity_id=entity_id, action="DELETE", new_value={}, changed_by_user_id=current_user.user_id, user_id=current_user.user_id)
+    except Exception:
+        pass

@@ -1,0 +1,257 @@
+<app-customer-navbar></app-customer-navbar>
+<div class="flex flex-col lg:flex-row max-w-7xl mx-auto w-full py-4 sm:py-6 lg:py-8 px-4 lg:px-8 gap-4 lg:gap-8 mt-16 lg:mt-20">
+
+    <main class="flex-1 space-y-8">
+        <header class="relative rounded-xl bg-white p-8 sm:p-10 lg:p-12 text-center shadow-lg border-t-4 border-blue-600">
+            <div class="flex flex-col items-center">
+                <span class="material-icons text-4xl text-blue-600 mb-3">edit_note</span>
+                <h1 class="text-3xl sm:text-4xl lg:text-5xl text-gray-800 font-extrabold tracking-tight">Edit Issue</h1>
+                <p class="text-gray-500 mt-2 text-md font-medium">Update your issue details</p>
+            </div>
+        </header>
+
+        <div class="flex justify-start items-center">
+            <button (click)="goBack()" class="flex items-center gap-2 text-gray-600 hover:text-blue-600 px-3 py-1 rounded-md transition duration-200 font-medium hover:bg-gray-100">
+                <span class="material-icons text-xl">arrow_back</span>
+                Back to Details
+            </button>
+        </div>
+
+        <div *ngIf="isLoading" class="text-center py-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+            <p class="text-gray-600">Loading issue details...</p>
+        </div>
+
+        <div *ngIf="errorMessage" class="bg-red-100 border-l-4 border-red-500 text-red-800 p-4 rounded-lg font-medium">
+            <span class="material-icons text-lg mr-2 inline align-middle">error</span>
+            <span class="align-middle">{{ errorMessage }}</span>
+        </div>
+
+        <div *ngIf="successMessage" class="bg-green-100 border-l-4 border-green-500 text-green-800 p-4 rounded-lg font-medium">
+            <span class="material-icons text-lg mr-2 inline align-middle">check_circle</span>
+            <span class="align-middle">{{ successMessage }}</span>
+        </div>
+
+        <div *ngIf="!isLoading && issue" class="space-y-8">
+            <section class="bg-white rounded-xl border border-gray-200 p-6 sm:p-8 shadow-lg">
+                <div class="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
+                    <span class="material-icons text-2xl text-gray-500">visibility</span>
+                    <h2 class="text-xl font-bold text-gray-800">Issue Metadata (Read-only)</h2>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <p class="text-xs text-gray-500 uppercase font-semibold tracking-wider">Issue ID</p>
+                        <p class="text-lg text-gray-800 font-extrabold mt-1">#{{ issue.issue_id }}</p>
+                    </div>
+
+                    <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <p class="text-xs text-blue-600 uppercase font-semibold tracking-wider">Status</p>
+                        <span [ngClass]="getStatusColor(issue.status)" class="inline-block px-3 py-1 rounded-full text-xs font-bold mt-1 shadow-sm">
+                            {{ issue.status }}
+                        </span>
+                    </div>
+
+                    <div class="p-4 bg-green-50 rounded-lg border border-green-200">
+                        <p class="text-xs text-green-600 uppercase font-semibold tracking-wider">Reported On</p>
+                        <p class="text-sm text-gray-800 mt-1 font-semibold">{{ formatDate(issue.reported_at) }}</p>
+                    </div>
+
+                    <div class="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                        <p class="text-xs text-purple-600 uppercase font-semibold tracking-wider">Last Updated</p>
+                        <p class="text-sm text-gray-800 mt-1 font-semibold">{{ formatDate(issue.last_updated) }}</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="bg-white rounded-xl border border-gray-200 p-6 sm:p-8 shadow-2xl">
+                <div class="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
+                    <span class="material-icons text-2xl text-blue-600">mode_edit</span>
+                    <h2 class="text-2xl font-bold text-gray-800">Editable Fields</h2>
+                </div>
+
+                <div class="space-y-6">
+                    <div>
+                        <label for="issue-title" class="block text-sm font-bold text-gray-700 mb-2 tracking-wide">ISSUE TITLE</label>
+                        <input 
+                            id="issue-title"
+                            [(ngModel)]="title" 
+                            type="text"
+                            placeholder="Enter issue title"
+                            maxlength="200"
+                            class="w-full p-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium text-gray-800 transition"
+                        >
+                        <p class="text-xs text-gray-500 mt-2 text-right">{{ title.length || 0 }}/200 characters</p>
+                    </div>
+
+                    <div>
+                        <label for="issue-description" class="block text-sm font-bold text-gray-700 mb-2 tracking-wide">DESCRIPTION</label>
+                        <textarea 
+                            id="issue-description"
+                            [(ngModel)]="description"
+                            placeholder="Enter detailed description of the issue"
+                            maxlength="1000"
+                            rows="8"
+                            class="w-full p-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium text-gray-800 resize-none transition"
+                        ></textarea>
+                        <p class="text-xs text-gray-500 mt-2 text-right">{{ description.length || 0 }}/1000 characters</p>
+                    </div>
+
+                    <!-- Existing Images Section -->
+                    <div *ngIf="issue.images && issue.images.length > 0" class="mt-6 pt-6 border-t border-gray-100">
+                        <label class="text-sm font-bold text-gray-700 mb-4 tracking-wide flex items-center gap-2">
+                            <span class="material-icons text-lg text-green-600">image</span>
+                            Current Images ({{ issue.images.length }})
+                        </label>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                            <div *ngFor="let image of issue.images; let i = index" class="relative group aspect-square rounded-lg border-2 border-green-200 shadow-md overflow-hidden cursor-pointer transition transform hover:scale-105" (click)="openLightbox(image)">
+                                <img 
+                                    [src]="image.image_url" 
+                                    class="w-full h-full object-cover bg-gray-100 group-hover:opacity-80 transition-opacity duration-300" 
+                                    alt="Issue image"
+                                    (error)="onImageError($event)"
+                                >
+                                <!-- Hover Overlay -->
+                                <div class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-300">
+                                    <span class="material-icons text-white text-3xl">zoom_in</span>
+                                </div>
+                                <!-- Delete Button -->
+                                <button
+                                    type="button"
+                                    (click)="deleteExistingImage(image.image_id, i)"
+                                    [disabled]="isDeletingImage"
+                                    class="absolute top-2 right-2 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-full w-8 h-8 flex items-center justify-center text-lg hover:shadow-lg shadow-md transition z-10"
+                                    title="Delete this image"
+                                >
+                                    <span class="material-icons text-base">close</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- New Image Upload -->
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-3 tracking-wide">
+                            <span class="material-icons text-lg text-blue-600 inline-block mr-2">add_a_photo</span>
+                            Upload Additional Images (Optional)
+                        </label>
+                        <input
+                            #fileInput
+                            type="file"
+                            multiple
+                            accept="image/*"
+                            (change)="onImageSelect($event)"
+                            class="w-full border-2 border-dashed border-gray-300 rounded-lg p-4 text-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer hover:border-blue-400 transition"
+                        >
+                        <p class="text-xs text-gray-500 mt-2">You can upload multiple images to help explain the issue further</p>
+
+                        <!-- New Image Preview -->
+                        <div *ngIf="newImages.length > 0" class="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4">
+                            <div *ngFor="let image of newImages; let i = index" class="relative">
+                                <img [src]="image.preview" class="h-24 w-full object-cover rounded-lg shadow border-2 border-blue-200">
+                                <button
+                                    type="button"
+                                    (click)="removeNewImage(i)"
+                                    class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 shadow-lg transition"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-4 mt-8 pt-6 border-t border-gray-200">
+                    <button 
+                        (click)="saveChanges()" 
+                        [disabled]="isSaving || !title.trim() || !description.trim()"
+                        class="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg shadow-lg transition font-extrabold flex items-center justify-center gap-2 text-lg">
+                        <span class="material-icons text-lg">{{ isSaving ? 'schedule' : 'save' }}</span>
+                        {{ isSaving ? 'Saving...' : 'Save Changes' }}
+                    </button>
+                    <button 
+                        (click)="cancelEdit()"
+                        [disabled]="isSaving"
+                        class="px-6 py-4 bg-white border-2 border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50 rounded-lg shadow-md transition font-bold flex items-center justify-center gap-2">
+                        <span class="material-icons">close</span>
+                        Cancel
+                    </button>
+                </div>
+            </section>
+
+            <section class="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-6 text-sm text-blue-800 shadow-sm">
+                <div class="flex gap-3">
+                    <span class="material-icons shrink-0 mt-0.5">info_outline</span>
+                    <div>
+                        <p class="font-bold mb-2 text-base">Important Information</p>
+                        <ul class="list-disc list-inside space-y-1">
+                            <li>You can only update the title and description here.</li>
+                            <li>Changes are final once saved.</li>
+                            <li>If the issue status is CLOSED you won't be able to submit edits.</li>
+                            <li>For urgent or critical updates, please use the chat feature or contact support directly.</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Image Viewer Modal (Lightbox) -->
+    <div *ngIf="showLightbox && selectedImage" 
+        class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+        (click)="closeLightbox()">
+        <div class="relative bg-black rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col" (click)="$event.stopPropagation()">
+            <!-- Image Display -->
+            <div class="flex-1 flex items-center justify-center overflow-hidden rounded-t-lg">
+                <img 
+                    [src]="selectedImage.image_url" 
+                    class="max-h-[80vh] object-contain"
+                    alt="Full view image"
+                >
+            </div>
+
+            <!-- Navigation and Controls -->
+            <div class="bg-gray-900 px-6 py-4 flex items-center justify-between rounded-b-lg">
+                <!-- Previous Button -->
+                <button 
+                    (click)="prevImage()" 
+                    *ngIf="currentImageIndex > 0"
+                    class="text-white hover:text-blue-400 transition"
+                    title="Previous image">
+                    <span class="material-icons text-3xl">navigate_before</span>
+                </button>
+                <div *ngIf="currentImageIndex === 0" class="w-12"></div>
+
+                <!-- Image Counter and Download -->
+                <div class="flex items-center gap-4">
+                    <span class="text-white text-sm font-medium">
+                        {{ currentImageIndex + 1 }} of {{ issue?.images?.length || 0 }}
+                    </span>
+                    <button 
+                        (click)="downloadImage()"
+                        class="text-white hover:text-blue-400 transition"
+                        title="Download image">
+                        <span class="material-icons">download</span>
+                    </button>
+                </div>
+
+                <!-- Next Button -->
+                <button 
+                    (click)="nextImage()" 
+                    *ngIf="currentImageIndex < (issue?.images?.length || 0) - 1"
+                    class="text-white hover:text-blue-400 transition"
+                    title="Next image">
+                    <span class="material-icons text-3xl">navigate_next</span>
+                </button>
+                <div *ngIf="currentImageIndex === (issue?.images?.length || 0) - 1" class="w-12"></div>
+            </div>
+
+            <!-- Close Button -->
+            <button 
+                (click)="closeLightbox()"
+                class="absolute top-4 right-4 text-white hover:text-red-400 transition bg-black/50 hover:bg-black/70 rounded-full p-2">
+                <span class="material-icons text-2xl">close</span>
+            </button>
+        </div>
+    </div>
+</div>

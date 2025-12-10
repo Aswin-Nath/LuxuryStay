@@ -55,6 +55,12 @@ import { RoomDisplayComponent } from './features/rooms-display/pages/rooms-displ
 import { CustomerRoomDetailComponent } from './features/rooms-display/pages/individual-room-details/individual-room-details.component';
 import { CustomerOfferDetailComponent } from './features/customer-booking/pages/individual-offers-details/individual-offers-details.component';
 import { OfferBookingComponent } from './features/customer-booking/pages/offer_booking/offer_booking.component';
+import { MyIssuesComponent } from './features/reporting-issues/pages/my-issues/my-issues.component';
+import { IssueDetailsCustomerComponent } from './features/reporting-issues/pages/individual-issues/issue-details.component';
+import { EditIssueComponent } from './features/reporting-issues/pages/edit-issue/edit-issue.component';
+import { AdminIssuesComponent } from './features/issue-management/pages/individual-issues/admin-issues.component';
+import { AdminIssueDetailsComponent } from './features/issue-management/pages/issues-details/admin-issue-details.component';
+
 export const routes: Routes = [
 	{ path: '', redirectTo: 'login', pathMatch: 'full' },
 	{ path: 'login', component: Login, canActivate: [PublicGuard] },
@@ -83,6 +89,14 @@ export const routes: Routes = [
 						children: [
 							{ path: '', component: MyBookingsComponent },
 							{ path: 'details/:id', component: BookingDetailsComponent }
+						]
+					},
+					{
+						path: 'issues',
+						children: [
+							{ path: '', component: MyIssuesComponent },
+							{ path: 'details/:id', component: IssueDetailsCustomerComponent },
+							{ path: 'edit/:id', component: EditIssueComponent }
 						]
 					},
 					{ path: '', redirectTo: 'dashboard', pathMatch: 'full' },
@@ -148,6 +162,13 @@ export const routes: Routes = [
 						component: EditRoomTypeComponent,
 						canActivate: [PermissionGuard],
 						data: { requiredPermission: 'ROOM_MANAGEMENT:WRITE' }
+					},
+					{
+						path: 'issues',
+						children: [
+							{ path: '', component: AdminIssuesComponent },
+							{ path: 'details/:id', component: AdminIssueDetailsComponent }
+						]
 					},
 					{ path: '', redirectTo: 'dashboard', pathMatch: 'full' }
 				]

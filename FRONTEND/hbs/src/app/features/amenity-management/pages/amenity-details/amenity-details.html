@@ -141,7 +141,7 @@
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-200">
-                <tr *ngFor="let roomType of roomTypes" class="hover:bg-gray-50">
+                <tr *ngFor="let roomType of paginatedRoomTypes" class="hover:bg-gray-50">
                   <td class="p-3 font-medium text-blue-600">
                     <div class="flex items-center gap-2">
                       <span class="material-icons text-gray-600 text-sm">king_bed</span>
@@ -177,6 +177,52 @@
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <!-- Pagination -->
+          <div *ngIf="!loadingRoomTypes && rtTotalRecords > 0" class="px-4 py-4 border-t bg-gray-50 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="text-sm text-gray-600">
+              Showing {{ (rtCurrentPage - 1) * rtPageSize + 1 }} to {{ Math.min(rtCurrentPage * rtPageSize, rtTotalRecords) }} of {{ rtTotalRecords }} results
+            </div>
+            
+            <div class="flex items-center gap-2">
+              <!-- Items per page -->
+              <select
+                [(ngModel)]="rtPageSize"
+                (change)="rtChangePageSize(rtPageSize)"
+                class="px-3 py-1 border rounded text-sm"
+              >
+                <option *ngFor="let size of rtPageSizeOptions" [value]="size">{{ size }} per page</option>
+              </select>
+
+              <!-- Page navigation -->
+              <button
+                (click)="rtPreviousPage()"
+                [disabled]="rtCurrentPage === 1"
+                class="px-3 py-1 border rounded text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <i class="fas fa-chevron-left"></i>
+              </button>
+              
+              <button
+                *ngFor="let page of rtGetPageNumbers()"
+                (click)="rtGoToPage(page)"
+                [class.bg-yellow-600]="page === rtCurrentPage"
+                [class.text-white]="page === rtCurrentPage"
+                [class.hover:bg-gray-100]="page !== rtCurrentPage"
+                class="px-3 py-1 border rounded text-sm transition"
+              >
+                {{ page }}
+              </button>
+              
+              <button
+                (click)="rtNextPage()"
+                [disabled]="rtCurrentPage === rtTotalPages"
+                class="px-3 py-1 border rounded text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <i class="fas fa-chevron-right"></i>
+              </button>
+            </div>
           </div>
         </div>
 

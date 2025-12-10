@@ -238,16 +238,49 @@
   </div>
 
   <!-- Pagination -->
-  <div *ngIf="!loading && totalPages > 1" class="pagination">
-    <button (click)="previousPage()" [disabled]="currentPage === 1" class="btn-pagination">
-      <span class="material-icons">navigate_before</span>
-    </button>
-    <span class="page-info">
-      Page {{ currentPage }} of {{ totalPages }}
-    </span>
-    <button (click)="nextPage()" [disabled]="currentPage === totalPages" class="btn-pagination">
-      <span class="material-icons">navigate_next</span>
-    </button>
+  <div *ngIf="!loading && totalRecords > 0" class="px-4 py-4 border-t bg-gray-50 flex flex-col sm:flex-row items-center justify-between gap-4">
+    <div class="text-sm text-gray-600">
+      Showing {{ (currentPage - 1) * pageSize + 1 }} to {{ Math.min(currentPage * pageSize, totalRecords) }} of {{ totalRecords }} results
+    </div>
+    
+    <div class="flex items-center gap-2">
+      <!-- Items per page -->
+      <select
+        [(ngModel)]="pageSize"
+        (change)="changePageSize(pageSize)"
+        class="px-3 py-1 border rounded text-sm"
+      >
+        <option *ngFor="let size of pageSizeOptions" [value]="size">{{ size }} per page</option>
+      </select>
+
+      <!-- Page navigation -->
+      <button
+        (click)="previousPage()"
+        [disabled]="currentPage === 1"
+        class="px-3 py-1 border rounded text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <i class="fas fa-chevron-left"></i>
+      </button>
+      
+      <button
+        *ngFor="let page of getPageNumbers()"
+        (click)="goToPage(page)"
+        [class.bg-yellow-600]="page === currentPage"
+        [class.text-white]="page === currentPage"
+        [class.hover:bg-gray-100]="page !== currentPage"
+        class="px-3 py-1 border rounded text-sm transition"
+      >
+        {{ page }}
+      </button>
+      
+      <button
+        (click)="nextPage()"
+        [disabled]="currentPage === totalPages"
+        class="px-3 py-1 border rounded text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <i class="fas fa-chevron-right"></i>
+      </button>
+    </div>
   </div>
     </div>
     </main>

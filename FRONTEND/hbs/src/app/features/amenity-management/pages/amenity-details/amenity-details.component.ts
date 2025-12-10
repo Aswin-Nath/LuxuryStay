@@ -42,6 +42,14 @@ export class RoomTypesAmenitiesManagementComponent implements OnInit, OnDestroy 
     totalRevenue: 0
   };
   
+  // Room Types Pagination
+  rtCurrentPage = 1;
+  rtPageSize = 10;
+  rtPageSizeOptions = [5, 10, 15, 20];
+  rtTotalRecords = 0;
+  rtTotalPages = 0;
+  Math = Math;
+  
   // Amenities
   amenities: any[] = [];
   loadingAmenities = false;
@@ -167,6 +175,8 @@ export class RoomTypesAmenitiesManagementComponent implements OnInit, OnDestroy 
       .subscribe(
         (data) => {
           this.roomTypes = data;
+          this.rtTotalRecords = data.length;
+          this.rtTotalPages = Math.ceil(this.rtTotalRecords / this.rtPageSize);
           this.loadingRoomTypes = false;
         },
         (error) => {
@@ -365,6 +375,62 @@ export class RoomTypesAmenitiesManagementComponent implements OnInit, OnDestroy 
 
   onAddRoomTypeSaved(): void {
     this.closeAddRoomTypeModal();
+    this.loadRoomTypes();
+  }
+
+  // Room Types Pagination Methods
+  get paginatedRoomTypes(): any[] {
+    const start = (this.rtCurrentPage - 1) * this.rtPageSize;
+    return this.roomTypes.slice(start, start + this.rtPageSize);
+  }
+
+  rtChangePageSize(size: number): void {
+    this.rtPageSize = size;
+    this.rtCurrentPage = 1;
+    this.rtTotalPages = Math.ceil(this.rtTotalRecords / this.rtPageSize);
+    this.loadRoomTypes();
+  }
+
+  rtGetPageNumbers(): number[] {
+    const pages: number[] = [];
+    const maxPages = 5;
+    
+    if (this.rtTotalPages <= maxPages) {
+      for (let i = 1; i <= this.rtTotalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      const startPage = Math.max(1, this.rtCurrentPage - 2);
+      const endPage = Math.min(this.rtTotalPages, this.rtCurrentPage + 2);
+      
+      if (startPage > 1) pages.push(1);
+      if (startPage > 2) pages.push(-1);
+      
+      for (let i = startPage; i <= endPage; i++) {
+        pages.push(i);
+      }
+      
+      if (endPage < this.rtTotalPages - 1) pages.push(-1);
+      if (endPage < this.rtTotalPages) pages.push(this.rtTotalPages);
+    }
+    
+    return pages;
+  }
+
+  rtGoToPage(page: number): void {
+    if (page >= 1 && page <= this.rtTotalPages) {
+      this.rtCurrentPage = page;
+      this.loadRoomTypes();
+    }
+  }
+
+  rtPreviousPage(): void {
+    if (this.rtCurrentPage > 1) this.rtCurrentPage--;
+    this.loadRoomTypes();
+  }
+
+  rtNextPage(): void {
+    if (this.rtCurrentPage < this.rtTotalPages) this.rtCurrentPage++;
     this.loadRoomTypes();
   }
 }

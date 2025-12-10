@@ -26,8 +26,9 @@ export class AdminManagementComponent implements OnInit {
   
   // Pagination
   currentPage = 1;
-  itemsPerPage = 10;
-  totalItems = 0;
+  pageSize = 5;
+  pageSizeOptions = [5, 10, 20, 50];
+  totalRecords = 0;
   totalPages = 0;
   
   // Filtering
@@ -51,9 +52,6 @@ export class AdminManagementComponent implements OnInit {
   suspendReasonError = '';
   errorMessage = '';
   successMessage = '';
-  
-  // Pagination options
-  pageSizeOptions = [5, 10, 20, 50];
 
   constructor(
     private adminService: AdminManagementService,
@@ -89,7 +87,7 @@ export class AdminManagementComponent implements OnInit {
     
     const params = {
       page: this.currentPage,
-      limit: this.itemsPerPage,
+      limit: this.pageSize,
       search: this.searchTerm,
       role_id: this.selectedRole || undefined,
       status: this.selectedStatus,
@@ -103,8 +101,8 @@ export class AdminManagementComponent implements OnInit {
       next: (response: any) => {
         this.admins = response.users;
         this.filteredAdmins = this.admins;
-        this.totalItems = response.total;
-        this.totalPages = Math.ceil(this.totalItems / this.itemsPerPage);
+        this.totalRecords = response.total;
+        this.totalPages = Math.ceil(this.totalRecords / this.pageSize);
         this.isLoading = false;
       },
       error: (err: any) => {
@@ -178,22 +176,36 @@ export class AdminManagementComponent implements OnInit {
     this.loadAdmins();
   }
 
+  changePageSize(size: number): void {
+    this.pageSize = size;
+    this.currentPage = 1;
+    this.loadAdmins();
+  }
+
   /**
-   * Get page numbers for pagination display
+   * Get page numbers for pagination display with ellipsis support
    */
   getPageNumbers(): number[] {
     const pages: number[] = [];
-    const maxVisible = 5;
+    const maxPages = 5;
     
-    let startPage = Math.max(1, this.currentPage - Math.floor(maxVisible / 2));
-    let endPage = Math.min(this.totalPages, startPage + maxVisible - 1);
-    
-    if (endPage - startPage < maxVisible - 1) {
-      startPage = Math.max(1, endPage - maxVisible + 1);
-    }
-    
-    for (let i = startPage; i <= endPage; i++) {
-      pages.push(i);
+    if (this.totalPages <= maxPages) {
+      for (let i = 1; i <= this.totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      const startPage = Math.max(1, this.currentPage - 2);
+      const endPage = Math.min(this.totalPages, this.currentPage + 2);
+      
+      if (startPage > 1) pages.push(1);
+      if (startPage > 2) pages.push(-1); // -1 represents ellipsis
+      
+      for (let i = startPage; i <= endPage; i++) {
+        pages.push(i);
+      }
+      
+      if (endPage < this.totalPages - 1) pages.push(-1);
+      if (endPage < this.totalPages) pages.push(this.totalPages);
     }
     
     return pages;

@@ -1,0 +1,202 @@
+<app-customer-navbar></app-customer-navbar>
+<div class="flex flex-col lg:flex-row max-w-7xl mx-auto w-full py-4 sm:py-6 lg:py-8 px-4 lg:px-8 gap-4 lg:gap-8 mt-16 lg:mt-20">
+
+    <main *ngIf="issue" class="flex-1 space-y-8">
+        <header class="relative rounded-xl bg-white border border-gray-200 p-6 sm:p-8 lg:p-10 shadow-xl">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-4xl sm:text-5xl text-gray-800 font-extrabold tracking-tight">Issue Details</h1>
+                    <p class="text-gray-500 mt-2 text-md font-medium">View your issue and communicate with support</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-sm text-gray-500 uppercase font-bold tracking-wider mb-1">Current Status</p>
+                    <span [ngClass]="getStatusColor(issue.status)" class="inline-flex items-center px-4 py-2 rounded-full text-sm font-bold shadow-md">
+                        <span class="w-2.5 h-2.5 rounded-full mr-2" [ngClass]="issue.status === 'CLOSED' ? 'bg-green-500' : (issue.status === 'OPEN' ? 'bg-red-500' : 'bg-blue-500')"></span>
+                        {{ issue.status }}
+                    </span>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex justify-between items-center">
+            <button (click)="goBack()" class="flex items-center gap-2 text-gray-600 hover:text-gray-900 px-3 py-1 rounded-md transition duration-200 font-medium hover:bg-gray-100">
+                <span class="material-icons">arrow_back</span>
+                Back to Issues
+            </button>
+
+            <div *ngIf="issue.status && issue.status.toLocaleUpperCase()!='RESOLVED'"  class="flex gap-3">
+                <button (click)="editIssue()" *ngIf="issue.status !== 'CLOSED'" class="flex items-center gap-2 px-5 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg shadow-md transition font-semibold text-sm">
+                    <span class="material-icons text-lg">edit</span>
+                    Edit Issue
+                </button>
+
+            </div>
+        </div>
+
+        <div *ngIf="isLoadingIssue" class="text-center py-12">
+            <p class="text-gray-500">Loading issue details...</p>
+        </div>
+
+        <div *ngIf="errorMessage" class="bg-red-100 border-l-4 border-red-500 text-red-800 p-4 rounded-lg">
+            <p class="font-semibold">Error:</p>
+            <p>{{ errorMessage }}</p>
+        </div>
+
+        <div *ngIf="!isLoadingIssue && issue" class="space-y-8">
+            <section class="bg-white rounded-xl border border-gray-200 p-6 shadow-lg">
+                <div class="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
+                    <span class="material-icons text-2xl text-red-500">assignment_turned_in</span>
+                    <h2 class="text-xl font-bold text-gray-800">Issue Information</h2>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="md:col-span-2 space-y-4">
+                        <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <p class="text-sm text-gray-500 uppercase font-semibold tracking-wider">Issue ID</p>
+                            <p class="text-2xl text-gray-800 font-extrabold mt-1">#{{ issue.issue_id }}</p>
+                        </div>
+                        <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                            <p class="text-sm text-blue-600 uppercase font-semibold tracking-wider">Title</p>
+                            <p class="text-lg text-gray-800 mt-1 font-semibold">{{ issue.title }}</p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="p-4 bg-green-50 rounded-lg border border-green-200">
+                            <p class="text-sm text-green-600 uppercase font-semibold tracking-wider">Reported On</p>
+                            <p class="text-base text-gray-800 mt-1 font-medium">{{ formatDate(issue.reported_at) }}</p>
+                        </div>
+
+                        <div *ngIf="issue.resolved_at" class="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
+                            <p class="text-sm text-emerald-600 uppercase font-semibold tracking-wider">Resolved On</p>
+                            <p class="text-base text-gray-800 mt-1 font-medium">{{ formatDate(issue.resolved_at) }}</p>
+                        </div>
+
+                        <div class="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                            <p class="text-sm text-orange-600 uppercase font-semibold tracking-wider">Last Updated</p>
+                            <p class="text-base text-gray-800 mt-1 font-medium">{{ formatDate(issue.last_updated) }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 pt-6 border-t border-gray-100">
+                    <h3 class="text-xl font-bold text-gray-800 mb-3 flex items-center gap-2">
+                        <span class="material-icons text-red-500 text-xl">subject</span>
+                        Description
+                    </h3>
+                    <div class="bg-gray-50 p-5 rounded-lg border border-gray-200 text-base text-gray-700 whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
+                        {{ issue.description }}
+                    </div>
+                </div>
+            </section>
+
+            <section class="bg-white rounded-xl border border-gray-200 p-6 shadow-lg" *ngIf="images && images.length > 0">
+                <div class="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
+                    <span class="material-icons text-2xl text-purple-500">collections</span>
+                    <h2 class="text-xl font-bold text-gray-800">Attached Media ({{ images.length }})</h2>
+                </div>
+                <div id="issueMediaGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    <div *ngFor="let img of images" (click)="openLightbox(img)" class="cursor-pointer group relative aspect-video rounded-lg overflow-hidden shadow-md transition transform hover:scale-[1.02]">
+                        <img [src]="img.image_url" [alt]="img.caption || 'Issue image'" class="w-full h-full object-cover bg-gray-200 transition duration-300 group-hover:opacity-80">
+                        <div class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-300">
+                            <span class="material-icons text-white text-3xl">zoom_in</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="bg-white rounded-xl border border-gray-200 p-6 shadow-lg">
+                <div class="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
+                    <span class="material-icons text-2xl text-blue-500">forum</span>
+                    <h2 class="text-xl font-bold text-gray-800">Support Conversation</h2>
+                </div>
+
+                <div id="chatMessages" class="bg-gray-50 rounded-lg border border-gray-200 h-96 p-4 overflow-y-auto space-y-4 mb-6 shadow-inner">
+                    <div *ngIf="isLoadingChats" class="text-center text-gray-500 py-12">
+                        <span class="material-icons animate-spin text-2xl">hourglass_empty</span>
+                        <p class="mt-2">Loading messages...</p>
+                    </div>
+
+                    <div *ngIf="!isLoadingChats && chats.length === 0" class="text-center text-gray-400 py-12">
+                        <span class="material-icons text-4xl">chat_bubble_outline</span>
+                        <p class="mt-2 text-lg font-medium">No messages yet. Start the conversation!</p>
+                    </div>
+
+                    <div *ngFor="let chat of chats" [ngClass]="{'justify-end': chat.sender_id === issue.user_id, 'justify-start': chat.sender_id !== issue.user_id}" class="flex">
+                        <div [ngClass]="chat.sender_id === issue.user_id ? 'bg-blue-600 text-white rounded-br-none' : 'bg-gray-200 text-gray-800 rounded-tl-none'" class="max-w-md px-4 py-3 rounded-xl shadow-md">
+                            <p class="text-xs font-bold mb-1" [ngClass]="chat.sender_id === issue.user_id ? 'text-blue-200' : 'text-gray-600'">
+                                {{ chat.sender_id === issue.user_id ? 'You' : 'Support Team' }}
+                            </p>
+                            <p class="text-sm whitespace-pre-wrap">{{ chat.message }}</p>
+                            <p class="text-xs mt-1 italic" [ngClass]="chat.sender_id === issue.user_id ? 'text-blue-300' : 'text-gray-500'">
+                                {{ formatDate(chat.sent_at) }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div *ngIf="successMessage" class="bg-green-100 border-l-4 border-green-500 text-green-700 p-3 rounded-lg text-sm mb-4 font-medium">
+                    <span class="material-icons text-lg mr-2 inline">check_circle</span>{{ successMessage }}
+                </div>
+
+                <div class="flex gap-3">
+                    <input 
+                        [(ngModel)]="newChatMessage" 
+                        (keyup.enter)="postChat()"
+                        placeholder="Type your message here..." 
+                        class="flex-1 p-3 border border-gray-300 rounded-lg text-sm transition focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <button 
+                        (click)="postChat()" 
+                        [disabled]="isPostingChat || !newChatMessage.trim()"
+                        class="px-6 py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg shadow-md transition font-bold flex items-center gap-2 text-sm">
+                        <span class="material-icons text-lg">{{ isPostingChat ? 'schedule' : 'send' }}</span>
+                        {{ isPostingChat ? 'Sending...' : 'Send Message' }}
+                    </button>
+                </div>
+            </section>
+        </div>
+    </main>
+</div>
+
+<div *ngIf="showLightbox && selectedImage" id="mediaLightbox" class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" (click)="closeLightbox()">
+    <div class="relative max-w-4xl max-h-[90vh] w-full h-full flex flex-col items-center justify-center" (click)="$event.stopPropagation()">
+        <!-- Close Button -->
+        <button (click)="closeLightbox()" class="absolute top-4 right-4 z-10 bg-white rounded-full p-2 hover:bg-gray-200 transition shadow-lg">
+            <span class="material-icons text-gray-800">close</span>
+        </button>
+
+        <!-- Image Display -->
+        <img [src]="selectedImage.image_url" [alt]="selectedImage.caption || 'Issue image'" class="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl">
+
+        <!-- Image Counter & Navigation -->
+        <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/70 text-white px-4 py-2 rounded-full text-sm font-medium">
+            {{ currentImageIndex + 1 }} of {{ images.length }}
+        </div>
+
+        <!-- Previous Button -->
+        <button 
+            *ngIf="currentImageIndex > 0"
+            (click)="prevImage()" 
+            class="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white rounded-full p-3 hover:bg-gray-200 transition shadow-lg"
+        >
+            <span class="material-icons">navigate_before</span>
+        </button>
+
+        <!-- Next Button -->
+        <button 
+            *ngIf="currentImageIndex < images.length - 1"
+            (click)="nextImage()" 
+            class="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white rounded-full p-3 hover:bg-gray-200 transition shadow-lg"
+        >
+            <span class="material-icons">navigate_next</span>
+        </button>
+
+        <!-- Download Button -->
+        <button 
+            (click)="downloadImage()" 
+            class="absolute top-16 right-4 bg-white rounded-full p-2 hover:bg-gray-200 transition shadow-lg"
+        >
+            <span class="material-icons text-gray-800">download</span>
+        </button>
+    </div>
+</div>

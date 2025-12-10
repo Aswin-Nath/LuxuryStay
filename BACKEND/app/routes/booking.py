@@ -174,6 +174,8 @@ async def get_customer_bookings(
         room_type_id=room_type_id,
         check_in_date=check_in_date_parsed,
         check_out_date=check_out_date_parsed,
+        limit=limit,
+        offset=offset,
     )
     
     return [BookingResponse.model_validate(i).model_dump(exclude={"created_at"}) for i in items]
@@ -196,7 +198,17 @@ async def get_admin_bookings(
     current_user: Users = Depends(get_current_user),
     token_payload: dict = Security(check_permission, scopes=["BOOKING:READ", "ADMIN"]),
 ):
-    items = await svc_query_bookings(db,room_type_id=room_type_id,status=status,min_price=min_price,max_price=max_price,check_in_date=check_in_date,check_out_date=check_out_date)
+    items = await svc_query_bookings(
+        db,
+        room_type_id=room_type_id,
+        status=status,
+        min_price=min_price,
+        max_price=max_price,
+        check_in_date=check_in_date,
+        check_out_date=check_out_date,
+        limit=limit,
+        offset=offset,
+    )
     return [BookingResponse.model_validate(i).model_dump(exclude={"created_at"}) for i in items]
 
 

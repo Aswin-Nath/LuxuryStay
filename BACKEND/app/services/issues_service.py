@@ -39,7 +39,7 @@ async def create_issue(
     
     Args:
         db (AsyncSession): Database session for executing queries.
-        payload (dict): Issue data including booking_id, user_id, title, description, room_id (optional).
+        payload (dict): Issue data including booking_id, user_id, title, description, room_ids (optional).
         images (Optional[List[UploadFile]]): List of image files to attach (default None).
     
     Returns:
@@ -59,7 +59,7 @@ async def create_issue(
         db,
         {
             "booking_id": payload["booking_id"],
-            "room_id": payload.get("room_id"),
+            "room_ids": payload.get("room_ids"),
             "user_id": payload["user_id"],
             "title": payload["title"],
             "description": payload["description"],
@@ -140,23 +140,56 @@ async def get_issue(db: AsyncSession, issue_id: int):
 # 🔹 LIST ISSUES
 # ==========================================================
 
-async def list_issues(db: AsyncSession, user_id: Optional[int] = None, limit: int = 50, offset: int = 0):
+async def list_issues(
+    db: AsyncSession,
+    user_id: Optional[int] = None,
+    status: Optional[str] = None,
+    room_id: Optional[int] = None,
+    search: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    sort_by: str = "recent",
+    limit: int = 50,
+    offset: int = 0,
+):
     """
-    Retrieve list of issues with pagination and optional user filtering.
+    Retrieve list of issues with advanced filtering and pagination.
     
-    Fetches issues with attached images for each one. Supports filtering by issue creator
-    (user_id) and paginated results. Each issue includes all associated image URLs.
+    Supports filtering by:
+    - user_id: Filter by issue creator (for customer list)
+    - status: OPEN, IN_PROGRESS, RESOLVED, CLOSED
+    - room_id: Filter by room ID
+    - search: Search in title and description
+    - date_from/date_to: Filter by reported_at date range
+    - sort_by: recent (default), oldest, or title
     
     Args:
         db (AsyncSession): Database session for executing queries.
-        user_id (Optional[int]): Filter issues by creator user ID (default None = all).
-        limit (int): Maximum number of issues to return (default 50).
-        offset (int): Number of issues to skip for pagination (default 0).
+        user_id (Optional[int]): Filter by issue creator user ID.
+        status (Optional[str]): Filter by status.
+        room_id (Optional[int]): Filter by room ID.
+        search (Optional[str]): Search string for title/description.
+        date_from (Optional[str]): Start date for filtering (YYYY-MM-DD).
+        date_to (Optional[str]): End date for filtering (YYYY-MM-DD).
+        sort_by (str): Sorting preference (recent, oldest, title).
+        limit (int): Maximum number of issues to return.
+        offset (int): Pagination offset.
     
     Returns:
-        list: List of issue records, each with images list populated in __dict__["images"].
+        list: List of issue records with images populated.
     """
-    items = await list_issues_records(db, user_id, limit, offset)
+    items = await list_issues_records(
+        db,
+        user_id=user_id,
+        status=status,
+        room_id=room_id,
+        search=search,
+        date_from=date_from,
+        date_to=date_to,
+        sort_by=sort_by,
+        limit=limit,
+        offset=offset,
+    )
     for issue in items:
         imgs = await get_issue_images(db, issue.issue_id)
         issue.__dict__["images"] = imgs

@@ -25,7 +25,7 @@ class Issues(Base):
 
 	issue_id = Column(Integer, primary_key=True, autoincrement=True)
 	booking_id = Column(Integer, ForeignKey("bookings.booking_id", ondelete="RESTRICT"), index=True, nullable=False)
-	room_id = Column(Integer, ForeignKey("rooms.room_id"), index=True, nullable=True)
+	room_ids = Column(JSONB, server_default="[]")  # Array of room IDs
 	user_id = Column(Integer, ForeignKey("users.user_id"), index=True, nullable=False)
 	title = Column(String(200), nullable=False)
 	description = Column(Text, nullable=False)

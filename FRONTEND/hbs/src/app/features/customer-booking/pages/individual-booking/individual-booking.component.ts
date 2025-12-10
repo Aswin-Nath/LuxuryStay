@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { BookingsService, BookingResponse } from '../../../../shared/services/bookings.service';
 import { ReviewsService, Review } from '../../../../services/reviews.service';
+import { IssuesService } from '../../../../services/issues.service';
 import { CustomerNavbarComponent } from '../../../../layout/Customer/customer-navbar/customer-navbar.component';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -43,6 +44,8 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
   issueTitle: string = '';
   issueDescription: string = '';
   selectedImages: any[] = [];
+  selectedRoomIds: number[] = [];
+  isSubmittingIssue: boolean = false;
   previousPage="bookings";
   // Cancel properties
   cancellationReason: string = '';
@@ -52,6 +55,7 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
   constructor(
     private bookingsService: BookingsService,
     private reviewsService: ReviewsService,
+    private issuesService: IssuesService,
     private route: ActivatedRoute,
     private router: Router
   ) {
@@ -550,6 +554,7 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
     this.issueTitle = '';
     this.issueDescription = '';
     this.selectedImages = [];
+    this.selectedRoomIds = [];
   }
 
   onImageSelect(event: any): void {
@@ -559,7 +564,8 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
       reader.onload = (e: any) => {
         this.selectedImages.push({
           name: file.name,
-          preview: e.target.result
+          preview: e.target.result,
+          file: file  // Store the actual File object
         });
       };
       reader.readAsDataURL(file);
@@ -576,15 +582,73 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
       return;
     }
 
-    console.log('Issue submitted:', {
-      title: this.issueTitle,
-      description: this.issueDescription,
-      images: this.selectedImages,
-      bookingId: this.booking?.booking_id
-    });
+    if (!this.selectedRoomIds || this.selectedRoomIds.length === 0) {
+      this.showToast('Please select at least one room', 'error');
+      return;
+    }
 
+    this.isSubmittingIssue = true;
+
+    const issuePayload = {
+      booking_id: this.booking?.booking_id || 0,
+      room_ids: this.selectedRoomIds,
+      title: this.issueTitle,
+      description: this.issueDescription
+    };
+
+    // Create issue first (without images)
+    this.issuesService.createIssue(issuePayload)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response) => {
+          // After issue creation, upload images if any
+          if (this.selectedImages.length > 0) {
+            this.uploadIssuImages(response.issue_id);
+          } else {
+            this.handleIssueCreationSuccess();
+          }
+        },
+        error: (error) => {
+          this.isSubmittingIssue = false;
+          console.error('Error submitting issue:', error);
+          this.showToast('Failed to submit issue. Please try again.', 'error');
+        }
+      });
+  }
+
+  uploadIssuImages(issueId: number): void {
+    if (this.selectedImages.length === 0) {
+      this.handleIssueCreationSuccess();
+      return;
+    }
+
+    // Extract file objects from selectedImages
+    const files = this.selectedImages.map(img => img.file).filter(f => f);
+
+    this.issuesService.uploadIssueImages(issueId, files)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.handleIssueCreationSuccess();
+        },
+        error: (error) => {
+          console.error('Error uploading images:', error);
+          // Still show success for issue creation even if images fail
+          this.handleIssueCreationSuccess(true);
+        }
+      });
+  }
+
+  private handleIssueCreationSuccess(imageUploadWarning: boolean = false): void {
+    this.isSubmittingIssue = false;
+    if (imageUploadWarning) {
+      this.showToast('Issue created! However, image upload encountered an issue.', 'error');
+    } else {
+      this.showToast('Issue reported successfully! We will contact you soon.', 'success');
+    }
     this.closeRaiseIssueModal();
-    this.showToast('Issue reported successfully! We will contact you soon.', 'success');
+    // Reload booking details to show new issue
+    this.loadBookingDetails();
   }
 
   // ✅ Cancel Booking Methods

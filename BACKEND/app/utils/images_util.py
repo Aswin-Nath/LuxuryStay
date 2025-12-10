@@ -155,6 +155,58 @@ async def hard_delete_image(db: AsyncSession, image_id: int, requester_id: int |
     await db.commit()
 
 
+async def soft_delete_image(db: AsyncSession, image_id: int) -> None:
+    """Soft delete an image by setting is_deleted=True.
+    
+    This marks the image as deleted without removing the DB row, preserving audit trails
+    and relationships. Used for customer-initiated deletions from issues/reviews.
+    
+    Args:
+        db: AsyncSession
+        image_id: ID of image to soft delete
+    
+    Raises:
+        HTTPException (404): If image not found
+    """
+    query = await db.execute(select(Images).where(Images.image_id == image_id))
+    image_record = query.scalars().first()
+    if not image_record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+
+    image_record.is_deleted = True
+    db.add(image_record)
+    await db.commit()
+
+
+async def get_image_by_id(db: AsyncSession, image_id: int) -> Optional[Images]:
+    """Fetch a single image by ID (including deleted)."""
+    query = await db.execute(select(Images).where(Images.image_id == image_id))
+    return query.scalars().first()
+
+
+async def get_image_by_id_and_entity(db: AsyncSession, image_id: int, entity_type: str, entity_id: int) -> Optional[Images]:
+    """Fetch an image by ID and verify it belongs to the given entity.
+    
+    Args:
+        db: AsyncSession
+        image_id: ID of image to fetch
+        entity_type: Type of entity (e.g., "issue", "review")
+        entity_id: ID of the entity
+    
+    Returns:
+        Images record or None if not found or doesn't belong to entity
+    """
+    query = await db.execute(
+        select(Images).where(
+            Images.image_id == image_id,
+            Images.entity_type == entity_type,
+            Images.entity_id == entity_id
+        )
+    )
+    return query.scalars().first()
+
+
+
 async def set_image_primary(db: AsyncSession, image_id: Optional[int] = None, requester_id: int | None = None, offer_id: Optional[int] = None) -> None:
     """Mark the given image as primary for its entity (unset others).
 

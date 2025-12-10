@@ -203,16 +203,16 @@
         </div>
 
         <!-- Pagination -->
-        <div *ngIf="totalPages > 1" class="px-4 py-4 border-t bg-gray-50 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div *ngIf="!isLoading && totalRecords > 0" class="px-4 py-4 border-t bg-gray-50 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div class="text-sm text-gray-600">
-            Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPage * itemsPerPage, totalItems) }} of {{ totalItems }} results
+            Showing {{ (currentPage - 1) * pageSize + 1 }} to {{ Math.min(currentPage * pageSize, totalRecords) }} of {{ totalRecords }} results
           </div>
           
           <div class="flex items-center gap-2">
             <!-- Items per page -->
             <select
-              [(ngModel)]="itemsPerPage"
-              (change)="onPageSizeChange()"
+              [(ngModel)]="pageSize"
+              (change)="changePageSize(pageSize)"
               class="px-3 py-1 border rounded text-sm"
             >
               <option *ngFor="let size of pageSizeOptions" [value]="size">{{ size }} per page</option>
