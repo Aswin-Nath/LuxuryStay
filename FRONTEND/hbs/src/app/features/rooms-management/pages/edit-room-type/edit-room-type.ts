@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { RoomsService } from '../../../../shared/services/rooms.service';
+import { RoomsService } from '../../../../services/room-management.service';
 import { AdminNavbarComponent } from '../../../../layout/Admin/admin-navbar/admin-navbar.component';
 import { AdminSidebarComponent } from '../../../../layout/Admin/admin-sidebar/admin-sidebar.component';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';

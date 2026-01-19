@@ -16,17 +16,18 @@
   <!-- Desktop Nav -->
   <nav class="hidden md:flex space-x-9 font-medium text-sm sm:text-base">
     <a routerLink="/home" routerLinkActive="text-yellow-600" class="hover:text-yellow-600">Home</a>
-    <a (click)="navigateOrScroll('/rooms', 'rooms')" class="cursor-pointer hover:text-yellow-600">Rooms</a>
-    <a (click)="navigateOrScroll('/offers', 'offers')" class="cursor-pointer hover:text-yellow-600">Offers</a>
-    <a (click)="navigateOrScroll('/facilities', 'facilities')" class="cursor-pointer hover:text-yellow-600">Facilities</a>
-    <a *ngIf="isLoggedIn$ | async" routerLink="/faqs" routerLinkActive="text-yellow-600" class="cursor-pointer hover:text-yellow-600">FAQs</a>
-    <a (click)="navigateOrScroll('/destinations', 'destinations')" class="cursor-pointer hover:text-yellow-600">Destinations</a>
+    <a routerLink="/rooms" routerLinkActive="text-yellow-600" class="cursor-pointer hover:text-yellow-600">Rooms</a>
+    <a routerLink="/offers" routerLinkActive="text-yellow-600" class="cursor-pointer hover:text-yellow-600">Offers</a>
+    <a routerLink="/facilities" routerLinkActive="text-yellow-600" class="cursor-pointer hover:text-yellow-600">Facilities</a>
+    <a routerLink="/faqs" routerLinkActive="text-yellow-600" class="cursor-pointer hover:text-yellow-600">FAQs</a>
+    <a routerLink="/destinations" routerLinkActive="text-yellow-600" class="cursor-pointer hover:text-yellow-600">Destinations</a>
   </nav>
 
   <!-- Desktop Buttons -->
   <div class="hidden md:flex items-center space-x-3 text-sm sm:text-base relative">
     <!-- When User is Logged In -->
-    <ng-container *ngIf="isLoggedIn$ | async; else notLoggedIn">
+    <!-- Use fallback direct check as primary, observable as secondary -->
+    <ng-container *ngIf="isLoggedInDirect || (isLoggedIn$ | async); else notLoggedIn">
       <!-- Book Now -->
       <button (click)="openBookingModal()"
         class="text-center px-4 py-2 bg-linear-to-r from-yellow-500 to-red-500 text-white font-medium rounded-lg hover:opacity-90 transition glow-btn cursor-pointer">
@@ -121,16 +122,16 @@
   [class.overflow-hidden]="!isMobileMenuOpen" [class.py-4]="isMobileMenuOpen">
 
   <a routerLink="/home" routerLinkActive="text-yellow-600" class="hover:text-yellow-600">Home</a>
-  <a (click)="navigateOrScroll('/rooms', 'rooms')" class="cursor-pointer hover:text-yellow-600">Rooms</a>
-  <a (click)="navigateOrScroll('/offers', 'offers')" class="cursor-pointer hover:text-yellow-600">Offers</a>
-  <a (click)="navigateOrScroll('/facilities', 'facilities')" class="cursor-pointer hover:text-yellow-600">Facilities</a>
-  <a *ngIf="isLoggedIn$ | async" routerLink="/faqs" routerLinkActive="text-yellow-600" class="cursor-pointer hover:text-yellow-600">FAQs</a>
-  <a (click)="navigateOrScroll('/destinations', 'destinations')" class="cursor-pointer hover:text-yellow-600">Destinations</a>
+  <a routerLink="/rooms" routerLinkActive="text-yellow-600" class="cursor-pointer hover:text-yellow-600">Rooms</a>
+  <a routerLink="/offers" routerLinkActive="text-yellow-600" class="cursor-pointer hover:text-yellow-600">Offers</a>
+  <a routerLink="/facilities" routerLinkActive="text-yellow-600" class="cursor-pointer hover:text-yellow-600">Facilities</a>
+  <a *ngIf="isLoggedInDirect || (isLoggedIn$ | async)" routerLink="/faqs" routerLinkActive="text-yellow-600" class="cursor-pointer hover:text-yellow-600">FAQs</a>
+  <a routerLink="/destinations" routerLinkActive="text-yellow-600" class="cursor-pointer hover:text-yellow-600">Destinations</a>
 
   <!-- Mobile Buttons -->
   <div class="flex flex-col space-y-2 pt-2">
     <!-- When User is Logged In -->
-    <ng-container *ngIf="isLoggedIn$ | async; else notLoggedInMobile">
+    <ng-container *ngIf="isLoggedInDirect || (isLoggedIn$ | async); else notLoggedInMobile">
       <!-- Book Now -->
       <button (click)="openBookingModal()"
         class="text-center px-4 py-2 bg-linear-to-r from-yellow-500 to-red-500 text-white font-medium rounded-lg hover:opacity-90 transition glow-btn">

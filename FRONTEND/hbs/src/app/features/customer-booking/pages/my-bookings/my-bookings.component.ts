@@ -2,8 +2,8 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
-import { BookingsService, BookingResponse, PaginatedBookingResponse } from '../../../../shared/services/bookings.service';
-import { RoomsService, RoomType } from '../../../../shared/services/rooms.service';
+import { BookingService, BookingResponse, PaginatedBookingResponse } from '../../../../services/room-booking.service';
+import { RoomsService, RoomType } from '../../../../services/room-management.service';
 import { CustomerNavbarComponent } from '../../../../layout/Customer/customer-navbar/customer-navbar.component';
 import { Subject } from 'rxjs';
 import { CustomerSidebarComponent } from '../../../../layout/Customer/customer-sidebar/customer-sidebar.component';
@@ -49,7 +49,7 @@ export class MyBookingsComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
 
   constructor(
-    private bookingsService: BookingsService,
+    private bookingService: BookingService,
     private roomsService: RoomsService,
     private router: Router
   ) {}
@@ -68,7 +68,7 @@ export class MyBookingsComponent implements OnInit, OnDestroy {
   // Load booking statuses from backend
   loadStatuses(): void {
     this.isLoadingStatuses = true;
-    this.bookingsService
+    this.bookingService
       .getBookingStatuses()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
@@ -109,7 +109,7 @@ export class MyBookingsComponent implements OnInit, OnDestroy {
 
     const offset = (this.currentPage - 1) * this.itemsPerPage;
 
-    this.bookingsService
+    this.bookingService
       .getCustomerBookings(
         this.selectedStatus || undefined,
         this.itemsPerPage,

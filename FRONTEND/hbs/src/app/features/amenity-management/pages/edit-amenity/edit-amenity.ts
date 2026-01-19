@@ -1,7 +1,7 @@
 import { Component, Input, Output, EventEmitter, OnInit, OnChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RoomsService } from '../../../../shared/services/rooms.service';
+import { RoomsService } from '../../../../services/room-management.service';
 
 @Component({
   selector: 'app-edit-amenity',

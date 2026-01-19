@@ -403,11 +403,14 @@ async def refresh_access_token(db: AsyncSession, access_token_value: str):
     """
 
     # Step 1: Decode access token and extract user
+    # NOTE: During refresh, we decode without expiration validation because
+    # expired tokens are expected. The whole point of refresh is to get a new token
+    # when the old one expired. We'll validate the refresh token (7-day TTL) instead.
     try:
-        payload = jwt.decode(access_token_value, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(access_token_value, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_exp": False})
         user_id = int(payload.get("sub"))
-    except JWTError:
-        raise Exception("Invalid access_token")
+    except JWTError as e:
+        raise Exception(f"Invalid access_token: {str(e)}")
 
     # Step 2: Find session linked to this access token
     result = await db.execute(

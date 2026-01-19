@@ -4,11 +4,9 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-
-import { OfferBookingService, OfferRoomDetail } from '../../../../services/offer-booking.service';
-import { SharedOfferBookingService, OfferBookingState } from '../../../../shared/services/shared-offer-booking.service';
+import { OfferRoomDetail, OfferService, OfferBookingState } from '../../../../services/offer.service';
 import { ToastService } from '../../../../shared/services/toast.service';
-import { BookingService } from '../../../../shared/services/booking.service';
+import { BookingService } from '../../../../services/room-booking.service';
 
 /**
  * OfferBookingComponent
@@ -73,8 +71,7 @@ export class OfferBookingComponent implements OnInit, OnDestroy {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private offerBookingService: OfferBookingService,
-    private sharedOfferBookingService: SharedOfferBookingService,
+    private offerService: OfferService,
     private toastService: ToastService,
     private bookingService: BookingService,
     private cdr: ChangeDetectorRef
@@ -95,16 +92,16 @@ export class OfferBookingComponent implements OnInit, OnDestroy {
     const navigation = this.router.getCurrentNavigation();
     if (navigation?.extras?.state?.['lockedRoomsData']) {
       const lockedData = navigation.extras.state['lockedRoomsData'];
-      this.sharedOfferBookingService.initializeOfferBooking(lockedData);
+      this.offerService.initializeOfferBooking(lockedData);
       
       // Initialize timer with the locked data's expiration time
       if (lockedData.expires_at) {
-        this.offerBookingService.initializeTimerWithExpiration(lockedData.expires_at);
+        this.offerService.initializeTimerWithExpiration(lockedData.expires_at);
       }
     }
 
     // 🎯 SUBSCRIBE TO REMAINING TIME - EXACTLY SAME AS T-COMPONENT
-    this.offerBookingService.remainingTime$.pipe(
+    this.offerService.remainingTime$.pipe(
       takeUntil(this.destroy$)
     ).subscribe(seconds => {
       // Update timer display properties
@@ -130,7 +127,7 @@ export class OfferBookingComponent implements OnInit, OnDestroy {
     });
 
     // Subscribe to shared booking state
-    this.sharedOfferBookingService.getOfferBookingState$()
+    this.offerService.getOfferBookingState$()
       .pipe(takeUntil(this.destroy$))
       .subscribe(state => {
         this.offerSession = state;
@@ -241,7 +238,7 @@ export class OfferBookingComponent implements OnInit, OnDestroy {
 
     // Update shared state with guest details
     const guestDetails = Array.from(this.guestDetailsPerRoom.values());
-    this.sharedOfferBookingService.updateGuestDetails(guestDetails);
+    this.offerService.updateGuestDetails(guestDetails);
 
     this.currentPhase = 'payments';
     this.toastService.success('✅ Guest details saved!');
@@ -257,7 +254,7 @@ export class OfferBookingComponent implements OnInit, OnDestroy {
    */
   selectPaymentMethod(methodId: number): void {
     this.selectedPaymentMethod = methodId;
-    this.sharedOfferBookingService.updatePaymentMethod(methodId);
+    this.offerService.updatePaymentMethod(methodId);
     this.cdr.markForCheck();
   }
 
@@ -270,7 +267,7 @@ export class OfferBookingComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (!this.sharedOfferBookingService.isReadyForConfirmation()) {
+    if (!this.offerService.isReadyForConfirmation()) {
       this.toastService.error('Booking is not ready. Please fill all required fields.');
       return;
     }
@@ -279,7 +276,7 @@ export class OfferBookingComponent implements OnInit, OnDestroy {
     this.paymentError = '';
     this.cdr.markForCheck();
 
-    const state = this.sharedOfferBookingService.getCurrentState();
+    const state = this.offerService.getCurrentState();
     const guestDetails = state.guest_details.map((detail: any) => ({
       lock_id: detail.lock_id,
       guest_name: detail.adultName,
@@ -289,7 +286,7 @@ export class OfferBookingComponent implements OnInit, OnDestroy {
       special_requests: detail.specialRequests
     }));
 
-    this.offerBookingService.confirmOfferBooking(
+    this.offerService.confirmOfferBooking(
       state.offer_id,
       this.selectedPaymentMethod!,
       guestDetails
@@ -306,7 +303,7 @@ export class OfferBookingComponent implements OnInit, OnDestroy {
         this.currentPhase = 'confirmation';
 
         // Store confirmation details
-        this.sharedOfferBookingService.markConfirmed();
+        this.offerService.markConfirmed();
 
         this.cdr.markForCheck();
       },
@@ -455,10 +452,10 @@ export class OfferBookingComponent implements OnInit, OnDestroy {
   stopBooking(): void {
     if (confirm('Are you sure you want to cancel this booking? Your room locks will be released.')) {
       // Release locks on backend
-      this.offerBookingService.releaseOfferLocks(this.offerId).subscribe({
+      this.offerService.releaseOfferLocks(this.offerId).subscribe({
         next: () => {
           this.toastService.success('✅ Booking cancelled and rooms released');
-          this.sharedOfferBookingService.resetOfferBooking();
+          this.offerService.resetOfferBooking();
           this.guestDetailsPerRoom.clear();
           this.router.navigate(['/offers']);
         },
@@ -503,7 +500,7 @@ export class OfferBookingComponent implements OnInit, OnDestroy {
    */
   private onSessionExpired(): void {
     alert('❌ Your offer booking session has expired. Please start over.');
-    this.offerBookingService.releaseOfferLocks(this.offerId).subscribe({
+    this.offerService.releaseOfferLocks(this.offerId).subscribe({
       next: () => {
         console.log('🔓 Locks released due to session expiry');
         this.router.navigate(['/offers']);

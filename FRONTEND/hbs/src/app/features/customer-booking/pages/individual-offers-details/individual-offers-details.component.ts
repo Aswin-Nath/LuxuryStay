@@ -6,10 +6,9 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { CustomerNavbarComponent } from '../../../../layout/Customer/customer-navbar/customer-navbar.component';
 import { OfferService } from '../../../../services/offer.service';
+
 import { ImageService } from '../../../../shared/services/image.service';
-import { ReviewsService, Review } from '../../../../services/reviews.service';
-import { WishlistService } from '../../../../services/wishlist.service';
-import { BookingStateService } from '../../../../shared/services/booking-state.service';
+import {  Review } from '../../../../services/reviews.service';
 import { OfferDatePickerModalComponent } from '../../../../shared/components/offer-date-picker-modal/offer-date-picker-modal.component';
 
 interface OfferDetail {
@@ -57,9 +56,6 @@ export class CustomerOfferDetailComponent implements OnInit, OnDestroy {
     public router: Router,
     private offerService: OfferService,
     private imageService: ImageService,
-    private reviewsService: ReviewsService,
-    private wishlistService: WishlistService,
-    private bookingStateService: BookingStateService
   ) {
     const navigation = this.router.getCurrentNavigation();
     this.previousPage = navigation?.extras?.state?.['from'] || 'offers';

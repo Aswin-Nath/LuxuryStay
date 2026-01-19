@@ -6,7 +6,7 @@ import asyncio
 
 from app.middlewares.logging_middleware import LoggingMiddleware
 from app.middlewares.error_handler_middleware import ErrorHandlerMiddleware
-
+from app.middlewares.logging_middleware import LoggingMiddleware
 from app.routes.roles_and_permissions import roles_and_permissions_router
 from app.routes.authentication import auth_router
 from app.routes.rooms import router as room_management_router

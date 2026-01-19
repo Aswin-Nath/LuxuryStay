@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { BookingsService, BookingResponse, BookingRoomMapResponse } from '../../../../shared/services/bookings.service';
+import { BookingService, BookingResponse, BookingRoomMapResponse } from '../../../../services/room-booking.service';
 import { ReviewsService, Review } from '../../../../services/reviews.service';
 import { AdminNavbarComponent } from '../../../../layout/Admin/admin-navbar/admin-navbar.component';
 import { AdminSidebarComponent } from '../../../../layout/Admin/admin-sidebar/admin-sidebar.component';
@@ -38,7 +38,7 @@ export class AdminBookingDetailsComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
 
   constructor(
-    private bookingsService: BookingsService,
+    private bookingService: BookingService,
     private reviewsService: ReviewsService,
     private route: ActivatedRoute,
     private router: Router
@@ -72,7 +72,7 @@ getRoomTypePrice(roomTypeId: number): number | null {
     this.error = '';
 
     // Load room types first
-    this.bookingsService
+    this.bookingService
       .getRoomTypes()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
@@ -90,7 +90,7 @@ getRoomTypePrice(roomTypeId: number): number | null {
   }
 
   private loadBookingWithDetails(): void {
-    this.bookingsService
+    this.bookingService
       .getAdminBookingDetails(this.bookingId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
@@ -125,7 +125,7 @@ getRoomTypePrice(roomTypeId: number): number | null {
     if (!this.booking) return;
 
     // Call the payments endpoint to get booking payments
-    this.bookingsService
+    this.bookingService
       .getPaymentsByBooking(this.bookingId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
@@ -170,7 +170,7 @@ getRoomTypePrice(roomTypeId: number): number | null {
   private loadIssues(): void {
     if (!this.bookingId) return;
     
-    this.bookingsService
+    this.bookingService
       .getIssuesByBooking(this.bookingId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({

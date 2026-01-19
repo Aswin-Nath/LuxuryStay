@@ -1,0 +1,136 @@
+<ng-container *ngIf="loading" class="flex justify-center items-center p-8 min-h-screen">
+  <div class="text-center">
+    <div class="spinner-border animate-spin inline-block w-8 h-8 border-4 rounded-full" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <p class="mt-4 text-gray-600">Loading refund details...</p>
+  </div>
+</ng-container>
+
+<ng-container *ngIf="!loading && error" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+  <p class="text-red-700 font-semibold">{{ error }}</p>
+  <button
+    (click)="goBack()"
+    class="mt-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+  >
+    Go Back
+  </button>
+</ng-container>
+
+<ng-container *ngIf="!loading && !error && refund">
+  <!-- ✅ Header -->
+  <div class="mb-6 flex items-center justify-between">
+    <div>
+      <h1 class="text-3xl font-bold text-gray-800">Refund #{{ refund.refund_id }}</h1>
+      <p class="text-gray-600 mt-2">View detailed refund information</p>
+    </div>
+    <button
+      (click)="goBack()"
+      class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2"
+    >
+      <span class="material-icons">arrow_back</span>
+      Back
+    </button>
+  </div>
+
+  <!-- ✅ Main Info Card -->
+  <div class="bg-white shadow-lg border border-gray-200 rounded-xl p-6 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- Left Column -->
+      <div class="space-y-4">
+        <!-- Status -->
+        <div>
+          <label class="text-sm font-medium text-gray-600">Current Status</label>
+          <div class="mt-2">
+            <span [ngClass]="getStatusColor(refund.status)" class="px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 w-fit">
+              <span class="material-icons text-base">{{ getStatusIcon(refund.status) }}</span>
+              {{ refund.status }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Refund Amount -->
+        <div>
+          <label class="text-sm font-medium text-gray-600">Refund Amount</label>
+          <p class="mt-2 text-3xl font-bold text-green-600">{{ formatCurrency(refund.refund_amount) }}</p>
+        </div>
+
+        <!-- Type -->
+        <div>
+          <label class="text-sm font-medium text-gray-600">Refund Type</label>
+          <p class="mt-2 text-gray-900">{{ getTypeLabel(refund.type) }}</p>
+        </div>
+
+        <!-- Associated Booking -->
+        <div>
+          <label class="text-sm font-medium text-gray-600">Associated Booking</label>
+          <p class="mt-2 text-gray-900">
+            <span class="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-lg font-medium">
+              BK-{{ refund.booking_id }}
+            </span>
+          </p>
+        </div>
+      </div>
+
+      <!-- Right Column -->
+      <div class="space-y-4">
+        <!-- Initiated Date -->
+        <div>
+          <label class="text-sm font-medium text-gray-600">Initiated On</label>
+          <p class="mt-2 text-gray-900">{{ formatDateTime(refund.initiated_at) }}</p>
+        </div>
+
+        <!-- Processed Date -->
+        <div>
+          <label class="text-sm font-medium text-gray-600">Processed On</label>
+          <p class="mt-2 text-gray-900">
+            {{ refund.processed_at ? formatDateTime(refund.processed_at) : 'Pending' }}
+          </p>
+        </div>
+
+        <!-- Completed Date -->
+        <div>
+          <label class="text-sm font-medium text-gray-600">Completed On</label>
+          <p class="mt-2 text-gray-900">
+            {{ refund.completed_at ? formatDateTime(refund.completed_at) : 'Pending' }}
+          </p>
+        </div>
+
+        <!-- Full Cancellation -->
+        <div>
+          <label class="text-sm font-medium text-gray-600">Full Cancellation</label>
+          <p class="mt-2">
+            <span *ngIf="refund.full_cancellation" class="inline-block px-3 py-1 bg-green-100 text-green-800 rounded-lg text-sm font-medium">
+              <span class="material-icons text-base">check_circle</span>
+              Yes
+            </span>
+            <span *ngIf="!refund.full_cancellation" class="inline-block px-3 py-1 bg-gray-100 text-gray-800 rounded-lg text-sm font-medium">
+              <span class="material-icons text-base">close</span>
+              No
+            </span>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✅ Remarks Section -->
+  <div *ngIf="refund.remarks" class="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
+    <h3 class="text-lg font-semibold text-gray-800 mb-3">Remarks</h3>
+    <p class="text-gray-700">{{ refund.remarks }}</p>
+  </div>
+
+  <!-- ✅ Help Section -->
+  <div class="bg-blue-50 border border-blue-200 rounded-xl p-6">
+    <h3 class="text-lg font-semibold text-gray-800 mb-3">Need Help?</h3>
+    <p class="text-gray-700 mb-3">
+      If you have questions about your refund or need assistance, please contact our support team.
+    </p>
+    <button
+      class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
+    >
+      <span class="material-icons">help</span>
+      Contact Support
+    </button>
+  </div>
+</ng-container>

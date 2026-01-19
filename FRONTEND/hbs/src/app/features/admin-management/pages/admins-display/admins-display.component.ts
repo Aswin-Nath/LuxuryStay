@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
 import { AdminNavbarComponent } from '../../../../layout/Admin/admin-navbar/admin-navbar.component';
 import { AdminSidebarComponent } from '../../../../layout/Admin/admin-sidebar/admin-sidebar.component';
-import { AdminManagementService, AdminUser, Role } from '../../../../services/admin-management.service';
+import { AuthenticationService, AdminUser, Role } from '../../../../services/authentication.service';
 // import { AdminFormModalComponent } from '../users-management/admin-form-modal.component';
 // import { AdminFormModalComponent } from '../admin-addition.component';
 import { AdminFormModalComponent } from '../admin-addition/admin-addition.component';
@@ -54,7 +54,7 @@ export class AdminManagementComponent implements OnInit {
   successMessage = '';
 
   constructor(
-    private adminService: AdminManagementService,
+    private adminService: AuthenticationService,
     private router: Router
   ) {}
 

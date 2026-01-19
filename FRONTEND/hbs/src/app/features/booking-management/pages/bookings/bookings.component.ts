@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { BookingsService, BookingResponse, PaginatedBookingResponse } from '../../../../shared/services/bookings.service';
+import { BookingService,BookingResponse, PaginatedBookingResponse } from '../../../../services/room-booking.service';
 import { AdminNavbarComponent } from '../../../../layout/Admin/admin-navbar/admin-navbar.component';
 import { AdminSidebarComponent } from '../../../../layout/Admin/admin-sidebar/admin-sidebar.component';
 
@@ -44,7 +44,7 @@ export class AdminBookingsComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
 
   constructor(
-    private bookingsService: BookingsService,
+    private bookingService: BookingService,
     private router: Router
   ) {}
 
@@ -65,7 +65,7 @@ export class AdminBookingsComponent implements OnInit, OnDestroy {
     const offset = (this.currentPage - 1) * this.bookingsPerPage;
 
     // Call API to get all bookings (admin view)
-    this.bookingsService
+    this.bookingService
       .getAdminBookings(
         this.filterStatus !== 'all' ? this.filterStatus : undefined,
         this.bookingsPerPage,
@@ -93,7 +93,7 @@ export class AdminBookingsComponent implements OnInit, OnDestroy {
   }
 
   loadRoomTypes(): void {
-    this.bookingsService
+    this.bookingService
       .getRoomTypes()
       .pipe(takeUntil(this.destroy$))
       .subscribe({

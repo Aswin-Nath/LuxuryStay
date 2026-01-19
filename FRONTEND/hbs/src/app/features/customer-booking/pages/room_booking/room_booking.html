@@ -18,9 +18,6 @@
           <div [ngClass]="'text-4xl font-black font-mono ' + timerColor + ' transition-all'">
             {{ getTimerDisplay() }}
           </div>
-          <p class="text-xs text-gray-500 mt-1" [ngClass]="remainingMinutes <= 2 ? 'text-red-500' : ''">
-            {{ remainingMinutes <= 2 ? '⚠️ Hurry!' : '⏱️ ' + remainingMinutes + ' min left' }}
-          </p>
         </div>
 
         <!-- BACK BUTTON (Available in all phases except dates) -->

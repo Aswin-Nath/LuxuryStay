@@ -11,7 +11,7 @@ import { CustomerNavbarComponent } from "../../../../layout/Customer/customer-na
 @Component({
   selector: 'app-edit-issue',
   standalone: true,
-  imports: [CommonModule, FormsModule, CustomerSidebarComponent, CustomerNavbarComponent],
+  imports: [CommonModule, FormsModule, CustomerNavbarComponent],
   templateUrl: './edit-issue.component.html',
   styleUrls: ['./edit-issue.component.css']
 })

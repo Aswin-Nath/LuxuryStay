@@ -1,0 +1,207 @@
+<div class="min-h-screen bg-gray-50 p-8">
+  <!-- ✅ Header -->
+  <div class="mb-8">
+    <button
+      (click)="goBack()"
+      class="text-yellow-600 hover:text-yellow-700 font-medium mb-4 flex items-center gap-2"
+    >
+      <span class="material-icons text-sm">arrow_back</span>
+      Back to Refunds
+    </button>
+    <h1 class="text-3xl font-bold text-gray-800">Refund Details</h1>
+  </div>
+
+  <!-- ✅ Loading State -->
+  <div *ngIf="loading" class="flex justify-center items-center p-8">
+    <div class="text-center">
+      <div class="inline-block w-12 h-12 border-4 border-yellow-600 border-t-transparent rounded-full animate-spin"></div>
+      <p class="mt-4 text-gray-600">Loading refund details...</p>
+    </div>
+  </div>
+
+  <!-- ✅ Error State -->
+  <div *ngIf="!loading && error" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+    <p class="text-red-700 font-semibold">{{ error }}</p>
+    <button
+      (click)="loadRefund(refund?.refund_id || 0)"
+      class="mt-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+    >
+      Try Again
+    </button>
+  </div>
+
+  <!-- ✅ Refund Details -->
+  <div *ngIf="!loading && !error && refund" class="max-w-4xl mx-auto space-y-6">
+    <!-- Main Card -->
+    <div class="bg-white rounded-lg shadow-lg p-8 border-l-4 border-yellow-600">
+      <!-- Status Badge -->
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-2xl font-bold text-gray-800">Refund #{{ refund.refund_id }}</h2>
+        <span
+          [class]="'px-4 py-2 rounded-full font-semibold text-sm flex items-center gap-2 ' + getStatusColor(refund.status)"
+        >
+          <span class="material-icons text-base">{{ getStatusIcon(refund.status) }}</span>
+          {{ refund.status }}
+        </span>
+      </div>
+
+      <!-- Refund Basics -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div>
+          <label class="block text-gray-600 text-sm font-medium mb-1">Refund ID</label>
+          <p class="text-lg font-semibold text-gray-800">{{ refund.refund_id }}</p>
+        </div>
+        <div>
+          <label class="block text-gray-600 text-sm font-medium mb-1">Booking ID</label>
+          <p class="text-lg font-semibold text-gray-800">{{ refund.booking_id }}</p>
+        </div>
+        <div>
+          <label class="block text-gray-600 text-sm font-medium mb-1">Refund Type</label>
+          <p class="text-lg font-semibold text-gray-800">{{ getTypeLabel(refund.type) }}</p>
+        </div>
+        <div>
+          <label class="block text-gray-600 text-sm font-medium mb-1">Refund Amount</label>
+          <p class="text-2xl font-bold text-green-600">{{ formatCurrency(refund.refund_amount) }}</p>
+        </div>
+        <div>
+          <label class="block text-gray-600 text-sm font-medium mb-1">User ID</label>
+          <p class="text-lg font-semibold text-gray-800">{{ refund.user_id }}</p>
+        </div>
+        <div>
+          <label class="block text-gray-600 text-sm font-medium mb-1">Full Cancellation</label>
+          <p class="text-lg">
+            <span *ngIf="refund.full_cancellation" class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
+              Yes
+            </span>
+            <span *ngIf="!refund.full_cancellation" class="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm">
+              No
+            </span>
+          </p>
+        </div>
+      </div>
+
+      <!-- Timeline -->
+      <div class="bg-gray-50 rounded-lg p-6 mb-8">
+        <h3 class="text-lg font-bold text-gray-800 mb-4">Timeline</h3>
+        <div class="space-y-4">
+          <div class="flex items-start gap-4">
+            <div class="w-3 h-3 bg-blue-600 rounded-full mt-2"></div>
+            <div>
+              <label class="block text-gray-600 text-sm font-medium">Initiated At</label>
+              <p class="text-gray-800 font-semibold">{{ formatDateTime(refund.initiated_at) }}</p>
+            </div>
+          </div>
+          <div *ngIf="refund.processed_at" class="flex items-start gap-4">
+            <div class="w-3 h-3 bg-yellow-600 rounded-full mt-2"></div>
+            <div>
+              <label class="block text-gray-600 text-sm font-medium">Processed At</label>
+              <p class="text-gray-800 font-semibold">{{ formatDateTime(refund.processed_at) }}</p>
+            </div>
+          </div>
+          <div *ngIf="refund.completed_at" class="flex items-start gap-4">
+            <div class="w-3 h-3 bg-green-600 rounded-full mt-2"></div>
+            <div>
+              <label class="block text-gray-600 text-sm font-medium">Completed At</label>
+              <p class="text-gray-800 font-semibold">{{ formatDateTime(refund.completed_at) }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Transaction Details -->
+      <div class="bg-blue-50 rounded-lg p-6 mb-8 border-l-4 border-blue-600">
+        <h3 class="text-lg font-bold text-gray-800 mb-4">Transaction Details</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-gray-600 text-sm font-medium mb-1">Payment Method</label>
+            <p class="text-gray-800 font-semibold">{{ getPaymentMethodName(refund.transaction_method_id) }}</p>
+          </div>
+          <div>
+            <label class="block text-gray-600 text-sm font-medium mb-1">Transaction Number</label>
+            <p class="text-gray-800 font-semibold">{{ refund.transaction_number || 'N/A' }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Remarks -->
+      <div *ngIf="refund.remarks" class="bg-amber-50 rounded-lg p-6 mb-8 border-l-4 border-amber-600">
+        <h3 class="text-lg font-bold text-gray-800 mb-2">Remarks</h3>
+        <p class="text-gray-800">{{ refund.remarks }}</p>
+      </div>
+    </div>
+
+    <!-- Admin Actions -->
+    <div class="bg-white rounded-lg shadow-lg p-6">
+      <h3 class="text-lg font-bold text-gray-800 mb-4">Admin Actions</h3>
+      
+      <button
+        *ngIf="!showUpdateForm"
+        (click)="showUpdateFormFn()"
+        class="px-6 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 font-semibold flex items-center gap-2"
+      >
+        <span class="material-icons text-sm">edit</span>
+        Update Refund Status
+      </button>
+
+      <!-- Update Form -->
+      <div *ngIf="showUpdateForm" class="mt-6 bg-gray-50 p-6 rounded-lg space-y-4">
+        <h4 class="text-lg font-bold text-gray-800">Update Refund Transaction</h4>
+        
+        <!-- Status Select -->
+        <div>
+          <label class="block text-gray-700 font-medium mb-2">Refund Status *</label>
+          <select
+            [(ngModel)]="updatePayload.status"
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-600 focus:border-transparent"
+          >
+            <option *ngFor="let opt of statusOptions" [value]="opt.value">
+              {{ opt.label }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Payment Method Select -->
+        <div>
+          <label class="block text-gray-700 font-medium mb-2">Payment Method</label>
+          <select
+            [(ngModel)]="updatePayload.transaction_method_id"
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-600 focus:border-transparent"
+          >
+            <option [value]="null">Select Payment Method</option>
+            <option *ngFor="let method of paymentMethods" [value]="method.id">
+              {{ method.name }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Transaction Number -->
+        <div>
+          <label class="block text-gray-700 font-medium mb-2">Transaction Number</label>
+          <input
+            type="text"
+            [(ngModel)]="updatePayload.transaction_number"
+            placeholder="e.g., TXN123456789"
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-600 focus:border-transparent"
+          />
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex gap-4">
+          <button
+            (click)="updateRefund()"
+            [disabled]="updating"
+            class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold disabled:opacity-50"
+          >
+            {{ updating ? 'Updating...' : 'Save Changes' }}
+          </button>
+          <button
+            (click)="cancelUpdate()"
+            class="px-6 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500 font-semibold"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

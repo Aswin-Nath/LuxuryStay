@@ -4,20 +4,12 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-// import { RoomsService } from '../../../../../core/services/rooms/rooms.service';
-import { WishlistService } from '../../../wishlist-management/wishlist.service';
-// import {BookingStt}
-import { RoomsService } from '../../../../shared/services/rooms.service';
-import { BookingStateService } from '../../../../shared/services/booking-state.service';
+import { WishlistService } from '../../../../services/wishlist.service';
+import { RoomsService } from '../../../../services/room-management.service';
 import { CustomerNavbarComponent } from '../../../../layout/Customer/customer-navbar/customer-navbar.component';
 import { DatePickerModalComponent } from '../../../../shared/components/date-picker-modal/date-picker-modal.component';
+import { BookingService } from '../../../../services/room-booking.service';
 
-// import { RoomsService } from '../../core/services/rooms/rooms.service';
-// import { WishlistService } from '../../services/wishlist.service';
-// import { BookingStateService } from '../../services/booking-state.service';
-// import { CustomerNavbarComponent } from '../../layout/Customer/customer-navbar/customer-navbar.component';
-// import { CustomerSidebarComponent } from '../../layout/Customer/customer-sidebar/customer-sidebar.component';
-// import { DatePickerModalComponent } from '../../shared/components/date-picker-modal/date-picker-modal.component';
 
 export interface RoomType {
   room_type_id: number;
@@ -122,7 +114,7 @@ export class RoomDisplayComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private roomsService: RoomsService,
     private wishlistService: WishlistService,
-    private bookingStateService: BookingStateService
+    private bookingService:BookingService
   ) {}
 
   ngOnInit(): void {
@@ -336,7 +328,7 @@ export class RoomDisplayComponent implements OnInit, OnDestroy {
     this.showDatePickerModal = false;
     
     // Store state in service
-    this.bookingStateService.setBookingState({
+    this.bookingService.setBookingState({
       checkIn: data.checkIn,
       checkOut: data.checkOut,
       roomTypeId: data.roomTypeId

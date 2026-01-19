@@ -1,17 +1,16 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterModule, Router } from '@angular/router';
+import { RouterModule, Router, ActivatedRoute } from '@angular/router';
 import { CustomerNavbarComponent } from '../../../../layout/Customer/customer-navbar/customer-navbar.component';
 import { CustomerSidebarComponent } from '../../../../layout/Customer/customer-sidebar/customer-sidebar.component';
-import { BookingsService } from '../../../../services/bookings.service';
 import { OfferService } from '../../../../services/offer.service';
 import { ProfileService } from '../../../../services/profile.service';
 import { WishlistService } from '../../../../services/wishlist.service';
 import { takeUntil } from 'rxjs/operators';
-import { Subject } from 'rxjs';
-import { BookingStateService } from '../../../../shared/services/booking-state.service';
+import { Subject, forkJoin } from 'rxjs';
 import { DatePickerModalComponent } from '../../../../shared/components/date-picker-modal/date-picker-modal.component';
+import { BookingService } from '../../../../services/room-booking.service';
 interface Booking {
   booking_id: string;
   room_type_name?: string;
@@ -75,16 +74,22 @@ export class CustomerDashboardComponent implements OnInit {
 
   constructor(
     private router: Router,
-    private bookingsService: BookingsService,
+    private route: ActivatedRoute,
     private offerService: OfferService,
     private profileService: ProfileService,
     private wishlistService: WishlistService,
-        private bookingStateService: BookingStateService
-
+    private bookingService:BookingService
   ) { }
 
   ngOnInit(): void {
-    this.loadDashboardData();
+    // Wait for resolver to complete (permissions loaded)
+    // This ensures PermissionService is initialized before loading data
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe(() => {
+      // Small delay to ensure all async operations complete
+      setTimeout(() => {
+        this.loadDashboardData();
+      }, 0);
+    });
   }
 
   ngOnDestroy(): void {
@@ -103,7 +108,7 @@ export class CustomerDashboardComponent implements OnInit {
     this.showDatePickerModal = false;
     
     // Store state in service
-    this.bookingStateService.setBookingState({
+    this.bookingService.setBookingState({
       checkIn: data.checkIn,
       checkOut: data.checkOut,
     });
@@ -114,97 +119,91 @@ export class CustomerDashboardComponent implements OnInit {
 
   loadDashboardData(): void {
     this.isLoading = true;
-    
-    // Load user profile for loyalty points
-    this.profileService.getProfile()
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: (profile: any) => {
-          this.rewardPoints = profile.loyalty_points || 0;
-        },
-        error: (err: any) => {
-          console.error('Error loading profile:', err);
-        }
-      });
 
-    // Load recent bookings
-    this.bookingsService.getCustomerBookings()
+    // Use forkJoin to wait for all requests to complete
+    forkJoin({
+      profile: this.profileService.getProfile(),
+      bookings: this.bookingService.getCustomerBookings(),
+      offers: this.offerService.listOffersCustomer(0, 6, { isActive: true })
+    })
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (bookings: any[]) => {
-          // Filter upcoming bookings (check_out date is in future)
-          const now = new Date();
-          this.upcomingBookings = bookings
-            .filter(b => new Date(b.check_out) > now)
-            .slice(0, 3);  // Show only 3 most recent
-          
-          this.bookingsCount = bookings.length;
-        },
-        error: (err: any) => {
-          console.error('Error loading bookings:', err);
-          this.upcomingBookings = [];
-        }
-      });
+        next: async (results: any) => {
+          try {
+            // Handle profile data
+            if (results.profile) {
+              this.rewardPoints = results.profile.loyalty_points || 0;
+            }
 
-    // Load active offers with image medias
-    this.offerService.listOffersCustomer(0, 6, { isActive: true })
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: (offers: any[]) => {
-          // Filter offers that have not passed their valid_to date
-          const now = new Date();
-          this.offers = offers
-            .filter(o => new Date(o.valid_to) >= now)
-            .map(o => ({
-              offer_id: o.offer_id,
-              offer_name: o.offer_name,
-              description: o.description || 'Special offer',
-              discount_percent: o.discount_percent,
-              valid_to: o.valid_to,
-              isSaved: o.is_saved_to_wishlist || false,
-              is_saved_to_wishlist: o.is_saved_to_wishlist || false,
-              wishlist_id: o.wishlist_id
-            }));
-          this.offersCount = this.offers.length;
-          
-          // Load offer medias to get images
-          this.offerService.getOfferMedias()
-            .pipe(takeUntil(this.destroy$))
-            .subscribe({
-              next: (medias: any) => {
-                // Process medias: extract primary image for each offer
-                for (const offer of this.offers) {
-                  const offerMedias = medias[offer.offer_id];
-                  if (offerMedias && offerMedias.images && offerMedias.images.length > 0) {
-                    // Find primary image or use first one
-                    const primaryImage = offerMedias.images.find((img: any) => img.is_primary);
-                    const imageUrl = (primaryImage || offerMedias.images[0]).image_url;
-                    this.offerImages.set(offer.offer_id, imageUrl);
-                    offer.imageUrl = imageUrl;
-                  } else {
-                    // Fallback to placeholder
-                    this.offerImages.set(offer.offer_id, 'assets/images/placeholder-offer.jpg');
-                    offer.imageUrl = 'assets/images/placeholder-offer.jpg';
-                  }
-                }
-              },
-              error: (err: any) => {
-                console.warn('Failed to load offer medias:', err);
-                // Fallback: set placeholders for all offers
-                this.offers.forEach(offer => {
-                  this.offerImages.set(offer.offer_id, 'assets/images/placeholder-offer.jpg');
-                  offer.imageUrl = 'assets/images/placeholder-offer.jpg';
-                });
+            // Handle bookings data
+            if (results.bookings) {
+              const bookings = results.bookings.data || results.bookings || [];
+              const now = new Date();
+              this.upcomingBookings = bookings
+                .filter((b: any) => new Date(b.check_out) > now)
+                .slice(0, 3);
+              this.bookingsCount = bookings.length;
+            }
+
+            // Handle offers data
+            if (results.offers) {
+              const now = new Date();
+              this.offers = results.offers
+                .filter((o: any) => new Date(o.valid_to) >= now)
+                .map((o: any) => ({
+                  offer_id: o.offer_id,
+                  offer_name: o.offer_name,
+                  description: o.description || 'Special offer',
+                  discount_percent: o.discount_percent,
+                  valid_to: o.valid_to,
+                  isSaved: o.is_saved_to_wishlist || false,
+                  is_saved_to_wishlist: o.is_saved_to_wishlist || false,
+                  wishlist_id: o.wishlist_id
+                }));
+              this.offersCount = this.offers.length;
+
+              // Load offer medias separately after offers are loaded
+              if (this.offers.length > 0) {
+                this.offerService.getOfferMedias()
+                  .pipe(takeUntil(this.destroy$))
+                  .subscribe({
+                    next: (medias: any) => {
+                      for (const offer of this.offers) {
+                        const offerMedias = medias[offer.offer_id];
+                        if (offerMedias && offerMedias.images && offerMedias.images.length > 0) {
+                          const primaryImage = offerMedias.images.find((img: any) => img.is_primary);
+                          const imageUrl = (primaryImage || offerMedias.images[0]).image_url;
+                          this.offerImages.set(offer.offer_id, imageUrl);
+                          offer.imageUrl = imageUrl;
+                        } else {
+                          this.offerImages.set(offer.offer_id, 'assets/images/placeholder-offer.jpg');
+                          offer.imageUrl = 'assets/images/placeholder-offer.jpg';
+                        }
+                      }
+                    },
+                    error: (err: any) => {
+                      console.warn('Failed to load offer medias:', err);
+                      this.offers.forEach((offer: any) => {
+                        this.offerImages.set(offer.offer_id, 'assets/images/placeholder-offer.jpg');
+                        offer.imageUrl = 'assets/images/placeholder-offer.jpg';
+                      });
+                    }
+                  });
               }
-            });
+            }
+          } catch (error) {
+            console.error('Error processing dashboard data:', error);
+          } finally {
+            this.isLoading = false;
+          }
         },
         error: (err: any) => {
-          console.error('Error loading offers:', err);
+          console.error('Error loading dashboard data:', err);
+          this.isLoading = false;
+          this.upcomingBookings = [];
           this.offers = [];
         }
       });
-
-    this.isLoading = false;
   }
 
   toggleSaveOffer(offer: Offer): void {

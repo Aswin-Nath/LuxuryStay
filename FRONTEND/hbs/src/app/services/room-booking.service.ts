@@ -2,8 +2,21 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, BehaviorSubject, interval, of, Subject } from 'rxjs';
 import { map, switchMap, takeUntil } from 'rxjs/operators';
-import { environment } from '../../../environments/environment';
+import { environment } from '../../environments/environment';
 
+// ===================================================
+// BOOKING STATE INTERFACES
+// ===================================================
+export interface BookingState {
+  checkIn?: string;
+  checkOut?: string;
+  roomTypeId?: number;
+  offerId?: number;
+}
+
+// ===================================================
+// BOOKING SESSION & ROOM INTERFACES
+// ===================================================
 export interface Room {
   room_id: number;
   room_no: string;
@@ -56,43 +69,142 @@ export interface BookingSummary {
   rooms?: RoomLock[];
 }
 
-// Payment interfaces removed - keeping only room selection functionality
+// ===================================================
+// BOOKING RETRIEVAL INTERFACES
+// ===================================================
+export interface BookingResponse {
+  booking_id: number;
+  user_id: number;
+  room_count: number;
+  check_in: string;
+  check_in_time: string;
+  check_out: string;
+  check_out_time: string;
+  booking_time?: string;
+  total_price: number;
+  status: string;
+  is_deleted: boolean;
+  created_at?: string;
+  updated_at?: string;
+  primary_customer_name?: string;
+  primary_customer_phone_number?: string;
+  primary_customer_dob?: string;
+  rooms?: BookingRoomMapResponse[];
+  taxes?: BookingTaxMapResponse[];
+  payments?: any[];
+  issues?: any[];
+}
+
+export interface PaginatedBookingResponse {
+  data: BookingResponse[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+export interface BookingRoomMapResponse {
+  booking_id: number;
+  room_id: number;
+  room_type_id: number;
+  adults: number;
+  children?: number;
+  is_pre_edited_room?: boolean;
+  is_post_edited_room?: boolean;
+  is_room_active?: boolean;
+  rating_given?: number;
+  guest_name?: string;
+  guest_age?: number;
+  special_requests?: string;
+  edit_suggested_rooms?: any;
+  price_per_night?: number;
+}
+
+export interface RoomTypeResponse {
+  room_type_id: number;
+  type_name: string;
+  price_per_night: number;
+  max_adult_count: number;
+  max_child_count: number;
+  description?: string;
+  square_ft?: number;
+}
+
+export interface BookingTaxMapResponse {
+  booking_id: number;
+  tax_id: number;
+  tax_amount: number;
+  created_at?: string;
+}
 
 @Injectable({
   providedIn: 'root'
 })
 export class BookingService {
   private bookingApiUrl = `${environment.apiUrl}/v2/rooms`;
+  private bookingMainApiUrl = `${environment.apiUrl}/bookings`;
   private imageApiUrl = `${environment.apiUrl}/room-management`;
   private profileApiUrl = `${environment.apiUrl}/profile`;
+
+  // ===================================================
+  // STATE MANAGEMENT
+  // ===================================================
   
-  // Expose booking API URL for room booking operations
-  getBookingApiUrl(): string {
-    return this.bookingApiUrl;
-  }
-  
-  // Expose image API URL for room images
-  getImageApiUrl(): string {
-    return this.imageApiUrl;
-  }
-  
-  // State management
+  // Booking State (from booking-state.service)
+  private bookingState$ = new BehaviorSubject<BookingState | null>(null);
+  public bookingState = this.bookingState$.asObservable();
+
+  // Session Management (from booking.service)
   private bookingSession = new BehaviorSubject<BookingSession | null>(null);
   public bookingSession$ = this.bookingSession.asObservable();
 
   private selectedLocks = new BehaviorSubject<RoomLock[]>([]);
   public selectedLocks$ = this.selectedLocks.asObservable();
 
-  private remainingTime = new BehaviorSubject<number>(900); // 15 minutes in seconds
+  private remainingTime = new BehaviorSubject<number>(900);
   public remainingTime$ = this.remainingTime.asObservable();
 
   private isSessionExpired = new BehaviorSubject<boolean>(false);
   public isSessionExpired$ = this.isSessionExpired.asObservable();
 
-  // Timer cleanup subject - allows us to stop previous timers
   private timerCleanup = new Subject<void>();
 
   constructor(private http: HttpClient) {}
+
+  // ===================================================
+  // API URL ACCESSORS
+  // ===================================================
+  getBookingApiUrl(): string {
+    return this.bookingApiUrl;
+  }
+
+  getImageApiUrl(): string {
+    return this.imageApiUrl;
+  }
+
+  // ===================================================
+  // BOOKING STATE MANAGEMENT (from booking-state.service)
+  // ===================================================
+  setBookingState(state: BookingState): void {
+    console.log('Setting booking state:', state);
+    this.bookingState$.next(state);
+  }
+
+  getBookingState(): Observable<BookingState | null> {
+    return this.bookingState$.asObservable();
+  }
+
+
+  
+
+  
+  /**
+   * Clear booking state after use
+   */
+  clearBookingState(): void {
+    console.log('Clearing booking state');
+    this.bookingState$.next(null);
+  }
 
   // ===================================================
   // USER PROFILE
@@ -100,9 +212,6 @@ export class BookingService {
   getUserProfile() {
     return this.http.get<any>(`${this.profileApiUrl}/`);
   }
-
-  // ===================================================
-  // ROOM SEARCH
   // ===================================================
   searchRooms(
     checkIn: string,
@@ -160,6 +269,12 @@ export class BookingService {
   getAllRoomTypes(): Observable<Room[]> {
     return this.http.get<any>(`${this.bookingApiUrl}/room-types`).pipe(
       map(response => response.results || response || [])
+    );
+  }
+
+  getRoomTypes(): Observable<{ total: number; results: RoomTypeResponse[] }> {
+    return this.http.get<{ total: number; results: RoomTypeResponse[] }>(
+      `${environment.apiUrl}/v2/rooms/room-types`
     );
   }
 
@@ -388,5 +503,127 @@ export class BookingService {
     this.bookingSession.next(null);
     this.remainingTime.next(900);
     this.isSessionExpired.next(false);
+  }
+
+  // ===================================================
+  // CUSTOMER BOOKINGS
+  // ===================================================
+  getCustomerBookings(
+    status?: string,
+    limit: number = 20,
+    offset: number = 0,
+    minPrice?: number,
+    maxPrice?: number,
+    roomTypeId?: string,
+    checkInDate?: string,
+    checkOutDate?: string
+  ): Observable<PaginatedBookingResponse> {
+    let params = new HttpParams()
+      .set('limit', limit.toString())
+      .set('offset', offset.toString());
+
+    if (status) {
+      params = params.set('status', status);
+    }
+
+    if (minPrice !== undefined && minPrice !== null) {
+      params = params.set('min_price', minPrice.toString());
+    }
+
+    if (maxPrice !== undefined && maxPrice !== null) {
+      params = params.set('max_price', maxPrice.toString());
+    }
+
+    if (roomTypeId) {
+      params = params.set('room_type_id', roomTypeId);
+    }
+
+    if (checkInDate) {
+      params = params.set('check_in_date', checkInDate);
+    }
+
+    if (checkOutDate) {
+      params = params.set('check_out_date', checkOutDate);
+    }
+
+    return this.http.get<PaginatedBookingResponse>(`${this.bookingMainApiUrl}/customer`, { params });
+  }
+
+  getBookingDetails(bookingId: number): Observable<BookingResponse> {
+    return this.http.get<BookingResponse>(`${this.bookingMainApiUrl}/customer/${bookingId}`);
+  }
+
+  // ===================================================
+  // ADMIN BOOKINGS
+  // ===================================================
+  getAdminBookings(
+    status?: string,
+    limit: number = 20,
+    offset: number = 0,
+    minPrice?: number,
+    maxPrice?: number,
+    roomTypeId?: string,
+    checkInDate?: string,
+    checkOutDate?: string,
+  ): Observable<PaginatedBookingResponse> {
+    let params = new HttpParams()
+      .set('limit', limit.toString())
+      .set('offset', offset.toString());
+
+    if (status) {
+      params = params.set('status', status);
+    }
+
+    if (minPrice !== undefined && minPrice !== null) {
+      params = params.set('min_price', minPrice.toString());
+    }
+
+    if (maxPrice !== undefined && maxPrice !== null) {
+      params = params.set('max_price', maxPrice.toString());
+    }
+
+    if (roomTypeId) {
+      params = params.set('room_type_id', roomTypeId);
+    }
+
+    if (checkInDate) {
+      params = params.set('check_in_date', checkInDate);
+    }
+
+    if (checkOutDate) {
+      params = params.set('check_out_date', checkOutDate);
+    }
+
+    return this.http.get<PaginatedBookingResponse>(`${this.bookingMainApiUrl}/admin`, { params });
+  }
+
+  getAdminBookingDetails(bookingId: number): Observable<BookingResponse> {
+    return this.http.get<BookingResponse>(`${this.bookingMainApiUrl}/admin/${bookingId}`);
+  }
+
+  // ===================================================
+  // BOOKING OPERATIONS
+  // ===================================================
+  getBookingStatuses(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.bookingMainApiUrl}/statuses`);
+  }
+
+  cancelBooking(bookingId: number, reason?: string): Observable<any> {
+    return this.http.post<any>(`${this.bookingMainApiUrl}/${bookingId}/cancel`, {});
+  }
+
+  // ===================================================
+  // RELATED DATA
+  // ===================================================
+  getPaymentsByBooking(bookingId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${environment.apiUrl}/payments/booking/${bookingId}`);
+  }
+
+  getIssuesByBooking(bookingId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.bookingMainApiUrl}/${bookingId}/issues`);
+  }
+
+  getReviewsByBooking(bookingId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.bookingMainApiUrl}/${bookingId}/reviews`);
   }
 }

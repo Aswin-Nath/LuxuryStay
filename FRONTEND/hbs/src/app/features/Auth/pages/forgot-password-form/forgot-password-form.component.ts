@@ -2,7 +2,8 @@ import { Component, ElementRef, ViewChild, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { AuthenticationService } from '../../../../shared/services/authentication.service';
+import { AuthenticationService } from '../../../../services/authentication.service';
+
 import { HttpErrorResponse } from '@angular/common/http';
 
 @Component({

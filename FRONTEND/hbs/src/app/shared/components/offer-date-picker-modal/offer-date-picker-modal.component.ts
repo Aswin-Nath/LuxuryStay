@@ -1,9 +1,10 @@
 import { Component, Input, Output, EventEmitter, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { OfferBookingService } from '../../../services/offer-booking.service';
-import { SharedOfferBookingService } from '../../../shared/services/shared-offer-booking.service';
-import { ToastService } from '../../../services/toast.service';
+// import { OfferService } from '../../services/offer.service';
+// import { OfferService } from '../../services/offer.service';
+import { OfferService } from '../../../services/offer.service';
+import { ToastService } from '../../services/toast.service';
 
 /**
  * OfferDatePickerModal Component
@@ -47,8 +48,7 @@ export class OfferDatePickerModalComponent implements OnInit {
   lockingError: string = '';
 
   constructor(
-    private offerBookingService: OfferBookingService,
-    private sharedOfferBookingService: SharedOfferBookingService,
+    private offerService: OfferService,
     private toastService: ToastService,
     private cdr: ChangeDetectorRef
   ) {}
@@ -115,12 +115,12 @@ export class OfferDatePickerModalComponent implements OnInit {
     this.availabilityChecked = false;
     this.cdr.markForCheck();
 
-    this.offerBookingService.checkOfferAvailability(
+    this.offerService.checkOfferAvailability(
       this.offerId,
       this.checkIn,
       this.checkOut
     ).subscribe({
-      next: (response) => {
+      next: (response: any) => {
         this.isCheckingAvailability = false;
         this.availabilityChecked = true;
         this.isAvailable = response.overall_available;
@@ -134,7 +134,7 @@ export class OfferDatePickerModalComponent implements OnInit {
 
         this.cdr.markForCheck();
       },
-      error: (err) => {
+      error: (err: any) => {
         this.isCheckingAvailability = false;
         this.availabilityError = err.error?.detail || 'Failed to check availability';
         this.toastService.error(this.availabilityError);
@@ -157,20 +157,20 @@ export class OfferDatePickerModalComponent implements OnInit {
     this.lockingError = '';
     this.cdr.markForCheck();
 
-    this.offerBookingService.lockOfferRooms(
+    this.offerService.lockOfferRooms(
       this.offerId,
       this.checkIn,
       this.checkOut
     ).subscribe({
-      next: (response) => {
+      next: (response: any) => {
         this.isLocking = false;
         this.toastService.success(`🔒 ${response.total_locked} rooms locked for 15 minutes!`);
 
         // Get locked room details with pricing
-        this.offerBookingService.getLockedRoomsByOfferId(this.offerId).subscribe({
-          next: (roomsResponse) => {
+        this.offerService.getLockedRoomsByOfferId(this.offerId).subscribe({
+          next: (roomsResponse: any) => {
             // Initialize shared offer booking session
-            this.sharedOfferBookingService.initializeOfferBooking({
+            this.offerService.initializeOfferBooking({
               offer_id: this.offerId,
               check_in: this.checkIn,
               check_out: this.checkOut,
@@ -192,14 +192,14 @@ export class OfferDatePickerModalComponent implements OnInit {
             this.onCancel();
             this.cdr.markForCheck();
           },
-          error: (err) => {
+          error: (err: any) => {
             this.lockingError = 'Failed to retrieve locked rooms';
             this.toastService.error(this.lockingError);
             this.cdr.markForCheck();
           }
         });
       },
-      error: (err) => {
+      error: (err: any) => {
         this.isLocking = false;
         this.lockingError = err.error?.detail || 'Failed to lock rooms';
         this.toastService.error(this.lockingError);

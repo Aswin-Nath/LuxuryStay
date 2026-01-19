@@ -21,7 +21,9 @@ auth_router = APIRouter(prefix="/auth", tags=["AUTH"])
 SECURE_REFRESH_COOKIE = os.getenv("SECURE_REFRESH_COOKIE", "true").lower() in ("1", "true", "yes")
 REFRESH_COOKIE_SAMESITE = os.getenv("REFRESH_COOKIE_SAMESITE", "lax")
 REFRESH_COOKIE_NAME = "refresh_token"
-REFRESH_COOKIE_PATH = "/auth/refresh"
+# ✅ FIXED: Changed from "/auth/refresh" to "/" to allow cookie to be sent with ALL requests
+# HttpOnly cookies with specific paths are only sent to those paths. Using "/" makes it universal.
+REFRESH_COOKIE_PATH = "/"
 from pydantic import BaseModel
 from typing import Optional
 from app.core.security import oauth2_scheme
@@ -221,6 +223,7 @@ async def login(
 @auth_router.post("/refresh", response_model=TokenResponse,dependencies=[Security(lambda: None)])
 async def refresh_tokens(
     response: Response,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     refresh_token: Optional[str] = Cookie(None),
 ):
@@ -242,10 +245,19 @@ async def refresh_tokens(
         HTTPException (401): If refresh token is missing, invalid, or revoked.
     """
     if not refresh_token:
+        print(f"❌ REFRESH ENDPOINT: refresh_token cookie is MISSING!")
+        print(f"   Cookies received: {list(request.cookies.keys()) if hasattr(request, 'cookies') else 'N/A'}")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing refresh token")
-    auth_result = await svc_refresh_tokens(db, refresh_token)
-    _set_refresh_cookie(response, auth_result.refresh_token, auth_result.refresh_token_expires_at)
-    return auth_result.token_response
+    
+    print(f"✅ REFRESH ENDPOINT: refresh_token cookie received (length: {len(refresh_token)})")
+    try:
+        auth_result = await svc_refresh_tokens(db, refresh_token)
+        _set_refresh_cookie(response, auth_result.refresh_token, auth_result.refresh_token_expires_at)
+        print(f"✅ REFRESH ENDPOINT: New token generated, cookie set")
+        return auth_result.token_response
+    except Exception as e:
+        print(f"❌ REFRESH ENDPOINT: svc_refresh_tokens raised exception: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
 
 

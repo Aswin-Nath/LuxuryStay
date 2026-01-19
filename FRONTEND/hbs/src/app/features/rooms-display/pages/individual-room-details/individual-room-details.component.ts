@@ -6,17 +6,10 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { CustomerNavbarComponent } from '../../../../layout/Customer/customer-navbar/customer-navbar.component';
 import { ImageService } from '../../../../shared/services/image.service';
-import { RoomsService } from '../../../../shared/services/rooms.service';
+import { RoomsService } from '../../../../services/room-management.service';
 import { ReviewsService,Review } from '../../../../services/reviews.service';
 import { DatePickerModalComponent } from '../../../../shared/components/date-picker-modal/date-picker-modal.component';
-import { RoomTypeService } from '../../../../services/room-types.service';
-import { WishlistService } from '../../../wishlist-management/wishlist.service';
-import { BookingStateService } from '../../../../shared/services/booking-state.service';
-// import { RoomTypeService } from '../../services/room-types.service';
-// import { ImageService } from '../../services/image.service';
-// import { WishlistService } from '../../services/wishlist.service';
-// import { BookingStateService } from '../../services/booking-state.service';
-// import { DatePickerModalComponent } from '../../shared/components/date-picker-modal/date-picker-modal.component';
+import { BookingService } from '../../../../services/room-booking.service';
 interface Amenity{
     amenity_id:number,
     amenity_name:string
@@ -63,11 +56,9 @@ export class CustomerRoomDetailComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     public router: Router,
     private imageService: ImageService,
-    private roomTypeService: RoomTypeService,
     private reviewsService: ReviewsService,
-    private wishlistService: WishlistService,
     private roomService: RoomsService,
-    private bookingStateService: BookingStateService
+    private bookingService:BookingService
   ) {
     const navigation = this.router.getCurrentNavigation();
     this.previousPage = navigation?.extras?.state?.['from'] || 'rooms';
@@ -94,7 +85,7 @@ export class CustomerRoomDetailComponent implements OnInit, OnDestroy {
     const roomTypeId = this.roomId;
     
     // Fetch room type details
-    this.roomTypeService.getRoomType(roomTypeId).pipe(takeUntil(this.destroy$)).subscribe({
+    this.roomService.getRoomType(roomTypeId).pipe(takeUntil(this.destroy$)).subscribe({
       next: (roomType: any) => {
         // Fetch room type images
         this.imageService.getRoomTypeImages(roomTypeId).pipe(takeUntil(this.destroy$)).subscribe({
@@ -192,7 +183,7 @@ export class CustomerRoomDetailComponent implements OnInit, OnDestroy {
     this.showDatePickerModal = false;
     
     // Store state in service
-    this.bookingStateService.setBookingState({
+    this.bookingService.setBookingState({
       checkIn: data.checkIn,
       checkOut: data.checkOut,
       roomTypeId: this.roomId ?? undefined

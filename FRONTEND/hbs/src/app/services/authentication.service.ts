@@ -1,9 +1,10 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { environment } from '../../environments/environment';
 import { Observable, BehaviorSubject } from 'rxjs';
-import { tap, finalize,map } from 'rxjs/operators';
+import { tap, finalize, map } from 'rxjs/operators';
 
+// ===== Authentication Interfaces =====
 export interface TokenResponse {
   access_token: string;
   refresh_token: string;
@@ -14,32 +15,117 @@ export interface TokenResponse {
   refresh_token_expires_at?: number;  // Unix timestamp (milliseconds) when refresh token expires
 }
 
+// ===== Admin Management Interfaces =====
+export interface AdminUser {
+  user_id: number;
+  full_name: string;
+  email: string;
+  phone_number?: string;
+  role_id: number;
+  role_name?: string;
+  status?: string;
+  status_id?: number;
+  suspend_reason?: string;
+  created_at?: string;
+  dob?: string;
+  gender?: string;
+  profile_image_url?: string;
+}
+
+export interface CreateAdminPayload {
+  full_name: string;
+  email: string;
+  password: string;
+  phone_number: string;
+  dob: string;
+  gender: string;
+  role_id: number;
+}
+
+export interface UpdateAdminPayload {
+  full_name?: string;
+  phone_number?: string;
+  role_id?: number;
+  status?: string;
+}
+
+export interface AdminListResponse {
+  users: AdminUser[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+// ===== Role Management Interfaces =====
+export interface Role {
+  role_id: number;
+  role_name: string;
+  role_description?: string;
+  description?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Permission {
+  permission_id: number;
+  permission_name: string;
+}
+
+export interface PermissionGroup {
+  resource: string; // ADMIN_CREATION, ROOM_MANAGEMENT, etc.
+  permissions: PermissionAction[];
+}
+
+export interface PermissionAction {
+  action: string; // READ, WRITE, DELETE, UPDATE
+  permission_id: number;
+  permission_name: string;
+}
+
+export interface RolePermissions {
+  role_id: number;
+  role_name: string;
+  permissions: Permission[];
+  permission_ids: number[];
+}
+
+export interface AssignPermissionsRequest {
+  permission_ids: number[];
+}
+
 @Injectable({
   providedIn: 'root',
 })
 export class AuthenticationService {
   private readonly baseUrl = `${environment.apiUrl}/auth`;
+  private readonly apiUrl = `${environment.apiUrl}`;
+  
+  // Initialize authStateSubject with localStorage value - if token exists, user is logged in
   private authStateSubject = new BehaviorSubject<boolean>(!!localStorage.getItem('access_token'));
   public authState$ = this.authStateSubject.asObservable();
-  private tokenRefreshTimer: any;
+  
+  // ===== Permission Service Properties =====
+  private userScopes = new BehaviorSubject<Set<string>>(new Set());
+  public permissions$ = this.userScopes.asObservable();
 
   constructor(private http: HttpClient) {
-    this.initializeTokenRefresh();
+    // Subscribe to ensure we stay in sync with localStorage
+    this.authState$.subscribe(state => {
+      console.debug('🔐 AuthenticationService: Auth state changed to', state);
+    });
   }
 
-  ngOnDestroy() {
-    if (this.tokenRefreshTimer) clearTimeout(this.tokenRefreshTimer);
-  }
+  // ===== Authentication Methods =====
   fetchUserPermissions(): Observable<string[]> {
-  return this.http.get<any>(`${environment.apiUrl}/roles/me`, {
-    withCredentials: true
-  }).pipe(
-    tap(res => {
-      console.debug("Fetched user permissions:", res.permissions);
-    }),
-    map(res => res.permissions)
-  );
-}
+    return this.http.get<any>(`${environment.apiUrl}/roles/me`, {
+      withCredentials: true
+    }).pipe(
+      tap(res => {
+        console.debug("Fetched user permissions:", res.permissions);
+      }),
+      map(res => res.permissions)
+    );
+  }
 
   login(identifier: string, password: string): Observable<TokenResponse> {
     const body = new URLSearchParams();
@@ -67,9 +153,6 @@ export class AuthenticationService {
         }
         
         this.authStateSubject.next(true);
-        if (res?.expires_in !== undefined) {
-          this.setTokenRefreshTimer(res.expires_in);
-        }
       })
     );
   }
@@ -104,10 +187,6 @@ export class AuthenticationService {
         }
         
         this.authStateSubject.next(true);
-        // Reset timer with new expiration time
-        if (res?.expires_in !== undefined) {
-          this.setTokenRefreshTimer(res.expires_in);
-        }
       })
     );
   }
@@ -140,76 +219,229 @@ export class AuthenticationService {
     this.authStateSubject.next(value);
   }
 
+  // ===== Admin Management Methods =====
   /**
-   * Initialize token refresh timer on app startup.
-   * Checks localStorage for existing expiration time and sets timer.
+   * Fetch list of admin users with filtering and pagination
    */
-  private initializeTokenRefresh(): void {
-    const expiresIn = localStorage.getItem('expires_in');
-    if (expiresIn && Number(expiresIn) > 0) {
-      console.debug('AuthenticationService: Initializing token refresh timer', { expiresIn });
-      this.setTokenRefreshTimer(Number(expiresIn));
+  listAdmins(params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    role_id?: number;
+    status?: string;
+    date_from?: string;
+    date_to?: string;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
+  } = {}): Observable<AdminListResponse> {
+    let httpParams = new HttpParams();
+    
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        httpParams = httpParams.set(key, value.toString());
+      }
+    });
+
+    return this.http.get<AdminListResponse>(`${this.apiUrl}/users/list`, { params: httpParams });
+  }
+
+  /**
+   * Create new admin user
+   */
+  createAdmin(payload: CreateAdminPayload): Observable<AdminUser> {
+    return this.http.post<AdminUser>(`${this.apiUrl}/auth/register`, payload);
+  }
+
+  /**
+   * Update existing admin user
+   */
+  updateAdmin(userId: number, payload: UpdateAdminPayload): Observable<AdminUser> {
+    return this.http.put<AdminUser>(`${this.apiUrl}/users/${userId}`, payload);
+  }
+
+  /**
+   * Suspend or activate admin user
+   */
+  suspendAdmin(userId: number, suspend: boolean, reason?: string): Observable<any> {
+    if (suspend) {
+      // Suspend user
+      if (!reason) {
+        throw new Error('Suspension reason is required');
+      }
+      const payload = { suspend_reason: reason };
+      return this.http.post(`${this.apiUrl}/users/${userId}/suspend`, payload);
+    } else {
+      // Unsuspend user
+      return this.http.post(`${this.apiUrl}/users/${userId}/unsuspend`, {});
     }
   }
 
   /**
-   * Check if refresh token has expired.
-   * @returns true if refresh token is expired; false if valid or unknown
+   * Get single admin user details
    */
-  private isRefreshTokenExpired(): boolean {
-    const refreshTokenExpiry = localStorage.getItem('refresh_token_expires_at');
-    if (!refreshTokenExpiry) {
-      return false;  // If not set, assume valid
-    }
-    const expiryTime = Number(refreshTokenExpiry);
-    const isExpired = Date.now() > expiryTime;
-    if (isExpired) {
-      console.warn('AuthenticationService: Refresh token has expired');
-    }
-    return isExpired;
+  getAdmin(userId: number): Observable<AdminUser> {
+    return this.http.get<AdminUser>(`${this.apiUrl}/users/${userId}`);
   }
 
   /**
-   * Set a timer to proactively refresh token before expiration.
-   * Refreshes 30 seconds before token expires to prevent 401 errors.
-   * Also checks if refresh token itself has expired.
-   * 
-   * @param expiresIn Token expiration time in seconds
+   * Check if email is unique (for validation)
    */
-  private setTokenRefreshTimer(expiresIn: number): void {
-    // Clear existing timer if any
-    if (this.tokenRefreshTimer) {
-      clearTimeout(this.tokenRefreshTimer);
-    }
+  checkEmailUnique(email: string): Observable<{ available: boolean }> {
+    return this.http.get<{ available: boolean }>(`${this.apiUrl}/users/check-email`, {
+      params: { email }
+    });
+  }
 
-    // Check if refresh token itself has expired BEFORE scheduling refresh
-    if (this.isRefreshTokenExpired()) {
-      console.error('AuthenticationService: Refresh token has expired; logging out');
-      this.logout().subscribe();
-      return;
-    }
+  // ===== Signup Method =====
+  /**
+   * User signup
+   */
+  signup(payload: any): Observable<any> {
+    return this.http.post(`${this.baseUrl}/signup`, payload, { withCredentials: true });
+  }
 
-    // Refresh 30 seconds before expiration 
-    const refreshTime = (expiresIn - 30) * 1000;
+  // ===== Permission Service Methods =====
+  /**
+   * Load user permissions/scopes
+   */
+  loadPermissions(scopes: string[]): void {
+    console.log("🔐 Loaded Scopes in AuthenticationService:", scopes);
+    console.log("🔐 Total permissions:", scopes.length);
+    scopes.forEach(s => console.log("  ✓", s));
+    this.userScopes.next(new Set(scopes));
+  }
 
-    if (refreshTime > 0) {
-      console.debug('AuthenticationService: Token refresh scheduled in', {
-        seconds: Math.round(refreshTime / 1000),
-        totalExpiresIn: expiresIn,
-        refreshTokenExpiresAt: new Date(Number(localStorage.getItem('refresh_token_expires_at'))).toLocaleString()
-      });
-      this.tokenRefreshTimer = setTimeout(() => {
-        console.debug('AuthenticationService: Proactively refreshing token');
-        this.refreshToken().subscribe({
-          next: () => {
-            console.debug('AuthenticationService: Token proactively refreshed successfully');
+  /**
+   * Check if user has a specific permission
+   */
+  hasPermission(scope: string): boolean {
+    return this.userScopes.value.has(scope);
+  }
+
+  /**
+   * Check if user has all specified permissions
+   */
+  hasAll(scopes: string[]): boolean {
+    const current = this.userScopes.value;
+    return scopes.every(s => current.has(s));
+  }
+
+  // ===== Role Management Methods =====
+  /**
+   * Get all roles
+   */
+  getRoles(): Observable<Role[]> {
+    return this.http.get<Role[]>(`${this.apiUrl}/roles`);
+  }
+
+  /**
+   * Create a new role
+   */
+  createRole(roleData: { role_name: string; role_description: string }): Observable<Role> {
+    return this.http.post<Role>(`${this.apiUrl}/roles`, roleData);
+  }
+
+  /**
+   * Get all permissions grouped by resource
+   */
+  getPermissionsGrouped(): Observable<PermissionGroup[]> {
+    return this.http.get<Permission[]>(`${this.apiUrl}/roles/all-permissions`).pipe(
+      // Transform flat permission list to grouped structure
+      (source: any) => new Observable(observer => {
+        source.subscribe({
+          next: (permissions: Permission[]) => {
+            const grouped = this.groupPermissions(permissions);
+            observer.next(grouped);
+            observer.complete();
           },
-          error: (error) => {
-            console.error('AuthenticationService: Proactive token refresh failed', error);
-            this.logout().subscribe();
-          }
+          error: (err: any) => observer.error(err)
         });
-      }, refreshTime);
-    }
+      })
+    );
+  }
+
+  /**
+   * Get all permissions
+   */
+  getPermissions(): Observable<Permission[]> {
+    return this.http.get<Permission[]>(`${this.apiUrl}/roles/all-permissions`);
+  }
+
+  /**
+   * Get permissions for a specific role
+   */
+  getRolePermissions(roleId: number): Observable<Permission[]> {
+    const params = new HttpParams().set('role_id', roleId.toString());
+    return this.http.get<Permission[]>(`${this.apiUrl}/roles/permissions`, { params, withCredentials: true });
+  }
+
+  /**
+   * Assign permissions to a role
+   */
+  assignPermissionsToRole(
+    roleId: number,
+    permissionIds: number[]
+  ): Observable<any> {
+    return this.http.post(
+      `${this.apiUrl}/roles/assign`,
+      {
+        role_id: roleId,
+        permission_ids: permissionIds
+      }
+    );
+  }
+
+  /**
+   * Group permissions by resource and action
+   */
+  private groupPermissions(permissions: Permission[]): PermissionGroup[] {
+    const groupMap: { [key: string]: PermissionAction[] } = {};
+
+    permissions.forEach((perm: Permission) => {
+      const [resource, action] = perm.permission_name.split(':');
+
+      if (!groupMap[resource]) {
+        groupMap[resource] = [];
+      }
+
+      groupMap[resource].push({
+        action: action || 'OTHER',
+        permission_id: perm.permission_id,
+        permission_name: perm.permission_name
+      });
+    });
+
+    // Convert map to array and sort by resource name
+    return Object.entries(groupMap)
+      .map(([resource, permissions]) => ({
+        resource,
+        permissions: permissions.sort((a, b) =>
+          this.getActionOrder(a.action) - this.getActionOrder(b.action)
+        )
+      }))
+      .sort((a, b) => a.resource.localeCompare(b.resource));
+  }
+
+  /**
+   * Get sort order for permission actions
+   */
+  private getActionOrder(action: string): number {
+    const order: { [key: string]: number } = {
+      'READ': 1,
+      'WRITE': 2,
+      'UPDATE': 3,
+      'DELETE': 4
+    };
+    return order[action] || 99;
+  }
+
+  /**
+   * Transform grouped permissions to flat permission IDs
+   */
+  getSelectedPermissionIds(selectedGroups: {
+    [resource: string]: string[]
+  }): number[] {
+    // This will be implemented based on how we track selected permissions
+    return [];
   }
 }

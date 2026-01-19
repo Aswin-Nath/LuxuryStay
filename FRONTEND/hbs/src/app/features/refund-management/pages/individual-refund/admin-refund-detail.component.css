@@ -1,0 +1,100 @@
+/* Admin Refund Detail Component Styles */
+
+:host {
+  display: block;
+}
+
+.material-icons {
+  font-family: 'Material Icons';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  display: inline-block;
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: normal;
+  word-wrap: normal;
+  white-space: nowrap;
+  direction: ltr;
+  user-select: none;
+}
+
+/* Spinner Animation */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Button Styles */
+button {
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* Card Shadows */
+.shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+/* Status Badge Colors */
+.bg-yellow-600 {
+  background-color: #ca8a04;
+}
+
+.bg-green-100 {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.bg-red-100 {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.bg-blue-100 {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+/* Input Focus Styles */
+input:focus,
+select:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(202, 138, 4, 0.1);
+}
+
+/* Timeline Styles */
+.w-3 {
+  width: 12px;
+}
+
+.h-3 {
+  height: 12px;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
+  
+  h1 {
+    font-size: 1.5rem;
+  }
+  
+  h2 {
+    font-size: 1.25rem;
+  }
+}

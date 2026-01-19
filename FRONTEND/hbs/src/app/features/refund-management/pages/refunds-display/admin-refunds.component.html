@@ -1,0 +1,210 @@
+<ng-container *ngIf="loading" class="flex justify-center items-center p-8">
+  <div class="text-center">
+    <div class="spinner-border animate-spin inline-block w-8 h-8 border-4 rounded-full" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <p class="mt-4 text-gray-600">Loading refunds...</p>
+  </div>
+</ng-container>
+
+<ng-container *ngIf="!loading && error" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+  <p class="text-red-700 font-semibold">{{ error }}</p>
+  <button
+    (click)="loadRefunds()"
+    class="mt-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+  >
+    Try Again
+  </button>
+</ng-container>
+
+<ng-container *ngIf="!loading && !error">
+  <!-- ✅ Title -->
+  <div class="mb-6">
+    <h2 class="text-2xl font-bold text-gray-800">Refund Management</h2>
+  </div>
+
+  <!-- ✅ Compact Refunds Filter -->
+  <div class="bg-white shadow-md border border-gray-200 rounded-lg p-3 mb-4">
+    <div class="flex flex-wrap items-end gap-3">
+      <!-- Refund Status -->
+      <div class="flex flex-col">
+        <label class="text-xs font-medium text-gray-600 mb-1">Refund Status</label>
+        <select
+          [(ngModel)]="filters.status"
+          class="p-2 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-yellow-500"
+        >
+          <option *ngFor="let opt of statusOptions" [value]="opt.value">
+            {{ opt.label }}
+          </option>
+        </select>
+      </div>
+
+      <!-- Amount Range -->
+      <div class="flex flex-col">
+        <label class="text-xs font-medium text-gray-600 mb-1">Date Range</label>
+        <div class="flex items-center gap-2">
+          <input
+            type="date"
+            [(ngModel)]="filters.from_date"
+            class="p-2 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-yellow-500"
+          />
+          <span class="text-gray-400">to</span>
+          <input
+            type="date"
+            [(ngModel)]="filters.to_date"
+            class="p-2 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-yellow-500"
+          />
+        </div>
+      </div>
+
+      <!-- Sort By -->
+      <div class="flex flex-col">
+        <label class="text-xs font-medium text-gray-600 mb-1">Sort By</label>
+        <select class="p-2 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-yellow-500">
+          <option value="latest">Latest</option>
+          <option value="oldest">Oldest</option>
+          <option value="amount-asc">Amount (Low to High)</option>
+          <option value="amount-desc">Amount (High to Low)</option>
+        </select>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="ml-auto flex gap-2">
+        <button
+          (click)="clearFilters()"
+          class="px-3 py-2 bg-gray-100 text-gray-700 text-sm rounded-md hover:bg-gray-200 flex items-center gap-1"
+        >
+          <span class="material-icons text-sm">clear</span>
+          Clear
+        </button>
+        <button
+          (click)="applyFilters()"
+          class="px-4 py-2 bg-yellow-600 text-white text-sm rounded-md hover:bg-yellow-700 flex items-center gap-1"
+        >
+          <span class="material-icons text-sm">search</span>
+          Filter
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✅ Table -->
+  <div class="overflow-x-auto bg-white shadow-lg border border-gray-200 rounded-xl">
+    <table class="w-full text-sm" *ngIf="refunds.length > 0; else noRefunds">
+      <thead class="bg-yellow-50 border-b border-gray-300">
+        <tr>
+          <th class="px-6 py-3 text-left font-semibold text-gray-700">Refund ID</th>
+          <th class="px-6 py-3 text-left font-semibold text-gray-700">Customer</th>
+          <th class="px-6 py-3 text-left font-semibold text-gray-700">Booking ID</th>
+          <th class="px-6 py-3 text-left font-semibold text-gray-700">Type</th>
+          <th class="px-6 py-3 text-left font-semibold text-gray-700">Amount</th>
+          <th class="px-6 py-3 text-left font-semibold text-gray-700">Status</th>
+          <th class="px-6 py-3 text-left font-semibold text-gray-700">Initiated</th>
+          <th class="px-6 py-3 text-center font-semibold text-gray-700">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        <tr *ngFor="let refund of refunds" class="hover:bg-gray-50">
+          <td class="px-6 py-4 font-medium text-gray-900">RF-{{ refund.refund_id }}</td>
+          <td class="px-6 py-4 text-gray-600">User #{{ refund.user_id }}</td>
+          <td class="px-6 py-4 text-gray-600">BK-{{ refund.booking_id }}</td>
+          <td class="px-6 py-4">
+            <span class="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+              {{ getTypeLabel(refund.type) }}
+            </span>
+          </td>
+          <td class="px-6 py-4 font-semibold text-green-600">
+            {{ formatCurrency(refund.refund_amount) }}
+          </td>
+          <td class="px-6 py-4">
+            <span [ngClass]="getStatusColor(refund.status)" class="px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 w-fit">
+              <span class="material-icons text-sm">{{ getStatusIcon(refund.status) }}</span>
+              {{ refund.status }}
+            </span>
+          </td>
+          <td class="px-6 py-4 text-gray-500 text-xs">{{ formatDate(refund.initiated_at) }}</td>
+          <td class="px-6 py-4 text-center">
+            <button
+              (click)="viewRefund(refund.refund_id)"
+              class="px-3 py-1 bg-yellow-500 text-white text-xs rounded-md hover:bg-yellow-600 flex items-center gap-1 justify-center"
+            >
+              <span class="material-icons text-sm">visibility</span>
+              View
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <ng-template #noRefunds>
+      <div class="p-8 text-center">
+        <span class="material-icons text-5xl text-gray-300 block mb-4">folder_open</span>
+        <p class="text-gray-600 font-medium">No refunds found</p>
+        <p class="text-gray-500 text-sm mt-1">Try adjusting your filters</p>
+      </div>
+    </ng-template>
+  </div>
+
+  <!-- ✅ Pagination -->
+  <nav class="flex flex-col md:flex-row justify-between items-center mt-6 space-y-4 md:space-y-0">
+    <!-- Prev -->
+    <button
+      (click)="previousPage()"
+      [disabled]="currentPage === 1"
+      class="px-5 py-2 flex items-center space-x-2 border rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
+      [ngClass]="currentPage === 1 ? 'bg-gray-100 text-gray-400' : 'bg-gray-200 hover:bg-gray-300'"
+    >
+      <span class="material-icons text-sm">chevron_left</span>
+      <span>Prev</span>
+    </button>
+
+    <!-- Page Numbers -->
+    <ul class="flex space-x-2 flex-wrap justify-center">
+      <li *ngFor="let pageNum of getPaginationArray()">
+        <button
+          (click)="goToPage(pageNum)"
+          [ngClass]="{
+            'bg-yellow-500 text-white shadow': pageNum === currentPage,
+            'bg-gray-200 hover:bg-yellow-100': pageNum !== currentPage
+          }"
+          class="px-4 py-2 rounded-full"
+        >
+          {{ pageNum }}
+        </button>
+      </li>
+    </ul>
+
+    <!-- Next -->
+    <button
+      (click)="nextPage()"
+      [disabled]="currentPage >= totalPages"
+      class="px-5 py-2 flex items-center space-x-2 border rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
+      [ngClass]="currentPage >= totalPages ? 'bg-gray-100 text-gray-400' : 'bg-gray-200 hover:bg-gray-300'"
+    >
+      <span>Next</span>
+      <span class="material-icons text-sm">chevron_right</span>
+    </button>
+
+    <!-- Jumper -->
+    <div class="flex items-center space-x-2">
+      <input
+        type="number"
+        min="1"
+        [(ngModel)]="jumpPageInput"
+        class="w-12 p-2 border border-gray-200 rounded-md text-sm"
+        placeholder="Page"
+      />
+      <button
+        (click)="jumpToPage(jumpPageInput)"
+        class="px-3 py-2 bg-yellow-600 text-white text-sm rounded-md hover:bg-yellow-700"
+      >
+        Go
+      </button>
+    </div>
+  </nav>
+
+  <!-- Pagination Info -->
+  <div class="text-sm text-gray-600 mt-4 text-center">
+    Showing {{ (currentPage - 1) * pageSize + 1 }}-{{ Math.min(currentPage * pageSize, totalRefunds) }} of {{ totalRefunds }} refunds
+  </div>
+</ng-container>

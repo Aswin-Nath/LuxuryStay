@@ -67,21 +67,18 @@ async def get_permissions_by_role(db: AsyncSession, role_id: int):
 	
 	Fetches the complete set of permissions for a specific role. Returns all granular
 	permissions that users with this role possess (e.g., WRITE on BOOKING, READ on ROOM).
+	If no permissions are assigned, returns an empty list instead of raising 404.
 	
 	Args:
 		db (AsyncSession): Database session for executing the query.
 		role_id (int): The ID of the role.
 	
 	Returns:
-		list: Permission records assigned to the role.
-	
-	Raises:
-		HTTPException (404): If no permissions found for role_id.
+		list: Permission records assigned to the role (empty list if none assigned).
 	"""
 	permissions_list = await fetch_permissions_by_role_id(db, role_id)
-	if not permissions_list:
-		raise HTTPException(status_code=404, detail=f"No permissions found for role_id {role_id}")
-	return permissions_list
+	# Return empty list instead of raising 404 - role may exist without permissions
+	return permissions_list if permissions_list else []
 
 
 # ==========================================================

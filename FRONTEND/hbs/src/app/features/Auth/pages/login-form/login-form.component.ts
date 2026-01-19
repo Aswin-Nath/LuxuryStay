@@ -3,7 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule, DOCUMENT, NgIf } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { AuthenticationService, TokenResponse } from '../../../../shared/services/authentication.service';
+import { AuthenticationService,TokenResponse } from '../../../../services/authentication.service';
+import { filter, take } from 'rxjs/operators';
 
 @Component({
   selector: 'app-login',
@@ -164,7 +165,17 @@ export class Login implements AfterViewInit {
 
   private sendLoginRequest(payload: LoginRequest) {
     this.authService.login(payload.identifier, payload.password).subscribe({
-      next: (res) => this.handleLoginSuccess(res),
+      next: (res) => {
+        // Wait for authState to be updated to true before navigating
+        // This ensures the navbar and other components see the logged-in state
+        this.authService.authState$.pipe(
+          filter(state => state === true),
+          take(1)
+        ).subscribe(() => {
+          // Auth state is now true, proceed with navigation
+          this.handleLoginSuccess(res);
+        });
+      },
       error: (err: HttpErrorResponse) => {
         this.loading = false;
         this.handleLoginError(err);
@@ -197,7 +208,7 @@ export class Login implements AfterViewInit {
   setTimeout(() => {
     this.loading = false;
     if(response.role_id==1){
-      this.router.navigate(['/dashboard']);
+      this.router.navigate(['/']);
     }
     else{
       this.router.navigate(['admin/dashboard']);

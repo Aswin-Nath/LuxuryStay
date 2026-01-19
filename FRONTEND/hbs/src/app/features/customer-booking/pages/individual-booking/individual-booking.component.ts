@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { BookingsService, BookingResponse } from '../../../../shared/services/bookings.service';
+import { BookingService, BookingResponse } from '../../../../services/room-booking.service';
 import { ReviewsService, Review } from '../../../../services/reviews.service';
 import { IssuesService } from '../../../../services/issues.service';
 import { CustomerNavbarComponent } from '../../../../layout/Customer/customer-navbar/customer-navbar.component';
@@ -53,7 +53,7 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
 
   constructor(
-    private bookingsService: BookingsService,
+    private bookingService: BookingService,
     private reviewsService: ReviewsService,
     private issuesService: IssuesService,
     private route: ActivatedRoute,
@@ -83,7 +83,7 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
     this.error = '';
 
     // Load room types first
-    this.bookingsService
+    this.bookingService
       .getRoomTypes()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
@@ -101,7 +101,7 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
   }
 
   private loadBookingWithDetails(): void {
-    this.bookingsService
+    this.bookingService
       .getBookingDetails(this.bookingId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
@@ -156,7 +156,7 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
     if (!this.booking) return;
 
     // Call the payments endpoint to get booking payments
-    this.bookingsService
+    this.bookingService
       .getPaymentsByBooking(this.bookingId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
@@ -177,7 +177,7 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
   private loadIssues(): void {
     if (!this.booking) return;
 
-    this.bookingsService
+    this.bookingService
       .getIssuesByBooking(this.bookingId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
@@ -712,7 +712,7 @@ export class BookingDetailsComponent implements OnInit, OnDestroy {
     this.closeUnifiedCancelModal();
     
     // Call the cancel booking API
-    this.bookingsService
+    this.bookingService
       .cancelBooking(this.booking.booking_id, this.cancellationReason || '')
       .pipe(takeUntil(this.destroy$))
       .subscribe({

@@ -1,0 +1,141 @@
+/* Customer Refund Detail Component Styles */
+
+:host {
+  display: block;
+}
+
+.material-icons {
+  font-family: 'Material Icons';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  display: inline-block;
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: normal;
+  word-wrap: normal;
+  white-space: nowrap;
+  direction: ltr;
+  user-select: none;
+}
+
+/* Spinner Animation */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Button Styles */
+button {
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Card Shadows */
+.shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+/* Timeline Styles */
+.w-3 {
+  width: 12px;
+}
+
+.h-3 {
+  height: 12px;
+}
+
+.h-8 {
+  height: 32px;
+}
+
+.w-1 {
+  width: 4px;
+}
+
+/* Status Badge Colors */
+.bg-yellow-600 {
+  background-color: #ca8a04;
+}
+
+.bg-green-100 {
+  background-color: #dcfce7;
+}
+
+.bg-gray-100 {
+  background-color: #f3f4f6;
+}
+
+/* Color Classes */
+.text-green-600 {
+  color: #16a34a;
+}
+
+.text-green-700 {
+  color: #15803d;
+}
+
+.text-red-700 {
+  color: #b91c1c;
+}
+
+.border-l-4 {
+  border-left-width: 4px;
+}
+
+.border-yellow-600 {
+  border-color: #ca8a04;
+}
+
+.border-green-600 {
+  border-color: #16a34a;
+}
+
+.border-blue-600 {
+  border-color: #2563eb;
+}
+
+.border-amber-600 {
+  border-color: #d97706;
+}
+
+/* Font Monospace for IDs */
+.font-mono {
+  font-family: 'Courier New', Courier, monospace;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
+  
+  h1 {
+    font-size: 1.5rem;
+  }
+  
+  h2 {
+    font-size: 1.25rem;
+  }
+  
+  h3 {
+    font-size: 1.125rem;
+  }
+  
+  .text-3xl {
+    font-size: 1.875rem;
+  }
+}

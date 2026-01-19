@@ -373,11 +373,13 @@ async def refresh_tokens(db: AsyncSession, refresh_token: str) -> AuthResult:
     try:
         payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = int(payload.get("sub"))
-    except JWTError:
+        print(f"✅ svc_refresh_tokens: JWT decoded successfully, user_id={user_id}")
+    except JWTError as e:
         # Log for debugging
         import logging
         _logger = logging.getLogger(__name__)
-        _logger.debug("refresh_tokens: invalid refresh token provided")
+        print(f"❌ svc_refresh_tokens: JWT decode failed: {str(e)}")
+        _logger.debug("refresh_tokens: invalid refresh token provided: %s", str(e))
         raise UnauthorizedException("Invalid refresh token")
 
     result = await db.execute(
@@ -385,12 +387,18 @@ async def refresh_tokens(db: AsyncSession, refresh_token: str) -> AuthResult:
     )
     session = result.scalars().first()
     if not session:
+        print(f"❌ svc_refresh_tokens: Session not found for user_id={user_id}")
         raise UnauthorizedException("Session not found")
 
+    print(f"✅ svc_refresh_tokens: Session found, is_active={session.is_active}")
+
     if not session.is_active:
+        print(f"❌ svc_refresh_tokens: Session is INACTIVE (revoked)")
         raise UnauthorizedException("Session has been revoked")
 
+    print(f"✅ svc_refresh_tokens: Checking refresh_token_expires_at: {session.refresh_token_expires_at} vs now: {datetime.utcnow()}")
     if session.refresh_token_expires_at and datetime.utcnow() > session.refresh_token_expires_at:
+        print(f"❌ svc_refresh_tokens: Refresh token EXPIRED")
         session.is_active = False
         session.revoked_at = datetime.utcnow()
         db.add(session)
@@ -405,15 +413,19 @@ async def refresh_tokens(db: AsyncSession, refresh_token: str) -> AuthResult:
         )
     )
     if blacklist_result.scalars().first():
+        print(f"❌ svc_refresh_tokens: Refresh token is BLACKLISTED")
         raise UnauthorizedException("Refresh token has been revoked")
 
     try:
         session = await refresh_access_token(db, session.access_token)
-    except UnauthorizedException:
+        print(f"✅ svc_refresh_tokens: New access token generated successfully")
+    except UnauthorizedException as e:
+        print(f"❌ svc_refresh_tokens: refresh_access_token raised UnauthorizedException: {str(e)}")
         raise
     except Exception as exc:
         import logging
         _logger = logging.getLogger(__name__)
+        print(f"❌ svc_refresh_tokens: refresh_access_token raised exception: {str(exc)}")
         _logger.debug("refresh_tokens: refresh_access_token failed: %s", str(exc))
         raise UnauthorizedException(str(exc))
 

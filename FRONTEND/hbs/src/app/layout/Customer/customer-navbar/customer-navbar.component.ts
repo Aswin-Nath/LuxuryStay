@@ -2,10 +2,10 @@ import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { Subject, Observable, takeUntil } from 'rxjs';
+import { Subject, Observable, takeUntil, merge, of } from 'rxjs';
 import { AuthenticationService } from '../../../services/authentication.service';
-import { BookingStateService } from '../../../shared/services/booking-state.service';
 import { DatePickerModalComponent } from '../../../shared/components/date-picker-modal/date-picker-modal.component';
+import { BookingService } from '../../../services/room-booking.service';
 interface Notification {
   type: 'booking' | 'issue' | 'refund' | 'offer';
   msg: string;
@@ -21,6 +21,8 @@ interface Notification {
 })
 export class CustomerNavbarComponent implements OnInit, OnDestroy {
   public isLoggedIn$: Observable<boolean>;
+  // Fallback: check localStorage directly if Observable hasn't updated
+  public isLoggedInDirect: boolean = !!localStorage.getItem('access_token');
   private readonly destroy$ = new Subject<void>();
 
   isMobileMenuOpen = false;
@@ -46,13 +48,32 @@ export class CustomerNavbarComponent implements OnInit, OnDestroy {
   constructor(
     private authService: AuthenticationService,
     private router: Router,
-        private bookingStateService: BookingStateService
-
+    private bookingService: BookingService
   ) {
-    this.isLoggedIn$ = this.authService.authState$;
+    // Merge Observable state with localStorage check
+    // Use merge to combine both: if localStorage has token OR observable is true
+    this.isLoggedIn$ = merge(
+      this.authService.authState$,
+      // Also check localStorage periodically to catch state changes
+      new Observable<boolean>(observer => {
+        const checkAuth = () => {
+          observer.next(!!localStorage.getItem('access_token'));
+        };
+        checkAuth();
+        // Re-check every 500ms to catch any localStorage changes
+        const interval = setInterval(checkAuth, 500);
+        return () => clearInterval(interval);
+      })
+    ) as Observable<boolean>;
   }
 
-  ngOnInit(): void { }
+  ngOnInit(): void {
+    // Subscribe to auth state changes to update direct flag
+    this.authService.authState$.pipe(takeUntil(this.destroy$)).subscribe(state => {
+      this.isLoggedInDirect = state || !!localStorage.getItem('access_token');
+      console.debug('🔐 Customer Navbar: Auth state updated', { state, hasToken: !!localStorage.getItem('access_token') });
+    });
+  }
 
   ngOnDestroy(): void {
     this.destroy$.next();
@@ -160,7 +181,7 @@ export class CustomerNavbarComponent implements OnInit, OnDestroy {
     this.showDatePickerModal = false;
     
     // Store state in service
-    this.bookingStateService.setBookingState({
+    this.bookingService.setBookingState({
       checkIn: data.checkIn,
       checkOut: data.checkOut
     });

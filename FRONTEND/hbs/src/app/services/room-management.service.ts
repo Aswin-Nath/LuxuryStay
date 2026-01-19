@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { environment } from '../../../environments/environment';
+import { environment } from '../../environments/environment';
 
 export interface RoomType{
     room_type_id: Number,
@@ -153,14 +153,19 @@ export class RoomsService {
     return this.http.get<RoomType[]>(`${this.apiUrl}/room-types/`, { params });
   }
 
+
+  getRoomType(room_type_id:number):Observable<any>{
+      return this.http.get<any>(`${this.apiUrl}/types/${room_type_id}`)
+  }
+
   // Get images and reviews for all room types in a single call
   getRoomMedias(): Observable<{ [room_type_id: number]: { images: any[]; reviews: any[] } }> {
     return this.http.get<{ [room_type_id: number]: { images: any[]; reviews: any[] } }>(`${this.apiUrl}/room-medias`);
   }
 
-  getRoomType(id: number): Observable<any> {
-    return this.http.get<any>(`${this.apiUrl}/types/${id}`);
-  }
+  // getRoomType(id: number): Observable<any> {
+  //   return this.http.get<any>(`${this.apiUrl}/types/${id}`);
+  // }
 
   updateRoomType(id: number, data: any): Observable<any> {
     return this.http.put<any>(`${this.apiUrl}/types/${id}`, data);

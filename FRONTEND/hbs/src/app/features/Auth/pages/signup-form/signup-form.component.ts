@@ -3,8 +3,7 @@ import { CommonModule, DOCUMENT } from '@angular/common';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
-// import { SignupService } from "../signup.service"
-import { SignupService } from '../../../../services/signup.service';
+import { AuthenticationService } from '../../../../services/authentication.service';
 @Component({
   selector: 'app-signup',
   templateUrl: './signup-form.html',
@@ -36,7 +35,7 @@ export class Signup implements AfterViewInit {
   passwordError = '';
 
   private emailRegex = /^[^\s@]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-  private phoneRegex = /^\+?\d{10,15}$/;
+  private phoneRegex = /^\d{10}$/;
   private passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 
 
@@ -123,7 +122,7 @@ export class Signup implements AfterViewInit {
     const value = this.phone.trim();
     // If no value, do not clear existing errors (eg. 'Phone number is required.') so highlight remains.
     if (!value) return;
-    this.phoneError = this.phoneRegex.test(value) ? '' : 'Invalid phone number.';
+    this.phoneError = this.phoneRegex.test(value) ? '' : 'Phone number must be exactly 10 digits.';
   }
 
   private validatePersonalInfo() {
@@ -160,7 +159,7 @@ export class Signup implements AfterViewInit {
       this.phoneError = 'Phone number is required.';
       valid = false;
     } else if (!this.phoneRegex.test(this.phone.trim())) {
-      this.phoneError = 'Please enter a valid phone number.';
+      this.phoneError = 'Phone number must be exactly 10 digits.';
       valid = false;
     }
     this.onContactInfoChange();
@@ -206,7 +205,7 @@ export class Signup implements AfterViewInit {
       password: this.password
     };
   }
-  constructor(private signupService: SignupService, private router: Router, @Inject(DOCUMENT) private document: Document) {}
+  constructor(private signupService: AuthenticationService, private router: Router, @Inject(DOCUMENT) private document: Document) {}
 
   ngAfterViewInit() {
     this.hideToast();

@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AdminNavbarComponent } from '../../../../layout/Admin/admin-navbar/admin-navbar.component';
 import { AdminSidebarComponent } from '../../../../layout/Admin/admin-sidebar/admin-sidebar.component';
-import { RoleManagementService, Role, PermissionGroup, Permission } from '../../../../services/role-management.service';
+import { AuthenticationService, Role, PermissionGroup, Permission } from '../../../../services/authentication.service';
 // import { RolePermissionModalComponent } from '../permissions-management/role-permission-modal.component';
 // import { AddRoleModalComponent } from './add-role-modal.component';
 import { AddRoleModalComponent } from '../create-role/create_role.component';
@@ -47,7 +47,7 @@ export class RoleManagementComponent implements OnInit {
   totalRecords = 0;
   totalPages = 0;
 
-  constructor(private roleService: RoleManagementService) {}
+  constructor(private roleService: AuthenticationService) {}
 
   ngOnInit(): void {
     this.loadRoles();
@@ -73,8 +73,14 @@ export class RoleManagementComponent implements OnInit {
               this.rolePermissionsMap[role.role_id] = permissions.map(p => p.permission_id) || [];
             },
             error: (err: any) => {
-              console.error(`Error loading permissions for role ${role.role_id}:`, err);
-              this.rolePermissionsMap[role.role_id] = [];
+              // If 404, mark as "not available" instead of error
+              if (err.status === 404) {
+                console.warn(`⚠️ No permissions assigned to role ${role.role_id}`);
+                this.rolePermissionsMap[role.role_id] = [];
+              } else {
+                console.error(`Error loading permissions for role ${role.role_id}:`, err);
+                this.rolePermissionsMap[role.role_id] = [];
+              }
             }
           });
         });
@@ -116,9 +122,20 @@ export class RoleManagementComponent implements OnInit {
         this.showPermissionModal = true;
       },
       error: (err: any) => {
-        console.error('Error loading role permissions:', err);
-        this.selectedPermissions = [];
-        this.showPermissionModal = true;
+        // If 404, show modal but with message that permissions are not available
+        if (err.status === 404) {
+          console.warn(`⚠️ No permissions assigned to role ${role.role_id}`);
+          this.selectedPermissions = [];
+          this.rolePermissionsMap[role.role_id] = [];
+          // Show toast instead of error
+          this.showSuccessMessage(`Permissions not available for this role`);
+          // Still open modal to allow assigning permissions
+          this.showPermissionModal = true;
+        } else {
+          console.error('Error loading role permissions:', err);
+          this.selectedPermissions = [];
+          this.showPermissionModal = true;
+        }
       }
     });
   }

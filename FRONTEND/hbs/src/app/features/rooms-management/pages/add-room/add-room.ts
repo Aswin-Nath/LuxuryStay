@@ -1,8 +1,7 @@
 import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-// import { RoomsService, RoomType } from '../../../core/services/rooms/rooms.service';
-import { RoomsService,RoomType } from '../../../../shared/services/rooms.service';
+import { RoomsService, RoomType } from '../../../../services/room-management.service';
 @Component({
   selector: 'app-add-room',
   standalone: true,

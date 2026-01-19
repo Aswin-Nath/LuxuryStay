@@ -6,8 +6,7 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { OfferService } from '../../../../services/offer.service';
 import { WishlistService } from '../../../../services/wishlist.service';
-import { RoomsService } from '../../../../shared/services/rooms.service';
-import { BookingStateService } from '../../../../shared/services/booking-state.service';
+import { RoomsService } from '../../../../services/room-management.service';
 import { CustomerNavbarComponent } from '../../../../layout/Customer/customer-navbar/customer-navbar.component';
 import { OfferDatePickerModalComponent } from '../../../../shared/components/offer-date-picker-modal/offer-date-picker-modal.component';
 
@@ -81,7 +80,6 @@ export class OfferDisplayComponent implements OnInit, OnDestroy {
     private roomsService: RoomsService,
     private router: Router,
     private route: ActivatedRoute,
-    private bookingStateService: BookingStateService
   ) {}
 
   ngOnInit(): void {

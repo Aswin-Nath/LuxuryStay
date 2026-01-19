@@ -2,8 +2,7 @@ import { Component, OnInit, OnDestroy, ChangeDetectorRef, ChangeDetectionStrateg
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule, ActivatedRoute } from '@angular/router';
-import { BookingService, RoomLock, BookingSession, Room } from '../../../../shared/services/booking.service';
-import { BookingStateService } from '../../../../shared/services/booking-state.service';
+import { BookingService, RoomLock, BookingSession, Room } from '../../../../services/room-booking.service';
 import { ToastService } from '../../../../shared/services/toast.service';
 import { RoomCardComponent } from '../room-card/room-card.component';
 import { Subject } from 'rxjs';
@@ -180,9 +179,7 @@ export class BookingComponent implements OnInit, OnDestroy {
   constructor(
     public bookingService: BookingService,
     private router: Router,
-    private route: ActivatedRoute,
     private cdr: ChangeDetectorRef,
-    private bookingStateService: BookingStateService,
     private toastService: ToastService
   ) {
     // Get previousPage from router state
@@ -254,7 +251,7 @@ export class BookingComponent implements OnInit, OnDestroy {
     this.previousCheckOut = tomorrow;
 
    // Subscribe to booking state service (replaces query params)
-    this.bookingStateService.getBookingState()
+    this.bookingService.getBookingState()
       .pipe(takeUntil(this.destroy$))
       .subscribe(state => {
         if (!state) return;
@@ -288,7 +285,7 @@ export class BookingComponent implements OnInit, OnDestroy {
           }
 
           // Clear state from service after using it
-          this.bookingStateService.clearBookingState();
+          this.bookingService.clearBookingState();
 
           // Only proceed if we're still in DATES phase
           if (this.currentPhase === PHASES.DATES) {

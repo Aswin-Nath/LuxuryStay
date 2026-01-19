@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router, NavigationEnd } from '@angular/router';
 import { HasPermissionDirective } from '../../../core/directives/has-permission.directive';
-import { PermissionService } from '../../../services/permissions';
+import { AuthenticationService } from '../../../services/authentication.service';
 import { filter } from 'rxjs/operators';
 
 interface SidebarLink {
@@ -38,7 +38,7 @@ export class AdminSidebarComponent implements OnInit {
 
   currentRoute: string = '';
 
-  constructor(public permissionService: PermissionService, private router: Router) {}
+  constructor(public permissionService: AuthenticationService, private router: Router) {}
 
   ngOnInit(): void {
     // Track current route changes

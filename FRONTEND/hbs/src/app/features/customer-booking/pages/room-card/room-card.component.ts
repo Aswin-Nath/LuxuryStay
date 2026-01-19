@@ -2,7 +2,7 @@ import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy, Change
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { BookingService, RoomLock } from '../../../../shared/services/booking.service';
+import { BookingService, RoomLock } from '../../../../services/room-booking.service';
 import { takeUntil } from 'rxjs/operators';
 import { Subject } from 'rxjs';
 

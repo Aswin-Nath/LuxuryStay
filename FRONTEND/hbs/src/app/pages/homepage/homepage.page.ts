@@ -2,7 +2,6 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { AuthenticationService } from '../../services/authentication.service';
-import { BookingStateService } from '../../shared/services/booking-state.service';
 import { DatePickerModalComponent } from '../../shared/components/date-picker-modal/date-picker-modal.component';
 import { CustomerNavbarComponent } from '../../layout/Customer/customer-navbar/customer-navbar.component';
 import { HeroSectionComponent } from './components/hero-section/hero-section.component';
@@ -14,6 +13,7 @@ import { TestimonialsSectionComponent } from './components/testimonials-section/
 import { DestinationsSectionComponent } from './components/destinations-section/destinations-section.component';
 import { HotelInfoSectionComponent } from './components/hotel-info-section/hotel-info-section.component';
 import { FooterComponent } from '../../layout/Customer/footer/footer.component';
+import { BookingService } from '../../services/room-booking.service';
 
 @Component({
   selector: 'app-homepage',
@@ -50,21 +50,21 @@ export class HomepageComponent implements OnInit {
       name: 'Deluxe Room',
       image: '/assets/images/room1.jpg',
       description: 'Elegant room with stunning city views, modern amenities, and luxury comfort.',
-      price: '$150/night'
+      price: '₹15000/night'
     },
     {
       id: 2,
       name: 'Executive Suite',
       image: 'https://images.unsplash.com/photo-1505691723518-36a5ac3be353?auto=format&fit=crop&w=600&q=80',
       description: 'Spacious suite with premium furnishings, dedicated workspace, and exclusive services.',
-      price: '$250/night'
+      price: '₹25000/night'
     },
     {
       id: 3,
       name: 'Presidential Suite',
       image: '/assets/images/room3.jpg',
       description: 'Luxurious penthouse suite with panoramic views, private spa, and concierge service.',
-      price: '$500/night'
+      price: '₹50000/night'
     }
   ];
 
@@ -177,7 +177,7 @@ export class HomepageComponent implements OnInit {
   constructor(
     private authService: AuthenticationService,
     private router: Router,
-    private bookingStateService: BookingStateService
+    private bookingService: BookingService
   ) {}
 
   ngOnInit(): void {
@@ -252,7 +252,7 @@ export class HomepageComponent implements OnInit {
   onDatePickerProceed(data: { checkIn: string; checkOut: string; roomTypeId?: number; offerId?: number }): void {
     this.showDatePickerModal = false;
 
-    this.bookingStateService.setBookingState({
+    this.bookingService.setBookingState({
       checkIn: data.checkIn,
       checkOut: data.checkOut
     });

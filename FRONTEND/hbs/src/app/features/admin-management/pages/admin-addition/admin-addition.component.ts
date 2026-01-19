@@ -1,8 +1,7 @@
 import { Component, OnInit, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { AdminManagementService, CreateAdminPayload, Role } from '../../../../services/admin-management.service';
-import { RoleManagementService } from '../../../../services/role-management.service';
+import { AuthenticationService, CreateAdminPayload, Role } from '../../../../services/authentication.service';
 
 @Component({
   selector: 'app-admin-form-modal',
@@ -67,8 +66,8 @@ export class AdminFormModalComponent implements OnInit {
   touched: { [key: string]: boolean } = {};
 
   constructor(
-    private adminService: AdminManagementService,
-    private roleService: RoleManagementService
+    private adminService: AuthenticationService,
+    private roleService: AuthenticationService
   ) {}
 
   ngOnInit(): void {
@@ -171,18 +170,11 @@ export class AdminFormModalComponent implements OnInit {
       return;
     }
 
-    const phoneRegex = /^[0-9\s\-\+\(\)]+$/;
+    const phoneRegex = /^\d{10}$/;
     if (!phoneRegex.test(phone)) {
-      this.errors['phone_number'] = 'Invalid phone number format';
+      this.errors['phone_number'] = 'Phone number must be exactly 10 digits';
       return;
     }
-
-    if (phone.replace(/\D/g, '').length < 7) {
-      this.errors['phone_number'] = 'Phone number must have at least 7 digits';
-      return;
-    }
-
-
   }
 
   /**
@@ -292,10 +284,7 @@ export class AdminFormModalComponent implements OnInit {
       this.touched[key] = true;
     });
 
-    if (!this.validateForm()) {
-      this.errors['general'] = 'Please fix all errors before submitting';
-      return;
-    }
+
 
     this.isSubmitting = true;
     this.errors['general'] = '';
@@ -304,6 +293,8 @@ export class AdminFormModalComponent implements OnInit {
       ...this.formData,
       dob: this.formData.dob ? new Date(this.formData.dob).toISOString().split('T')[0] : ''
     };
+
+    console.log('📤 Creating admin with payload:', payload);
 
     if (this.mode === 'create') {
       this.adminService.createAdmin(payload).subscribe({
@@ -314,18 +305,16 @@ export class AdminFormModalComponent implements OnInit {
         },
         error: (err: any) => {
           this.isSubmitting = false;
-          if (err.error?.detail) {
-            this.errors['general'] = err.error.detail;
-          } else {
-            this.errors['general'] = 'Failed to create admin. Please try again.';
-          }
+          console.error('❌ Error creating admin:', err);
+          const errorDetail = err.error?.detail || err.error?.message || 'Failed to create admin. Please try again.';
+          this.errors['general'] = Array.isArray(errorDetail) 
+            ? errorDetail.map((e: any) => e.msg || e).join('; ')
+            : errorDetail;
         }
       });
     } else if (this.mode === 'edit' && this.adminId) {
       // For edit mode, only include password if it was provided
-      if (!payload.password) {
-        delete payload.password;
-      }
+
       
       this.adminService.updateAdmin(this.adminId, payload).subscribe({
         next: (response: any) => {

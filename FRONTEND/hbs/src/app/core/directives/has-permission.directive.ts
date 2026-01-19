@@ -1,6 +1,5 @@
 import { Directive, Input, TemplateRef, ViewContainerRef } from "@angular/core";
-// import { PermissionService } from "../services/permissions/permissions";
-import { PermissionService } from "../../services/permissions";
+import { AuthenticationService } from "../../services/authentication.service";
 
 @Directive({
     selector:"[appHasPermission]",
@@ -12,7 +11,7 @@ export class HasPermissionDirective{
     constructor(
         private template:TemplateRef<any>,
         private view:ViewContainerRef,
-        private permissions:PermissionService
+        private permissions:AuthenticationService
     ){
         // Subscribe to permission changes and re-render
         this.permissions.permissions$.subscribe(() => {

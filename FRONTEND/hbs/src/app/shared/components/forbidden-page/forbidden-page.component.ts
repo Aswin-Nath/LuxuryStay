@@ -6,7 +6,6 @@ import { RouterLink } from '@angular/router';
   selector: 'app-forbidden-page',
   templateUrl: './forbidden-page.component.html',
   standalone:true,
-  imports:[RouterLink],
   styleUrl: './forbidden-page.component.css'
 })
 export class ForbiddenPageComponent {
