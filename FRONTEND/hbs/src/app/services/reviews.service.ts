@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { ApiService } from '../core/services/api.service';
+import { environment } from '../../environments/environment';
 interface ImageUrl{
   image_url:string;
 } 
@@ -46,33 +46,35 @@ export interface AdminResponseCreate {
   providedIn: 'root'
 })
 export class ReviewsService {
-  constructor(private http: HttpClient, private apiService: ApiService) {}
+  private apiUrl = `${environment.apiUrl}/reviews`;
+  
+  constructor(private http: HttpClient) {}
 
   // Get reviews for a specific booking
   getReviewsByBooking(bookingId: number): Observable<Review[]> {
-    return this.http.get<Review[]>(this.apiService.getReviewsUrl() + `?booking_id=${bookingId}`);
+    return this.http.get<Review[]>(`${this.apiUrl}?booking_id=${bookingId}`);
   }
 
   // Get reviews for a room type
   getReviewsByRoomType(roomTypeId: number): Observable<Review[]> {
-    return this.http.get<Review[]>(this.apiService.getReviewsUrl() + `?room_type_id=${roomTypeId}`);
+    return this.http.get<Review[]>(`${this.apiUrl}?room_type_id=${roomTypeId}`);
   }
 
   // Get single review with details
   getReview(reviewId: number): Observable<Review> {
-    return this.http.get<Review>(this.apiService.getUrl(`reviews/${reviewId}`));
+    return this.http.get<Review>(`${this.apiUrl}/${reviewId}`);
   }
 
   // Create a new review
   createReview(payload: ReviewCreate): Observable<Review> {
-    console.log(this.apiService.getReviewsUrl());
+    console.log(this.apiUrl);
     const formData = new FormData();
     Object.entries(payload).forEach(([key, value]) => {
       if (value !== null && value !== undefined) {
         formData.append(key, value.toString());
       }
     });
-    return this.http.post<Review>(this.apiService.getReviewsUrl(), formData);
+    return this.http.post<Review>(this.apiUrl, formData);
   }
 
   // Update existing review (user can only update their own)
@@ -82,13 +84,13 @@ export class ReviewsService {
     if (comment) {
       formData.append('comment', comment);
     }
-    return this.http.put<Review>(this.apiService.getUrl(`reviews/${reviewId}`), formData);
+    return this.http.put<Review>(`${this.apiUrl}/${reviewId}`, formData);
   }
 
   // Admin posts response to review (one response per review)
   addAdminResponse(reviewId: number, adminResponse: string): Observable<Review> {
     const payload ={'admin_response':adminResponse};
-    return this.http.put<Review>(this.apiService.getUrl(`reviews/${reviewId}/respond`), payload);
+    return this.http.put<Review>(`${this.apiUrl}/${reviewId}/respond`, payload);
   }
 
   // Upload images for review (user review images)
@@ -97,7 +99,7 @@ export class ReviewsService {
     files.forEach((file) => {
       formData.append('files', file);
     });
-    return this.http.post(this.apiService.getUrl(`reviews/${reviewId}/images`), formData);
+    return this.http.post(`${this.apiUrl}/${reviewId}/images`, formData);
   }
 
   // Upload images for admin response
@@ -106,21 +108,21 @@ export class ReviewsService {
     files.forEach((file) => {
       formData.append('files', file);
     });
-    return this.http.post(this.apiService.getUrl(`reviews/${reviewId}/admin-images`), formData);
+    return this.http.post(`${this.apiUrl}/${reviewId}/admin-images`, formData);
   }
 
   // Delete review image
   deleteReviewImage(reviewId: number, imageId: number): Observable<any> {
-    return this.http.delete(this.apiService.getUrl(`reviews/${reviewId}/images/${imageId}`));
+    return this.http.delete(`${this.apiUrl}/${reviewId}/images/${imageId}`);
   }
 
   // Delete admin response image
   deleteAdminResponseImage(reviewId: number, imageId: number): Observable<any> {
-    return this.http.delete(this.apiService.getUrl(`reviews/${reviewId}/admin-images/${imageId}`));
+    return this.http.delete(`${this.apiUrl}/${reviewId}/admin-images/${imageId}`);
   }
 
   // Delete entire review
   deleteReview(reviewId: number): Observable<any> {
-    return this.http.delete(this.apiService.getUrl(`reviews/${reviewId}`));
+    return this.http.delete(`${this.apiUrl}/${reviewId}`);
   }
 }

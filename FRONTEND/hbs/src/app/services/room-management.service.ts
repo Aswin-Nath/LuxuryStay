@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { ApiService } from '../core/services/api.service';
+import { environment } from '../../environments/environment';
 
 export interface RoomType{
     room_type_id: Number,
@@ -49,7 +49,9 @@ export interface RoomsFilterParams {
   providedIn: 'root'
 })
 export class RoomsService {
-  constructor(private http: HttpClient, private apiService: ApiService) {}
+  private apiUrl = `${environment.apiUrl}/room-management`;
+
+  constructor(private http: HttpClient) {}
 
   getRooms(filters?: RoomsFilterParams): Observable<PaginatedRoomsResponse> {
     let params = new HttpParams();
@@ -81,35 +83,35 @@ export class RoomsService {
       }
     }
     
-    return this.http.get<PaginatedRoomsResponse>(this.apiService.getRoomManagementUrl() + '/rooms', { params });
+    return this.http.get<PaginatedRoomsResponse>(`${this.apiUrl}/rooms`, { params });
   }
 
   getRoom(id: number): Observable<Room> {
-    return this.http.get<Room>(this.apiService.getRoomManagementUrl() + `/rooms/${id}`);
+    return this.http.get<Room>(`${this.apiUrl}/rooms/${id}`);
   }
 
   createRoom(room: any): Observable<Room> {
-    return this.http.post<Room>(this.apiService.getRoomManagementUrl() + '/rooms', room);
+    return this.http.post<Room>(`${this.apiUrl}/rooms`, room);
   }
 
   updateRoom(id: number, room: any): Observable<Room> {
-    return this.http.put<Room>(this.apiService.getRoomManagementUrl() + `/rooms/${id}`, room);
+    return this.http.put<Room>(`${this.apiUrl}/rooms/${id}`, room);
   }
 
   deleteRoom(id: number): Observable<void> {
-    return this.http.delete<void>(this.apiService.getRoomManagementUrl() + `/rooms/${id}`);
+    return this.http.delete<void>(`${this.apiUrl}/rooms/${id}`);
   }
 
   freezeRoom(id: number, reason: string = ''): Observable<any> {
-    return this.http.post<any>(this.apiService.getRoomManagementUrl() + `/rooms/${id}/freeze`, { freeze_reason: reason });
+    return this.http.post<any>(`${this.apiUrl}/rooms/${id}/freeze`, { freeze_reason: reason });
   }
 
   unfreezeRoom(id: number): Observable<any> {
-    return this.http.delete<any>(this.apiService.getRoomManagementUrl() + `/rooms/${id}/freeze`);
+    return this.http.delete<any>(`${this.apiUrl}/rooms/${id}/freeze`);
   }
 
   getRoomTypes(withDetails?: boolean): Observable<RoomType[]> {
-    return this.http.get<RoomType[]>(this.apiService.getRoomManagementUrl() + '/room-types');
+    return this.http.get<RoomType[]>(`${this.apiUrl}/room-types`);
   }
 
   // Get room types with customer filters (price range, occupancy, square footage)
@@ -148,17 +150,17 @@ export class RoomsService {
       }
     }
     
-    return this.http.get<RoomType[]>(this.apiService.getRoomManagementUrl() + '/room-types/', { params });
+    return this.http.get<RoomType[]>(`${this.apiUrl}/room-types/`, { params });
   }
 
 
   getRoomType(room_type_id:number):Observable<any>{
-      return this.http.get<any>(this.apiService.getRoomManagementUrl() + `/types/${room_type_id}`)
+      return this.http.get<any>(`${this.apiUrl}/types/${room_type_id}`)
   }
 
   // Get images and reviews for all room types in a single call
   getRoomMedias(): Observable<{ [room_type_id: number]: { images: any[]; reviews: any[] } }> {
-    return this.http.get<{ [room_type_id: number]: { images: any[]; reviews: any[] } }>(this.apiService.getRoomManagementUrl() + '/room-medias');
+    return this.http.get<{ [room_type_id: number]: { images: any[]; reviews: any[] } }>(`${this.apiUrl}/room-medias`);
   }
 
   // getRoomType(id: number): Observable<any> {
@@ -166,60 +168,60 @@ export class RoomsService {
   // }
 
   updateRoomType(id: number, data: any): Observable<any> {
-    return this.http.put<any>(this.apiService.getRoomManagementUrl() + `/types/${id}`, data);
+    return this.http.put<any>(`${this.apiUrl}/types/${id}`, data);
   }
 
   // Update amenities for all rooms of a room type
   updateRoomTypeAmenities(roomTypeId: number, amenityIds: number[]): Observable<any> {
-    return this.http.post<any>(this.apiService.getRoomManagementUrl() + `/types/${roomTypeId}/amenities/update`, { amenity_ids: amenityIds });
+    return this.http.post<any>(`${this.apiUrl}/types/${roomTypeId}/amenities/update`, { amenity_ids: amenityIds });
   }
 
   getRoomTypesWithStats(): Observable<any[]> {
-    return this.http.get<any[]>(this.apiService.getRoomManagementUrl() + '/room-types/with-stats');
+    return this.http.get<any[]>(`${this.apiUrl}/room-types/with-stats`);
   }
 
   getAmenities(): Observable<any[]> {
-    return this.http.get<any[]>(this.apiService.getRoomManagementUrl() + '/amenities');
+    return this.http.get<any[]>(`${this.apiUrl}/amenities`);
   }
 
   // Dashboard KPIs
   getRoomKpis(): Observable<any> {
-    return this.http.get<any>(this.apiService.getRoomManagementUrl() + '/dashboard/kpis');
+    return this.http.get<any>(`${this.apiUrl}/dashboard/kpis`);
   }
 
   // Amenities with room count
   getAmenitiesWithRoomCount(): Observable<any[]> {
-    return this.http.get<any[]>(this.apiService.getRoomManagementUrl() + '/amenities/with-room-count');
+    return this.http.get<any[]>(`${this.apiUrl}/amenities/with-room-count`);
   }
 
   // Get amenities for a specific room type (NEW ENDPOINT)
   getAmenitiesForRoomType(roomTypeId: number): Observable<any> {
-    return this.http.get<any>(this.apiService.getRoomManagementUrl() + `/types/${roomTypeId}/amenities`);
+    return this.http.get<any>(`${this.apiUrl}/types/${roomTypeId}/amenities`);
   }
 
   // Get rooms for a specific amenity (deprecated - now returns room types)
   getRoomsForAmenity(amenityId: number): Observable<Room[]> {
-    return this.http.get<Room[]>(this.apiService.getRoomManagementUrl() + `/amenities/${amenityId}/rooms`);
+    return this.http.get<Room[]>(`${this.apiUrl}/amenities/${amenityId}/rooms`);
   }
 
   // Map amenity to room (deprecated - use updateRoomTypeAmenities instead)
   mapAmenity(roomId: number, amenityId: number): Observable<any> {
-    return this.http.post<any>(this.apiService.getRoomManagementUrl() + `/rooms/${roomId}/amenities/map`, { amenity_ids: [amenityId] });
+    return this.http.post<any>(`${this.apiUrl}/rooms/${roomId}/amenities/map`, { amenity_ids: [amenityId] });
   }
 
   // Unmap amenity from room (deprecated - use updateRoomTypeAmenities instead)
   unmapAmenity(roomId: number, amenityId: number): Observable<any> {
-    return this.http.delete<any>(this.apiService.getRoomManagementUrl() + `/rooms/${roomId}/amenities/unmap`, { body: { amenity_ids: [amenityId] } });
+    return this.http.delete<any>(`${this.apiUrl}/rooms/${roomId}/amenities/unmap`, { body: { amenity_ids: [amenityId] } });
   }
 
   // Delete amenity (will unmap from all rooms)
   deleteAmenity(amenityId: number): Observable<any> {
-    return this.http.delete<any>(this.apiService.getRoomManagementUrl() + `/amenities/${amenityId}`);
+    return this.http.delete<any>(`${this.apiUrl}/amenities/${amenityId}`);
   }
 
   // Update amenity
   updateAmenity(amenityId: number, data: any): Observable<any> {
-    return this.http.put<any>(this.apiService.getRoomManagementUrl() + `/amenities/${amenityId}`, data);
+    return this.http.put<any>(`${this.apiUrl}/amenities/${amenityId}`, data);
   }
 
   // Upload single image for room type
@@ -229,7 +231,7 @@ export class RoomsService {
     if (caption) {
       formData.append('caption', caption);
     }
-    return this.http.post<any>(this.apiService.getRoomManagementUrl() + `/types/${roomTypeId}/images`, formData);
+    return this.http.post<any>(`${this.apiUrl}/types/${roomTypeId}/images`, formData);
   }
 
   // Upload multiple images for room type
@@ -263,7 +265,7 @@ export class RoomsService {
 
   // Get images for room type
   getRoomTypeImages(roomTypeId: number): Observable<any[]> {
-    return this.http.get<any[]>(this.apiService.getRoomManagementUrl() + `/types/${roomTypeId}/images`);
+    return this.http.get<any[]>(`${this.apiUrl}/types/${roomTypeId}/images`);
   }
 
   // Delete room type images
@@ -272,33 +274,33 @@ export class RoomsService {
     imageIds.forEach(id => {
       params = params.append('image_ids', id.toString());
     });
-    return this.http.delete<any>(this.apiService.getRoomManagementUrl() + `/types/${roomTypeId}/images`, { params });
+    return this.http.delete<any>(`${this.apiUrl}/types/${roomTypeId}/images`, { params });
   }
 
   // Mark room type image as primary
   markRoomTypeImagePrimary(roomTypeId: number, imageId: number): Observable<any> {
-    return this.http.put<any>(this.apiService.getRoomManagementUrl() + `/types/${roomTypeId}/images/${imageId}/primary`, {});
+    return this.http.put<any>(`${this.apiUrl}/types/${roomTypeId}/images/${imageId}/primary`, {});
   }
 
   // Create new amenity
   createAmenity(data: any): Observable<any> {
-    return this.http.post<any>(this.apiService.getRoomManagementUrl() + '/amenities', data);
+    return this.http.post<any>(`${this.apiUrl}/amenities`, data);
   }
 
   // Create new room type
   createRoomType(data: any): Observable<any> {
-    return this.http.post<any>(this.apiService.getRoomManagementUrl() + '/types', data);
+    return this.http.post<any>(`${this.apiUrl}/types`, data);
   }
 
   // Create new room type with images (FormData)
   createRoomTypeWithImages(formData: FormData): Observable<any> {
-    return this.http.post<any>(this.apiService.getRoomManagementUrl() + '/types', formData);
+    return this.http.post<any>(`${this.apiUrl}/types`, formData);
   }
 
   // Bulk upload rooms from CSV
   bulkUploadRooms(file: File): Observable<any> {
     const formData = new FormData();
     formData.append('file', file);
-    return this.http.post<any>(this.apiService.getRoomManagementUrl() + '/rooms/bulk-upload', formData);
+    return this.http.post<any>(`${this.apiUrl}/rooms/bulk-upload`, formData);
   }
 }

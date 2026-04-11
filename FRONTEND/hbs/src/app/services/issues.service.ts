@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
-import { ApiService } from '../core/services/api.service';
+import { environment } from '../../environments/environment';
 export interface IssueCreate {
   booking_id: number;
   room_ids?: number[];
@@ -67,7 +67,9 @@ export interface ChatMessage {
   providedIn: 'root'
 })
 export class IssuesService {
-  constructor(private http: HttpClient, private apiService: ApiService) {}
+  private apiUrl = `${environment.apiUrl}/issues`;
+
+  constructor(private http: HttpClient) {}
 
   // ========== CUSTOMER ENDPOINTS ==========
 
@@ -85,7 +87,7 @@ export class IssuesService {
       formData.append('room_ids', JSON.stringify(payload.room_ids));
     }
 
-    return this.http.post<IssueResponse>(this.apiService.getIssuesUrl() + '/', formData);
+    return this.http.post<IssueResponse>(`${this.apiUrl}/`, formData);
   }
 
   /**
@@ -115,7 +117,7 @@ export class IssuesService {
     if (date_from) params = params.set('date_from', date_from);
     if (date_to) params = params.set('date_to', date_to);
     
-    return this.http.get<IssueResponse[]>(this.apiService.getIssuesUrl() + '/customer/', { params });
+    return this.http.get<IssueResponse[]>(`${this.apiUrl}/customer/`, { params });
   }
 
   /**
@@ -124,7 +126,7 @@ export class IssuesService {
    * @returns Observable of issue with full details
    */
   getMyIssueDetails(issueId: number): Observable<IssueResponse> {
-    return this.http.get<IssueResponse>(this.apiService.getIssuesUrl() + `/customer/${issueId}`);
+    return this.http.get<IssueResponse>(`${this.apiUrl}/customer/${issueId}`);
   }
 
   /**
@@ -143,7 +145,7 @@ export class IssuesService {
       formData.append('description', description);
     }
 
-    return this.http.put<IssueResponse>(this.apiService.getIssuesUrl() + `/${issueId}`, formData);
+    return this.http.put<IssueResponse>(`${this.apiUrl}/${issueId}`, formData);
   }
 
   /**
@@ -152,7 +154,7 @@ export class IssuesService {
    * @returns Observable of chat messages
    */
   getIssueChats(issueId: number): Observable<ChatMessage[]> {
-    return this.http.get<ChatMessage[]>(this.apiService.getIssuesUrl() + `/customer/${issueId}/chat`);
+    return this.http.get<ChatMessage[]>(`${this.apiUrl}/customer/${issueId}/chat`);
   }
 
   /**
@@ -165,7 +167,7 @@ export class IssuesService {
     const formData = new FormData();
     formData.append('message', message);
 
-    return this.http.post<ChatMessage>(this.apiService.getIssuesUrl() + `/customer/${issueId}/chat`, formData);
+    return this.http.post<ChatMessage>(`${this.apiUrl}/customer/${issueId}/chat`, formData);
   }
 
   /**
@@ -174,7 +176,7 @@ export class IssuesService {
    * @returns Observable of image records for the issue
    */
   getIssueImages(issueId: number): Observable<Image[]> {
-    return this.http.get<Image[]>(this.apiService.getIssuesUrl() + `/${issueId}/images`);
+    return this.http.get<Image[]>(`${this.apiUrl}/${issueId}/images`);
   }
 
   /**
@@ -189,7 +191,7 @@ export class IssuesService {
       formData.append('files', file);
     });
 
-    return this.http.post<Image[]>(this.apiService.getIssuesUrl() + `/${issueId}/images`, formData);
+    return this.http.post<Image[]>(`${this.apiUrl}/${issueId}/images`, formData);
   }
 
   /**
@@ -199,7 +201,7 @@ export class IssuesService {
    * @returns Observable of deletion response
    */
   deleteIssueImage(issueId: number, imageId: number): Observable<any> {
-    return this.http.delete(this.apiService.getIssuesUrl() + `/${issueId}/images/${imageId}`);
+    return this.http.delete(`${this.apiUrl}/${issueId}/images/${imageId}`);
   }
 
   // ========== ADMIN ENDPOINTS ==========
@@ -237,7 +239,7 @@ export class IssuesService {
     if (date_from) params = params.set('date_from', date_from);
     if (date_to) params = params.set('date_to', date_to);
     
-    return this.http.get<IssueResponse[]>(this.apiService.getIssuesUrl() + '/admin/', { params });
+    return this.http.get<IssueResponse[]>(`${this.apiUrl}/admin/`, { params });
   }
 
   /**
@@ -246,7 +248,7 @@ export class IssuesService {
    * @returns Observable of issue with full details
    */
   getIssueDetailsAdmin(issueId: number): Observable<IssueResponse> {
-    return this.http.get<IssueResponse>(this.apiService.getIssuesUrl() + `/admin/${issueId}`);
+    return this.http.get<IssueResponse>(`${this.apiUrl}/admin/${issueId}`);
   }
 
   /**
@@ -259,7 +261,7 @@ export class IssuesService {
     const formData = new FormData();
     formData.append('status', status);
 
-    return this.http.put<IssueResponse>(this.apiService.getIssuesUrl() + `/admin/${issueId}/status`, formData);
+    return this.http.put<IssueResponse>(`${this.apiUrl}/admin/${issueId}/status`, formData);
   }
 
   /**
@@ -268,7 +270,7 @@ export class IssuesService {
    * @returns Observable of chat messages
    */
   getIssueChatsAdmin(issueId: number): Observable<ChatMessage[]> {
-    return this.http.get<ChatMessage[]>(this.apiService.getIssuesUrl() + `/admin/${issueId}/chat`);
+    return this.http.get<ChatMessage[]>(`${this.apiUrl}/admin/${issueId}/chat`);
   }
 
   /**
@@ -281,6 +283,6 @@ export class IssuesService {
     const formData = new FormData();
     formData.append('message', message);
 
-    return this.http.post<ChatMessage>(this.apiService.getIssuesUrl() + `/admin/${issueId}/chat`, formData);
+    return this.http.post<ChatMessage>(`${this.apiUrl}/admin/${issueId}/chat`, formData);
   }
 }

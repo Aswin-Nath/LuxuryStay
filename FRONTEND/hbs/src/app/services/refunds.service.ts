@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { ApiService } from '../core/services/api.service';
+import { environment } from '../../environments/environment';
 // ============================================================================
 // 📋 REFUND MODELS & INTERFACES
 // ============================================================================
@@ -48,7 +48,9 @@ export interface RefundTransactionUpdate {
   providedIn: 'root'
 })
 export class RefundsService {
-  constructor(private http: HttpClient, private apiService: ApiService) {}
+  private baseUrl = `${environment.apiUrl}/refunds`;
+
+  constructor(private http: HttpClient) {}
 
   // ========== CUSTOMER ENDPOINTS ==========
 
@@ -69,7 +71,7 @@ export class RefundsService {
     if (filters.to_date) params = params.set('to_date', filters.to_date);
 
     return this.http.get<Refund[]>(
-      this.apiService.getRefundsUrl() + '/customer/',
+      `${this.baseUrl}/customer/`,
       { params }
     );
   }
@@ -80,7 +82,7 @@ export class RefundsService {
    * @returns Observable<Refund>
    */
   getCustomerRefundDetail(refundId: number): Observable<Refund> {
-    return this.http.get<Refund>(this.apiService.getRefundsUrl() + `/customer/${refundId}`);
+    return this.http.get<Refund>(`${this.baseUrl}/customer/${refundId}`);
   }
 
   // ========== ADMIN ENDPOINTS ==========
@@ -103,7 +105,7 @@ export class RefundsService {
     if (filters.to_date) params = params.set('to_date', filters.to_date);
 
     return this.http.get<Refund[]>(
-      this.apiService.getRefundsUrl() + '/admin/',
+      `${this.baseUrl}/admin/`,
       { params }
     );
   }
@@ -114,7 +116,7 @@ export class RefundsService {
    * @returns Observable<Refund>
    */
   getAdminRefundDetail(refundId: number): Observable<Refund> {
-    return this.http.get<Refund>(this.apiService.getRefundsUrl() + `/admin/${refundId}`);
+    return this.http.get<Refund>(`${this.baseUrl}/admin/${refundId}`);
   }
 
   /**
@@ -124,7 +126,7 @@ export class RefundsService {
    * @returns Observable<Refund>
    */
   updateRefundTransaction(refundId: number, payload: RefundTransactionUpdate): Observable<Refund> {
-    return this.http.put<Refund>(this.apiService.getRefundsUrl() + `/${refundId}`, payload);
+    return this.http.put<Refund>(`${this.baseUrl}/${refundId}`, payload);
   }
 
   // ========== UTILITY METHODS ==========

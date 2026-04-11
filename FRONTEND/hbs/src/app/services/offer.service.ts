@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { BehaviorSubject, Observable, interval, Subject } from 'rxjs';
 import { map, startWith, tap, takeUntil } from 'rxjs/operators';
-import { ApiService } from '../core/services/api.service';
+import { environment } from '../../environments/environment';
 export interface RoomTypeOffer {
   room_type_id: number;
   available_count: number;
@@ -190,6 +190,8 @@ export interface OfferBookingState {
   providedIn: 'root',
 })
 export class OfferService {
+  private apiUrl = `${environment.apiUrl}/offers`;
+  private bookingApiUrl = `${environment.apiUrl}/v2/rooms/offer`;
   private readonly destroy$ = new Subject<void>();
 
   // ===================================================
@@ -236,7 +238,7 @@ export class OfferService {
     locked_rooms: OfferRoomDetail[];
   } | null>(null);
 
-  constructor(private http: HttpClient, private apiService: ApiService) {}
+  constructor(private http: HttpClient) {}
 
   // ===================================================
   // OFFER BOOKING API METHODS
@@ -251,7 +253,7 @@ export class OfferService {
     checkOut: string
   ): Observable<OfferAvailabilityCheck> {
     return this.http.post<OfferAvailabilityCheck>(
-      this.apiService.getV2RoomsUrl() + '/offer/check-availability',
+      `${this.bookingApiUrl}/check-availability`,
       { offer_id: offerId, check_in: checkIn, check_out: checkOut }
     );
   }
@@ -265,7 +267,7 @@ export class OfferService {
     checkOut: string
   ): Observable<OfferLockResponse> {
     return this.http.post<OfferLockResponse>(
-      this.apiService.getV2RoomsUrl() + '/offer/lock',
+      `${this.bookingApiUrl}/lock`,
       { offer_id: offerId, check_in: checkIn, check_out: checkOut }
     ).pipe(
       tap(response => {
@@ -280,7 +282,7 @@ export class OfferService {
    */
   getLockedRoomsByOfferId(offerId: number): Observable<OfferLockedRoomsResponse> {
     return this.http.get<OfferLockedRoomsResponse>(
-      this.apiService.getV2RoomsUrl() + `/offer/${offerId}/locked-rooms`
+      `${this.bookingApiUrl}/${offerId}/locked-rooms`
     );
   }
 
@@ -293,7 +295,7 @@ export class OfferService {
     roomsGuestDetails: any[]
   ): Observable<any> {
     return this.http.post<any>(
-      this.apiService.getV2RoomsUrl() + `/offer/${offerId}/booking/confirm`,
+      `${this.bookingApiUrl}/${offerId}/booking/confirm`,
       {
         payment_method_id: paymentMethodId,
         rooms_guest_details: roomsGuestDetails
@@ -306,7 +308,7 @@ export class OfferService {
    */
   releaseOfferLocks(offerId: number): Observable<any> {
     return this.http.post<any>(
-      this.apiService.getV2RoomsUrl() + `/offer/${offerId}/release`,
+      `${this.bookingApiUrl}/${offerId}/release`,
       {}
     );
   }
@@ -617,11 +619,11 @@ export class OfferService {
   // ===============================================
 
   createOffer(offer: OfferCreate): Observable<Offer> {
-    return this.http.post<Offer>(this.apiService.getOffersUrl() + '/create', offer);
+    return this.http.post<Offer>(`${this.apiUrl}/create`, offer);
   }
 
   getOffer(offerId: number): Observable<Offer> {
-    return this.http.get<Offer>(this.apiService.getOffersUrl() + `/${offerId}`);
+    return this.http.get<Offer>(`${this.apiUrl}/${offerId}`);
   }
 
   listOffers(skip: number = 0, limit: number = 100, isActive?: boolean): Observable<OfferListItem[]> {
@@ -633,7 +635,7 @@ export class OfferService {
       params = params.set('is_active', isActive.toString());
     }
 
-    return this.http.get<OfferListItem[]>(this.apiService.getOffersUrl(), { params });
+    return this.http.get<OfferListItem[]>(`${this.apiUrl}`, { params });
   }
 
   // Admin: List offers with advanced filters
@@ -678,7 +680,7 @@ export class OfferService {
       }
     }
 
-    return this.http.get<OfferListItem[]>(this.apiService.getOffersUrl(), { params });
+    return this.http.get<OfferListItem[]>(`${this.apiUrl}`, { params });
   }
 
   // Customer: List available offers with filters
@@ -728,23 +730,23 @@ export class OfferService {
       }
     }
 
-    return this.http.get<OfferListItem[]>(this.apiService.getOffersUrl(), { params });
+    return this.http.get<OfferListItem[]>(`${this.apiUrl}`, { params });
   }
 
   updateOffer(offerId: number, offer: OfferUpdate): Observable<Offer> {
-    return this.http.put<Offer>(this.apiService.getOffersUrl() + `/${offerId}`, offer);
+    return this.http.put<Offer>(`${this.apiUrl}/${offerId}`, offer);
   }
 
   toggleOfferStatus(offerId: number, isActive: boolean): Observable<Offer> {
     return this.http.patch<Offer>(
-      this.apiService.getOffersUrl() + `/${offerId}/status`,
+      `${this.apiUrl}/${offerId}/status`,
       {},
       { params: new HttpParams().set('is_active', isActive.toString()) }
     );
   }
 
   deleteOffer(offerId: number): Observable<{ message: string; offer_id: number }> {
-    return this.http.delete<{ message: string; offer_id: number }>(this.apiService.getOffersUrl() + `/${offerId}`);
+    return this.http.delete<{ message: string; offer_id: number }>(`${this.apiUrl}/${offerId}`);
   }
 
   // ===============================================
@@ -752,17 +754,17 @@ export class OfferService {
   // ===============================================
 
   getRoomTypes(): Observable<RoomType[]> {
-    return this.http.get<RoomType[]>(this.apiService.getRoomManagementUrl() + '/room-types');
+    return this.http.get<RoomType[]>(`${environment.apiUrl}/room-management/room-types`);
   }
 
   getRoomTypesWithCounts(): Observable<RoomTypeWithCount[]> {
-    return this.http.get<RoomTypeWithCount[]>(this.apiService.getOffersUrl() + '/room-types/with-counts');
+    return this.http.get<RoomTypeWithCount[]>(`${this.apiUrl}/room-types/with-counts`);
   }
 
   // Get available rooms for a specific room type
   getAvailableRoomsForType(roomTypeId: number): Observable<{ available_count: number }> {
     return this.http.get<{ available_count: number }>(
-      this.apiService.getRoomManagementUrl() + `/room-types/${roomTypeId}/available`
+      `${environment.apiUrl}/room-management/room-types/${roomTypeId}/available`
     );
   }
 
@@ -783,7 +785,7 @@ export class OfferService {
    */
   getOfferMedias(): Observable<{ [offer_id: number]: { images: any[] } }> {
     return this.http.get<{ [offer_id: number]: { images: any[] } }>(
-      this.apiService.getOffersUrl() + `/medias`
+      `${this.apiUrl}/medias`
     );
   }
 
@@ -800,24 +802,24 @@ export class OfferService {
     formData.append('is_primary', isPrimary ? 'true' : 'false');
 
     return this.http.post<OfferImage>(
-      this.apiService.getImagesUrl() + `/offers/${offerId}/images`,
+      `${environment.apiUrl}/images/offers/${offerId}/images`,
       formData
     );
   }
 
   getOfferImages(offerId: number): Observable<OfferImage[]> {
     return this.http.get<OfferImage[]>(
-      this.apiService.getImagesUrl() + `/offers/${offerId}/images`
+      `${environment.apiUrl}/images/offers/${offerId}/images`
     );
   }
 
   deleteOfferImage(imageId: number): Observable<{ message: string }> {
-    return this.http.delete<{ message: string }>(this.apiService.getImagesUrl() + `/${imageId}`);
+    return this.http.delete<{ message: string }>(`${environment.apiUrl}/images/${imageId}`);
   }
 
   setOfferImageAsPrimary(offerId: number, imageId: number): Observable<{ message: string }> {
     return this.http.put<{ message: string }>(
-      this.apiService.getImagesUrl() + `/offers/${offerId}/images/${imageId}/primary`,
+      `${environment.apiUrl}/images/offers/${offerId}/images/${imageId}/primary`,
       {}
     );
   }
@@ -830,7 +832,7 @@ export class OfferService {
     formData.append('primary_index', primaryIndex.toString());
 
     return this.http.post<OfferImage[]>(
-      this.apiService.getImagesUrl() + `/offers/${offerId}/images/bulk`,
+      `${environment.apiUrl}/images/offers/${offerId}/images/bulk`,
       formData
     );
   }
@@ -845,7 +847,7 @@ export class OfferService {
     checkDate: string
   ): Observable<{ can_apply: boolean; offer_id: number; room_type_id: number }> {
     return this.http.get<{ can_apply: boolean; offer_id: number; room_type_id: number }>(
-      this.apiService.getOffersUrl() + `/validate/can-apply`,
+      `${this.apiUrl}/validate/can-apply`,
       {
         params: new HttpParams()
           .set('offer_id', offerId.toString())
@@ -871,7 +873,7 @@ export class OfferService {
       discount_percent: number;
       discount_amount: number;
       discounted_price: number;
-    }>( this.apiService.getOffersUrl() + `/apply/calculate-discount`, null, {
+    }>(`${this.apiUrl}/apply/calculate-discount`, null, {
       params: new HttpParams()
         .set('offer_id', offerId.toString())
         .set('room_type_id', roomTypeId.toString())

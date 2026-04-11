@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
-import { ApiService } from '../../core/services/api.service';
+import { environment } from '../../../environments/environment';
 
 export interface ImageData {
   image_id: number;
@@ -18,7 +18,9 @@ export interface ImageData {
   providedIn: 'root',
 })
 export class ImageService {
-  constructor(private http: HttpClient, private apiService: ApiService) {}
+  private apiUrl = `${environment.apiUrl}/images`;
+
+  constructor(private http: HttpClient) {}
 
   /**
    * Get images for a specific entity (room_type, offer, amenity, etc.)
@@ -31,7 +33,7 @@ export class ImageService {
       .set('entity_type', entityType)
       .set('entity_id', entityId.toString());
 
-    return this.http.get<ImageData[]>(this.apiService.getImagesUrl(), { params }).pipe(
+    return this.http.get<ImageData[]>(`${this.apiUrl}`, { params }).pipe(
       catchError((error) => {
         console.error(`Failed to load images for ${entityType}:${entityId}`, error);
         return of([]); // Return empty array on error
@@ -55,7 +57,7 @@ export class ImageService {
    */
   getOfferImages(offerId: number): Observable<ImageData[]> {
     return this.http
-      .get<ImageData[]>(this.apiService.getImagesUrl() + `/offers/${offerId}/images`)
+      .get<ImageData[]>(`${this.apiUrl}/offers/${offerId}/images`)
       .pipe(
         catchError((error) => {
           console.error(`Failed to load offer images for offer:${offerId}`, error);
