@@ -102,4 +102,3 @@ export class WishlistService {
     return this.http.delete(`${this.apiUrl}`);
   }
 }
-

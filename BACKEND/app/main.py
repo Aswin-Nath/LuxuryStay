@@ -3,7 +3,9 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 import asyncio
-
+import os
+from dotenv import load_dotenv
+load_dotenv()
 from app.middlewares.logging_middleware import LoggingMiddleware
 from app.middlewares.error_handler_middleware import ErrorHandlerMiddleware
 from app.middlewares.logging_middleware import LoggingMiddleware
@@ -33,6 +35,7 @@ from app.workers.room_lifecycle_daily_worker import run_daily_checkout_scheduler
 from app.workers.offers_expiry_worker import run_offer_expiry_scheduler_at_1159pm
 import os
 import logging
+import uvicorn
 from contextlib import asynccontextmanager
 _logger = logging.getLogger(__name__)
 
@@ -80,9 +83,11 @@ app = FastAPI(
 # -------------------------------------------------
 # ✅ Middlewares
 # -------------------------------------------------
+origin=os.getenv("FRONTEND_URL") or "http://localhost:4200"
+print(origin)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4200","http://localhost:63981"],
+    allow_origins=[origin],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -150,3 +155,15 @@ def custom_docs():
 #         _logger.info('Auth config - ACCESS_TOKEN_EXPIRE_MINUTES=%s REFRESH_TOKEN_EXPIRE_DAYS=%s', os.getenv('ACCESS_TOKEN_EXPIRE_MINUTES'), os.getenv('REFRESH_TOKEN_EXPIRE_DAYS'))
 #     except Exception:
 #         pass
+
+
+# -------------------------------------------------
+# ✅ Server Startup
+# -------------------------------------------------
+if __name__ == "__main__":
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=False
+    )
