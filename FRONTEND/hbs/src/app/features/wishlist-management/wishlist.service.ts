@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { ApiService } from '../../core/services/api.service';
+import { environment } from '../../../environments/environment';
 
 export interface WishlistItem {
   wishlist_id?: number;
@@ -27,21 +27,23 @@ export interface WishlistToggleResponse {
   providedIn: 'root',
 })
 export class WishlistService {
-  constructor(private http: HttpClient, private apiService: ApiService) {}
+  private apiUrl = `${environment.apiUrl}/wishlist`;
+
+  constructor(private http: HttpClient) {}
 
   // Get all wishlist items for current user
   getWishlist(): Observable<WishlistItem[]> {
-    return this.http.get<WishlistItem[]>(this.apiService.getWishlistUrl());
+    return this.http.get<WishlistItem[]>(`${this.apiUrl}`);
   }
 
   // Get wishlist rooms with full details and primary image
   getWishlistRooms(): Observable<any[]> {
-    return this.http.get<any[]>(this.apiService.getUrl('wishlist/rooms'));
+    return this.http.get<any[]>(`${this.apiUrl}/rooms`);
   }
 
   // Get wishlist offers with full details and primary image
   getWishlistOffers(): Observable<any[]> {
-    return this.http.get<any[]>(this.apiService.getUrl('wishlist/offers'));
+    return this.http.get<any[]>(`${this.apiUrl}/offers`);
   }
 
   // ============================================================
@@ -52,12 +54,12 @@ export class WishlistService {
       type,
       ...(type === 'room' ? { room_type_id: itemId } : { offer_id: itemId })
     };
-    return this.http.post<WishlistToggleResponse>(this.apiService.getUrl('wishlist/toggle'), payload);
+    return this.http.post<WishlistToggleResponse>(`${this.apiUrl}/toggle`, payload);
   }
 
   // Add room to wishlist (deprecated - use toggleWishlist instead)
   addRoomToWishlist(room_type_id: number): Observable<WishlistItem> {
-    return this.http.post<WishlistItem>(this.apiService.getWishlistUrl(), {
+    return this.http.post<WishlistItem>(`${this.apiUrl}`, {
       room_type_id,
       item_type: 'room',
     });
@@ -65,7 +67,7 @@ export class WishlistService {
 
   // Add offer to wishlist (deprecated - use toggleWishlist instead)
   addOfferToWishlist(offer_id: number): Observable<WishlistItem> {
-    return this.http.post<WishlistItem>(this.apiService.getWishlistUrl(), {
+    return this.http.post<WishlistItem>(`${this.apiUrl}`, {
       offer_id,
       item_type: 'offer',
     });
@@ -73,17 +75,17 @@ export class WishlistService {
 
   // Remove from wishlist by wishlist_id
   removeFromWishlist(wishlist_id: number): Observable<any> {
-    return this.http.delete(this.apiService.getWishlistUrl() + `/${wishlist_id}`);
+    return this.http.delete(`${this.apiUrl}/${wishlist_id}`);
   }
 
   // Remove room from wishlist (deprecated - use toggleWishlist instead)
   removeRoomFromWishlist(room_type_id: number): Observable<any> {
-    return this.http.delete(this.apiService.getWishlistUrl() + `/${room_type_id}`);
+    return this.http.delete(`${this.apiUrl}/${room_type_id}`);
   }
 
   // Remove offer from wishlist (deprecated - use toggleWishlist instead)
   removeOfferFromWishlist(offer_id: number): Observable<any> {
-    return this.http.delete(this.apiService.getWishlistUrl() + `/${offer_id}`);
+    return this.http.delete(`${this.apiUrl}/${offer_id}`);
   }
 
   // Check if item is in wishlist
@@ -92,12 +94,11 @@ export class WishlistService {
     if (room_type_id) params += `room_type_id=${room_type_id}`;
     if (offer_id) params += `offer_id=${offer_id}`;
     const queryString = params ? `?${params}` : '';
-    return this.http.get<{ in_wishlist: boolean }>(this.apiService.getUrl(`wishlist/check${queryString}`));
+    return this.http.get<{ in_wishlist: boolean }>(`${this.apiUrl}/check${queryString}`);
   }
 
   // Clear entire wishlist
   clearWishlist(): Observable<any> {
-    return this.http.delete(this.apiService.getWishlistUrl());
+    return this.http.delete(`${this.apiUrl}`);
   }
 }
-
