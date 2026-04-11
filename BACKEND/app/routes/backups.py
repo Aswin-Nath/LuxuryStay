@@ -2,7 +2,7 @@ import os
 import subprocess
 import asyncio
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from zipfile import ZipFile
 from typing import Optional, Dict, List
 from fastapi import APIRouter, HTTPException, status, Query, Depends,Security
@@ -17,7 +17,7 @@ from app.services.backup_service import list_backups
 # ───────────────────────────────
 BACKUP_ROOT_DIR = os.getenv("POSTGRES_BACKUP_DIR")
 ZIP_ROOT_DIR = os.getenv("POSTGRES_ZIP_DIR")
-MONGO_URI = os.getenv("MONGO_URI")
+MONGO_URL = os.getenv("MONGO_URL")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME")
 
 PG_USER = os.getenv("POSTGRES_USER")
@@ -30,7 +30,7 @@ PG_DATABASE = os.getenv("POSTGRES_DB")
 router = APIRouter(prefix="/backups", tags=["BACKUPS"])
 
 # Mongo client
-mongo_client = AsyncIOMotorClient(MONGO_URI)
+mongo_client = AsyncIOMotorClient(MONGO_URL)
 mongo_db = mongo_client[MONGO_DB_NAME]
 backup_col = mongo_db["backup_data_collections"]
 
@@ -82,7 +82,7 @@ async def create_database_backup(
     os.makedirs(BACKUP_ROOT_DIR, exist_ok=True)
     os.makedirs(ZIP_ROOT_DIR, exist_ok=True)
 
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     snapshot_name = snapshot_name or f"snapshot_{timestamp}"
 
     dump_filename = f"{snapshot_name}.dump"
@@ -127,7 +127,7 @@ async def create_database_backup(
     # Compute metadata
     size_mb = round(os.path.getsize(zip_path) / (1024 * 1024), 2)
     checksum = hashlib.sha256(open(zip_path, "rb").read()).hexdigest()
-    completed_at = datetime.utcnow()
+    completed_at = datetime.now(timezone.utc)
 
     # Insert record in Mongo
     record = {

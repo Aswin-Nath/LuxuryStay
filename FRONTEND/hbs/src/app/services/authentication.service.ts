@@ -157,6 +157,43 @@ export class AuthenticationService {
     );
   }
 
+  superAdminLogin(credentials: { email: string; password: string }): Observable<TokenResponse> {
+    const headers = new HttpHeaders({
+      'Content-Type': 'application/json',
+    });
+
+    return this.http.post<TokenResponse>(`${this.baseUrl}/superadmin/login`, credentials, {
+      headers,
+      withCredentials: true,
+    }).pipe(
+      tap((res) => {
+        // Store access token and expiration
+        localStorage.setItem('access_token', res.access_token);
+        localStorage.setItem('expires_in', String(res.expires_in));
+        localStorage.setItem('auth_role_id', String(res.role_id));
+        
+        // ✅ Store refresh token expiration (Unix timestamp in milliseconds)
+        if (res.refresh_token_expires_at) {
+          localStorage.setItem('refresh_token_expires_at', String(res.refresh_token_expires_at));
+          console.debug('AuthenticationService: Refresh token expires at', new Date(res.refresh_token_expires_at));
+        }
+        
+        this.authStateSubject.next(true);
+      })
+    );
+  }
+
+  superAdminSignup(credentials: { email: string; password: string }): Observable<any> {
+    const headers = new HttpHeaders({
+      'Content-Type': 'application/json',
+    });
+
+    return this.http.post<any>(`${this.baseUrl}/superadmin/signup`, credentials, {
+      headers,
+      withCredentials: true,
+    });
+  }
+
   requestOtp(email: string, verificationType: string = 'PASSWORD_RESET') {
     const payload = { email, verification_type: verificationType };
     // Include credentials so HttpOnly refresh cookie is sent when necessary

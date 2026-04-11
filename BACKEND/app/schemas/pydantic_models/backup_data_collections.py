@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, HttpUrl
@@ -23,7 +23,7 @@ class BackupDataCollection(BaseModel):
     sizeMB: Optional[float] = Field(None, description="Backup file size in MB")
     checksum: Optional[str] = Field(None, description="Checksum (SHA256/MD5) for integrity")
     status: str = Field(..., description="pending | in_progress | completed | failed")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Backup start time")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Backup start time")
     completedAt: Optional[datetime] = Field(None, description="Completion time")
     details: Optional[BackupDetails] = None
 

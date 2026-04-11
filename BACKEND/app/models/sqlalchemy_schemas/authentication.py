@@ -49,9 +49,9 @@ class Verifications(Base):
     otp_code = Column(String(10), nullable=False)
     is_verified = Column(Boolean, server_default="false", nullable=False)
     attempt_count = Column(SmallInteger, server_default="0", nullable=False)
-    expires_at = Column(DateTime, nullable=False)
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    verified_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    verified_at = Column(DateTime(timezone=True), nullable=True)
     ip_address = Column(String(45), nullable=True)
 
 # ==========================================================
@@ -66,15 +66,15 @@ class Sessions(Base):
     user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     access_token = Column(Text, nullable=False)
     refresh_token = Column(Text, nullable=False, unique=True)
-    access_token_expires_at = Column(DateTime, nullable=False)
-    refresh_token_expires_at = Column(DateTime, nullable=False)
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    access_token_expires_at = Column(DateTime(timezone=True), nullable=False)
+    refresh_token_expires_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     device_info = Column(Text, nullable=True)
     ip_address = Column(String(45), nullable=True)
-    login_time = Column(DateTime, server_default=func.now())
-    last_active = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    login_time = Column(DateTime(timezone=True), server_default=func.now())
+    last_active = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     is_active = Column(Boolean, server_default="true")
-    revoked_at = Column(DateTime, nullable=True)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
     revoked_reason = Column(Text, nullable=True)
 
     # relationships
@@ -94,7 +94,7 @@ class BlacklistedTokens(Base):
     token_value_hash = Column(Text, unique=True, nullable=False)
     revoked_type = Column(Enum(RevokedType, name="revoked_type"), nullable=False)
     reason = Column(Text, nullable=True)
-    revoked_at = Column(DateTime, server_default=func.now(), nullable=False)
+    revoked_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # relationships
     session = relationship("Sessions", back_populates="blacklisted_tokens")

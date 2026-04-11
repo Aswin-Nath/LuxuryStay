@@ -11,7 +11,7 @@ This ensures rooms are automatically released after the booking hold expires,
 allowing other customers to book them.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
@@ -51,7 +51,7 @@ async def release_expired_room_holds():
     async with AsyncSessionLocal() as db:
         try:
             # Get current UTC time
-            now_utc = datetime.utcnow()
+            now_utc = datetime.now(timezone.utc)
             
             # ========== FIND ALL EXPIRED HOLDS ==========
             query = await db.execute(

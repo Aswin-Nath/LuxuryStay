@@ -4,7 +4,7 @@ Converts report data to PDF format using reportlab.
 """
 from io import BytesIO
 from typing import List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
@@ -82,7 +82,7 @@ class PDFReportGenerator:
         
         # Add generation timestamp
         timestamp = Paragraph(
-            f"<i>Generated on: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}</i>",
+            f"<i>Generated on: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}</i>",
             self.styles['Normal']
         )
         story.append(timestamp)

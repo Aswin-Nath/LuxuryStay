@@ -122,31 +122,31 @@ def custom_docs():
     return FileResponse(path=html_file, media_type="text/html")
 
 
-# -------------------------------------------------
-# ✅ Startup Events
-# -------------------------------------------------
-@app.on_event("startup")
-async def startup_event():
-    """
-    Run background workers when the app starts:
-    1. Release expired room holds worker - runs every 60 seconds
-    2. Booking lifecycle hourly worker - runs every hour to mark confirmed bookings as checked-in
-    3. Room lifecycle daily worker - runs at 11:59 PM to mark checked-in bookings as checked-out
-    """
-    # Worker 1: Release expired room holds (every 60 seconds)
-    asyncio.create_task(run_hold_release_scheduler(interval_seconds=60))
-    _logger.info("[STARTUP] Room holds release worker started")
+# # -------------------------------------------------
+# # ✅ Startup Events
+# # -------------------------------------------------
+# @app.on_event("startup")
+# async def startup_event():
+#     """
+#     Run background workers when the app starts:
+#     1. Release expired room holds worker - runs every 60 seconds
+#     2. Booking lifecycle hourly worker - runs every hour to mark confirmed bookings as checked-in
+#     3. Room lifecycle daily worker - runs at 11:59 PM to mark checked-in bookings as checked-out
+#     """
+#     # Worker 1: Release expired room holds (every 60 seconds)
+#     asyncio.create_task(run_hold_release_scheduler(interval_seconds=60))
+#     _logger.info("[STARTUP] Room holds release worker started")
     
-    # Worker 2: Hourly booking lifecycle updates (every 3600 seconds = 1 hour)
-    asyncio.create_task(run_hourly_booking_lifecycle_scheduler(interval_seconds=3600))
-    _logger.info("[STARTUP] Hourly booking lifecycle worker started")
+#     # Worker 2: Hourly booking lifecycle updates (every 3600 seconds = 1 hour)
+#     asyncio.create_task(run_hourly_booking_lifecycle_scheduler(interval_seconds=3600))
+#     _logger.info("[STARTUP] Hourly booking lifecycle worker started")
     
-    # Worker 3: Daily checkout at 11:59 PM
-    asyncio.create_task(run_daily_checkout_scheduler_at_1159pm())
-    _logger.info("[STARTUP] Daily checkout (11:59 PM) worker started")
+#     # Worker 3: Daily checkout at 11:59 PM
+#     asyncio.create_task(run_daily_checkout_scheduler_at_1159pm())
+#     _logger.info("[STARTUP] Daily checkout (11:59 PM) worker started")
     
-    # Print out auth config (debug)
-    try:
-        _logger.info('Auth config - ACCESS_TOKEN_EXPIRE_MINUTES=%s REFRESH_TOKEN_EXPIRE_DAYS=%s', os.getenv('ACCESS_TOKEN_EXPIRE_MINUTES'), os.getenv('REFRESH_TOKEN_EXPIRE_DAYS'))
-    except Exception:
-        pass
+#     # Print out auth config (debug)
+#     try:
+#         _logger.info('Auth config - ACCESS_TOKEN_EXPIRE_MINUTES=%s REFRESH_TOKEN_EXPIRE_DAYS=%s', os.getenv('ACCESS_TOKEN_EXPIRE_MINUTES'), os.getenv('REFRESH_TOKEN_EXPIRE_DAYS'))
+#     except Exception:
+#         pass

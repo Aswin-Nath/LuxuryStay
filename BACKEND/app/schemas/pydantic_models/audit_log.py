@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
@@ -12,7 +12,7 @@ class AuditLogModel(BaseModel):
     new_value: Optional[Dict[str, Any]] = None
     changed_by_user_id: Optional[int] = None
     ip_address: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     user_id: Optional[int] = None
 
     class Config:

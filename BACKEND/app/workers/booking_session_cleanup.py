@@ -7,7 +7,7 @@
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, delete, and_
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -52,7 +52,7 @@ class BookingSessionCleanupWorker:
 
         db: AsyncSession = self.SessionLocal()
         try:
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             
             # 1. Find all EXPIRED locks (expires_at < NOW)
             result = await db.execute(

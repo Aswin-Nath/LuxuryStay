@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from bson import ObjectId
 from fastapi import HTTPException, status, UploadFile
 from motor.motor_asyncio import AsyncIOMotorCollection
@@ -38,8 +38,8 @@ async def create_doc_service(
         status=status,
         metadata=metadata or {},
         images=image_urls,
-        createdAt=datetime.utcnow(),
-        updatedAt=datetime.utcnow(),
+        createdAt=datetime.now(timezone.utc),
+        updatedAt=datetime.now(timezone.utc),
     )
 
     doc = payload.model_dump(by_alias=True)
@@ -78,7 +78,7 @@ async def update_doc_service(
     new_images: Optional[List[UploadFile]] = None,
 ):
     update_data = dict(payload)
-    update_data["updatedAt"] = datetime.utcnow()
+    update_data["updatedAt"] = datetime.now(timezone.utc)
 
     if new_media:
         update_data["media"] = {"url": await save_uploaded_image(new_media), "type": "image"}

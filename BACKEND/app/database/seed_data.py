@@ -148,13 +148,13 @@ async def seed_dummy_user(conn):
             """
             INSERT INTO users (role_id, full_name, dob, gender, email, phone_number, hashed_password, last_password_updated, loyalty_points, created_by, status, suspend_reason, is_deleted, created_at, updated_at, profile_image_url)
             SELECT :role_id, :full_name, NULL, :gender, :email, :phone, :hashed_password, now(), 0, NULL, :status, NULL, false, now(), now(), NULL
-            WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = :email)
+            WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = :email AND is_deleted = false)
             """
         ),
         {
             "role_id": 1,
             "full_name": 'aswin',
-            "gender": 'Other',
+            "gender": 'OTHER',
             "email": email,
             "phone": '1111122552',
             "hashed_password": hashed_password,

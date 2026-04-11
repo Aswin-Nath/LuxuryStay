@@ -1,6 +1,6 @@
 import hashlib
 import secrets
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from jose import jwt
 import uuid
 from app.models.sqlalchemy_schemas.users import Users, GenderTypes
@@ -42,7 +42,7 @@ def _normalize_gender(value: str | GenderTypes | None) -> GenderTypes:
     if isinstance(value, GenderTypes):
         return value
     if not value:
-        return GenderTypes.Other
+        return GenderTypes.OTHER
     normalized = value.strip().lower()
     for gender in GenderTypes:
         if gender.name.lower() == normalized or gender.value.lower() == normalized:
@@ -65,7 +65,7 @@ def _verify_password(stored: str, plain: str) -> bool:
 def create_access_token(data: dict, jti: str):
     """Create an access JWT. Optionally include a `jti` claim."""
     to_encode = data.copy()
-    expire = datetime.utcnow() + (timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.now(timezone.utc) + (timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     if jti:
         to_encode.update({"jti": str(jti)})
@@ -81,7 +81,7 @@ def create_refresh_token(data: dict, expires_delta: timedelta | None = None, jti
     """
     to_encode = data.copy()
     # Always use 7-day expiration; ignore expires_delta for consistency
-    expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode.update({"exp": expire, "scope": "refresh_token"})
     if jti:
         to_encode.update({"jti": str(jti)})
@@ -117,6 +117,7 @@ async def create_user(
         status=status,
         created_by=created_by
     )
+    print("USER_RECORD",user_record)
     db.add(user_record)
     await db.commit()
     await db.refresh(user_record)
@@ -161,7 +162,7 @@ async def create_session(db, user, device_info: str, ip: str):
         refresh_token=refresh_token,
         access_token_expires_at=access_exp,
         refresh_token_expires_at=refresh_exp,
-        login_time=datetime.utcnow(),
+        login_time=datetime.now(timezone.utc),
         device_info=device_info,
         ip_address=ip,
     )
@@ -183,7 +184,7 @@ async def create_verification(db: AsyncSession, user_id: int, verification_type:
     NOTE: returning the OTP is useful for dev environments where SMTP isn't configured.
     """
     otp = _generate_otp(6)
-    expires = datetime.utcnow() + timedelta(minutes=expires_minutes)
+    expires = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
     # Delete any previous verification entries for this user and verification type to ensure only latest OTP is valid
     await db.execute(
         delete(Verifications).where(
@@ -220,7 +221,7 @@ async def verify_otp(db: AsyncSession, user_id: int, otp: str, verification_type
     if not verification_record:
         return False, "No verification found"
     # check expiration
-    if verification_record.expires_at and datetime.utcnow() > verification_record.expires_at:
+    if verification_record.expires_at and datetime.now(timezone.utc) > verification_record.expires_at:
         return False, "OTP expired"
     # check attempts
     if verification_record.attempt_count >= max_attempts:
@@ -240,7 +241,7 @@ async def verify_otp(db: AsyncSession, user_id: int, otp: str, verification_type
     await db.execute(
         update(Verifications)
         .where(Verifications.verification_id == verification_record.verification_id)
-        .values(is_verified=True, verified_at=datetime.utcnow())
+        .values(is_verified=True, verified_at=datetime.now(timezone.utc))
     )
     await db.commit()
     return True, verification_record
@@ -252,7 +253,7 @@ async def update_user_password(db: AsyncSession, user: Users, new_password: str)
     await db.execute(
         update(Users)
         .where(Users.user_id == user.user_id)
-        .values(hashed_password=hashed, last_password_updated=datetime.utcnow())
+        .values(hashed_password=hashed, last_password_updated=datetime.now(timezone.utc))
     )
     await db.commit()
     # refresh user object
@@ -375,7 +376,7 @@ async def revoke_session(db: AsyncSession, *, session: Sessions, reason: str | N
     except Exception:
         pass
     session.is_active = False
-    session.revoked_at = datetime.utcnow()
+    session.revoked_at = datetime.now(timezone.utc)
     session.revoked_reason = reason
     db.add(session)
     await db.commit()
@@ -421,9 +422,9 @@ async def refresh_access_token(db: AsyncSession, access_token_value: str):
         raise Exception("Invalid or inactive session")
 
     # Step 3: Check refresh token expiry (7 days)
-    if session.refresh_token_expires_at and datetime.utcnow() > session.refresh_token_expires_at:
+    if session.refresh_token_expires_at and datetime.now(timezone.utc) > session.refresh_token_expires_at:
         session.is_active = False
-        session.revoked_at = datetime.utcnow()
+        session.revoked_at = datetime.now(timezone.utc)
         db.add(session)
         await db.commit()
         raise Exception("Refresh token expired")
@@ -441,7 +442,7 @@ async def refresh_access_token(db: AsyncSession, access_token_value: str):
     # ✅ Keep refresh_token_expires_at unchanged (still valid for 7 days)
     session.access_token = new_access_token
     session.access_token_expires_at = new_access_exp
-    session.last_active = datetime.utcnow()
+    session.last_active = datetime.now(timezone.utc)
     db.add(session)
     await db.commit()
     await db.refresh(session)

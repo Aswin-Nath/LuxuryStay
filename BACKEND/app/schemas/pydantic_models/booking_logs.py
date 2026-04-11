@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
@@ -25,7 +25,7 @@ class BookingLogModel(BaseModel):
     room_map_snapshot: Optional[List[RoomMapItem]] = Field(default_factory=list)
     approved_by: Optional[int] = None
     approved_at: Optional[datetime] = None
-    logged_at: datetime = Field(default_factory=datetime.utcnow)
+    logged_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     class Config:
         arbitrary_types_allowed = True

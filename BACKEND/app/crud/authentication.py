@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
-from sqlalchemy import select, update, delete
+from sqlalchemy import select, update, delete, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.sqlalchemy_schemas.users import Users
@@ -12,8 +12,8 @@ from app.models.sqlalchemy_schemas.authentication import Sessions
 # ==========================================================
 
 async def get_user_by_email(db: AsyncSession, email: str) -> Optional[Users]:
-    """Fetch a user by email."""
-    result = await db.execute(select(Users).where(Users.email == email))
+    """Fetch an active (non-deleted) user by email."""
+    result = await db.execute(select(Users).where(and_(Users.email == email, Users.is_deleted == False)))
     return result.scalars().first()
 
 
@@ -24,8 +24,8 @@ async def get_user_by_id(db: AsyncSession, user_id: int) -> Optional[Users]:
 
 
 async def get_user_by_phone(db: AsyncSession, phone_number: str) -> Optional[Users]:
-    """Fetch a user by phone number."""
-    result = await db.execute(select(Users).where(Users.phone_number == phone_number))
+    """Fetch an active (non-deleted) user by phone number."""
+    result = await db.execute(select(Users).where(and_(Users.phone_number == phone_number, Users.is_deleted == False)))
     return result.scalars().first()
 
 
@@ -145,7 +145,7 @@ async def update_session_tokens(
 
 async def revoke_session_record(db: AsyncSession, session: Sessions, reason: Optional[str] = None):
     """Soft-delete or revoke a session (invalidate token)."""
-    session.revoked_at = datetime.utcnow()
+    session.revoked_at = datetime.now(timezone.utc)
     session.revoked_reason = reason or "manual_revoke"
     db.add(session)
     await db.flush()
@@ -154,7 +154,7 @@ async def revoke_session_record(db: AsyncSession, session: Sessions, reason: Opt
 
 async def delete_expired_sessions(db: AsyncSession):
     """Delete expired sessions (cleanup)."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     stmt = delete(Sessions).where(Sessions.access_token_expires_at < now)
     await db.execute(stmt)
     await db.flush()

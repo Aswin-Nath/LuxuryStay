@@ -85,6 +85,7 @@ export class Signup implements AfterViewInit {
     }
 
     const payload = this.getSignupPayload();
+    // console.log(payload);
     if (!payload) return;
     console.log(payload, "this is payload");
 

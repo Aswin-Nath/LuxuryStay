@@ -1,6 +1,6 @@
 from typing import Optional
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -28,10 +28,13 @@ from app.utils.authentication_util import (
     create_session,
     refresh_access_token,
     SECRET_KEY,
+    _normalize_gender,
     ALGORITHM,
     _hash_token,
     _send_email,
     revoke_session,
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    REFRESH_TOKEN_EXPIRE_DAYS,
 )
 from app.core.exceptions import (
     NotFoundException,
@@ -110,7 +113,10 @@ async def signup(db: AsyncSession, payload: UserCreate, created_by: Optional[int
         existing_phone = await get_user_by_phone(db, payload.phone_number)
         if existing_phone:
             raise ConflictException("Phone number already registered")
-
+    
+    # Normalize and validate gender
+    gender_normalized = _normalize_gender(payload.gender)
+    
     try:
         user_record = await create_user(
             db=db,
@@ -119,8 +125,7 @@ async def signup(db: AsyncSession, payload: UserCreate, created_by: Optional[int
             password=payload.password,
             phone_number=payload.phone_number,
             dob=payload.dob,
-            gender=payload.gender,
-            
+            gender=gender_normalized,
             role_id=1,
             status="active",
             created_by=created_by,
@@ -128,6 +133,7 @@ async def signup(db: AsyncSession, payload: UserCreate, created_by: Optional[int
     except IntegrityError as exc:
         await db.rollback()
         constraint = getattr(getattr(exc, "orig", None), "constraint_name", None)
+        print("ERROR",exc)
         if constraint == "users_phone_number_key":
             raise ConflictException("Phone number already registered")
         if constraint == "users_email_key":
@@ -316,9 +322,9 @@ async def login_flow(
         db, user, device_info=device_info, ip=client_host
     )
 
-    # Calculate TTL using UTC now to avoid DB/server timezone mismatch.
-    # Clamp to >= 0 to avoid returning negative expires_in values.
-    expires_in = max(0, int((session.access_token_expires_at - datetime.utcnow()).total_seconds())) if session.access_token_expires_at else 0
+    # Use the configured ACCESS_TOKEN_EXPIRE_MINUTES (convert to seconds)
+    # Avoid datetime comparison which causes timezone mismatch errors
+    expires_in = ACCESS_TOKEN_EXPIRE_MINUTES * 60
 
     # Calculate refresh token expiration as Unix timestamp (milliseconds)
     refresh_token_expires_at_unix = int(session.refresh_token_expires_at.timestamp() * 1000) if session.refresh_token_expires_at else None
@@ -396,11 +402,11 @@ async def refresh_tokens(db: AsyncSession, refresh_token: str) -> AuthResult:
         print(f"❌ svc_refresh_tokens: Session is INACTIVE (revoked)")
         raise UnauthorizedException("Session has been revoked")
 
-    print(f"✅ svc_refresh_tokens: Checking refresh_token_expires_at: {session.refresh_token_expires_at} vs now: {datetime.utcnow()}")
-    if session.refresh_token_expires_at and datetime.utcnow() > session.refresh_token_expires_at:
+    print(f"✅ svc_refresh_tokens: Checking refresh_token_expires_at: {session.refresh_token_expires_at} vs now: {datetime.now(timezone.utc)}")
+    if session.refresh_token_expires_at and datetime.now(timezone.utc) > session.refresh_token_expires_at:
         print(f"❌ svc_refresh_tokens: Refresh token EXPIRED")
         session.is_active = False
-        session.revoked_at = datetime.utcnow()
+        session.revoked_at = datetime.now(timezone.utc)
         db.add(session)
         await db.commit()
         raise UnauthorizedException("Refresh token expired")
@@ -433,7 +439,9 @@ async def refresh_tokens(db: AsyncSession, refresh_token: str) -> AuthResult:
     if not user:
         raise NotFoundException("User not found")
 
-    expires_in = max(0, int((session.access_token_expires_at - datetime.utcnow()).total_seconds())) if session.access_token_expires_at else 0
+    # Use the configured ACCESS_TOKEN_EXPIRE_MINUTES (convert to seconds)
+    # Avoid datetime comparison which causes timezone mismatch errors
+    expires_in = ACCESS_TOKEN_EXPIRE_MINUTES * 60
     
     # Calculate refresh token expiration as Unix timestamp (milliseconds)
     refresh_token_expires_at_unix = int(session.refresh_token_expires_at.timestamp() * 1000) if session.refresh_token_expires_at else None
@@ -581,6 +589,65 @@ async def register_admin(
         constraint = getattr(getattr(exc, "orig", None), "constraint_name", None)
         if constraint == "users_phone_number_key":
             raise ConflictException("Phone number already registered")
+        if constraint == "users_email_key":
+            raise ConflictException("Email already registered")
+        raise ConflictException("User already exists")
+    return user_record
+
+
+# ==============================================================
+# SUPER ADMIN SIGNUP (No authentication required)
+# ==============================================================
+async def register_super_admin(
+    db: AsyncSession,
+    payload,  # SuperAdminCreate
+):
+    """
+    Super Admin registration with email and password only.
+    
+    Creates a new super admin user (role_id=3) with minimal required fields.
+    This endpoint does not require authentication.
+    
+    Validations:
+    - Email: standard email format
+    - Password: strong password requirements (uppercase, lowercase, digit, special char)
+    """
+    
+    # ✅ Validate Email
+    email_valid, email_error = is_valid_email(payload.email)
+    if not email_valid:
+        raise BadRequestException(f"Invalid email: {email_error}")
+
+    # ✅ Validate Password
+    password_valid, password_error = is_strong_password(payload.password)
+    if not password_valid:
+        raise BadRequestException(f"Weak password: {password_error}")
+
+    # ✅ Check if email already exists
+    existing_user = await get_user_by_email(db, payload.email)
+    if existing_user:
+        raise ConflictException("Email already registered")
+
+    try:
+        # Generate full_name from email (use email prefix or a default name)
+        email_prefix = payload.email.split('@')[0]
+        full_name = email_prefix.replace('.', ' ').title() if email_prefix else "Super Admin"
+        
+        user_record = await create_user(
+            db=db,
+            full_name=full_name,
+            email=payload.email,
+            password=payload.password,
+            phone_number=None,
+            dob=None,
+            gender="other",
+            role_id=3,  # Super Admin role
+            status="active",
+            created_by=None,  # System-created, no creator
+        )
+    except IntegrityError as exc:
+        await db.rollback()
+        constraint = getattr(getattr(exc, "orig", None), "constraint_name", None)
         if constraint == "users_email_key":
             raise ConflictException("Email already registered")
         raise ConflictException("User already exists")
