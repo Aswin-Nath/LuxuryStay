@@ -35,6 +35,7 @@ from app.workers.room_lifecycle_daily_worker import run_daily_checkout_scheduler
 from app.workers.offers_expiry_worker import run_offer_expiry_scheduler_at_1159pm
 import os
 import logging
+import uvicorn
 from contextlib import asynccontextmanager
 _logger = logging.getLogger(__name__)
 
@@ -154,3 +155,15 @@ def custom_docs():
 #         _logger.info('Auth config - ACCESS_TOKEN_EXPIRE_MINUTES=%s REFRESH_TOKEN_EXPIRE_DAYS=%s', os.getenv('ACCESS_TOKEN_EXPIRE_MINUTES'), os.getenv('REFRESH_TOKEN_EXPIRE_DAYS'))
 #     except Exception:
 #         pass
+
+
+# -------------------------------------------------
+# ✅ Server Startup
+# -------------------------------------------------
+if __name__ == "__main__":
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=False
+    )
