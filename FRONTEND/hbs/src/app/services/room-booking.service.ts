@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, BehaviorSubject, interval, of, Subject } from 'rxjs';
 import { map, switchMap, takeUntil } from 'rxjs/operators';
-import { environment } from '../../environments/environment';
+import { ApiService } from '../core/services/api.service';
 
 // ===================================================
 // BOOKING STATE INTERFACES
@@ -141,11 +141,6 @@ export interface BookingTaxMapResponse {
   providedIn: 'root'
 })
 export class BookingService {
-  private bookingApiUrl = `${environment.apiUrl}/v2/rooms`;
-  private bookingMainApiUrl = `${environment.apiUrl}/bookings`;
-  private imageApiUrl = `${environment.apiUrl}/room-management`;
-  private profileApiUrl = `${environment.apiUrl}/profile`;
-
   // ===================================================
   // STATE MANAGEMENT
   // ===================================================
@@ -169,17 +164,20 @@ export class BookingService {
 
   private timerCleanup = new Subject<void>();
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private apiService: ApiService
+  ) {}
 
   // ===================================================
   // API URL ACCESSORS
   // ===================================================
   getBookingApiUrl(): string {
-    return this.bookingApiUrl;
+    return this.apiService.getV2RoomsUrl();
   }
 
   getImageApiUrl(): string {
-    return this.imageApiUrl;
+    return this.apiService.getRoomManagementUrl();
   }
 
   // ===================================================
@@ -210,7 +208,7 @@ export class BookingService {
   // USER PROFILE
   // ===================================================
   getUserProfile() {
-    return this.http.get<any>(`${this.profileApiUrl}/`);
+    return this.http.get<any>(this.apiService.getProfileUrl() + '/');
   }
   // ===================================================
   searchRooms(
@@ -258,7 +256,7 @@ export class BookingService {
 
     console.log('🔍 Search request with params:', params.keys().map(key => `${key}=${params.get(key)}`).join('&'));
 
-    return this.http.get<any>(`${this.bookingApiUrl}/search`, { params }).pipe(
+    return this.http.get<any>(this.apiService.getV2RoomsUrl() + '/search', { params }).pipe(
       map(response => response.results || [])
     );
   }
@@ -267,14 +265,14 @@ export class BookingService {
   // GET ALL ROOM TYPES (For dropdown/filter)
   // ===================================================
   getAllRoomTypes(): Observable<Room[]> {
-    return this.http.get<any>(`${this.bookingApiUrl}/room-types`).pipe(
+    return this.http.get<any>(this.apiService.getV2RoomsUrl() + '/room-types').pipe(
       map(response => response.results || response || [])
     );
   }
 
   getRoomTypes(): Observable<{ total: number; results: RoomTypeResponse[] }> {
     return this.http.get<{ total: number; results: RoomTypeResponse[] }>(
-      `${environment.apiUrl}/v2/rooms/room-types`
+      this.apiService.getV2RoomsUrl() + '/room-types'
     );
   }
 
@@ -283,7 +281,7 @@ export class BookingService {
   // ===================================================
   createBookingSession(checkIn: string, checkOut: string): Observable<BookingSession> {
     return this.http.post<BookingSession>(
-      `${this.bookingApiUrl}/booking/session`,
+      this.apiService.getV2RoomsUrl() + '/booking/session',
       { check_in: checkIn, check_out: checkOut }
     ).pipe(
       map(session => {
@@ -296,7 +294,7 @@ export class BookingService {
 
   getBookingSession(sessionId: string): Observable<BookingSession> {
     return this.http.get<BookingSession>(
-      `${this.bookingApiUrl}/booking/session/${sessionId}`
+      this.apiService.getV2RoomsUrl() + `/booking/session/${sessionId}`
     );
   }
 
@@ -389,7 +387,7 @@ export class BookingService {
     expiresAt: string
   ): Observable<RoomLock> {
     return this.http.post<RoomLock>(
-      `${this.bookingApiUrl}/lock`,
+      this.apiService.getV2RoomsUrl() + '/lock',
       {
         room_type_id: roomTypeId,
         check_in: checkIn,
@@ -407,7 +405,7 @@ export class BookingService {
 
   unlockRoom(lockId: number): Observable<any> {
     return this.http.post(
-      `${this.bookingApiUrl}/unlock/${lockId}`,
+      this.apiService.getV2RoomsUrl() + `/unlock/${lockId}`,
       {}
     ).pipe(
       map(() => {
@@ -422,7 +420,7 @@ export class BookingService {
 
   // Release all locks for current user (used when dates change)
   releaseAllLocks(): Observable<any> {
-    return this.http.post(`${this.bookingApiUrl}/release-all-locks`, {}).pipe(
+    return this.http.post(this.apiService.getV2RoomsUrl() + '/release-all-locks', {}).pipe(
       map((response) => {
         // Clear all local locks
         this.selectedLocks.next([]);
@@ -432,7 +430,7 @@ export class BookingService {
   }
 
   getMyLocks(): Observable<RoomLock[]> {
-    return this.http.get<RoomLock[]>(`${this.bookingApiUrl}/my-locks`).pipe(
+    return this.http.get<RoomLock[]>(this.apiService.getV2RoomsUrl() + '/my-locks').pipe(
       map(locks => {
         this.selectedLocks.next(locks);
         return locks;
@@ -450,7 +448,7 @@ export class BookingService {
   getBookingSummary(lockIds: number[]): Observable<BookingSummary> {
     const params = new HttpParams().set('lock_ids', lockIds.join(','));
     return this.http.get<BookingSummary>(
-      `${this.bookingApiUrl}/booking/summary`,
+      this.apiService.getV2RoomsUrl() + '/booking/summary',
       { params }
     );
   }
@@ -474,7 +472,7 @@ export class BookingService {
     }
 
     return this.http.post<any>(
-      `${this.bookingApiUrl}/booking/confirm`,
+      this.apiService.getV2RoomsUrl() + '/booking/confirm',
       payload
     ).pipe(
       map(response => {
@@ -546,11 +544,11 @@ export class BookingService {
       params = params.set('check_out_date', checkOutDate);
     }
 
-    return this.http.get<PaginatedBookingResponse>(`${this.bookingMainApiUrl}/customer`, { params });
+    return this.http.get<PaginatedBookingResponse>(this.apiService.getBookingsUrl() + '/customer', { params });
   }
 
   getBookingDetails(bookingId: number): Observable<BookingResponse> {
-    return this.http.get<BookingResponse>(`${this.bookingMainApiUrl}/customer/${bookingId}`);
+    return this.http.get<BookingResponse>(this.apiService.getBookingsUrl() + `/customer/${bookingId}`);
   }
 
   // ===================================================
@@ -594,36 +592,36 @@ export class BookingService {
       params = params.set('check_out_date', checkOutDate);
     }
 
-    return this.http.get<PaginatedBookingResponse>(`${this.bookingMainApiUrl}/admin`, { params });
+    return this.http.get<PaginatedBookingResponse>(this.apiService.getBookingsUrl() + '/admin', { params });
   }
 
   getAdminBookingDetails(bookingId: number): Observable<BookingResponse> {
-    return this.http.get<BookingResponse>(`${this.bookingMainApiUrl}/admin/${bookingId}`);
+    return this.http.get<BookingResponse>(this.apiService.getBookingsUrl() + `/admin/${bookingId}`);
   }
 
   // ===================================================
   // BOOKING OPERATIONS
   // ===================================================
   getBookingStatuses(): Observable<string[]> {
-    return this.http.get<string[]>(`${this.bookingMainApiUrl}/statuses`);
+    return this.http.get<string[]>(this.apiService.getBookingsUrl() + '/statuses');
   }
 
   cancelBooking(bookingId: number, reason?: string): Observable<any> {
-    return this.http.post<any>(`${this.bookingMainApiUrl}/${bookingId}/cancel`, {});
+    return this.http.post<any>(this.apiService.getBookingsUrl() + `/${bookingId}/cancel`, {});
   }
 
   // ===================================================
   // RELATED DATA
   // ===================================================
   getPaymentsByBooking(bookingId: number): Observable<any[]> {
-    return this.http.get<any[]>(`${environment.apiUrl}/payments/booking/${bookingId}`);
+    return this.http.get<any[]>(this.apiService.getPaymentsUrl() + `/booking/${bookingId}`);
   }
 
   getIssuesByBooking(bookingId: number): Observable<any[]> {
-    return this.http.get<any[]>(`${this.bookingMainApiUrl}/${bookingId}/issues`);
+    return this.http.get<any[]>(this.apiService.getBookingsUrl() + `/${bookingId}/issues`);
   }
 
   getReviewsByBooking(bookingId: number): Observable<any[]> {
-    return this.http.get<any[]>(`${this.bookingMainApiUrl}/${bookingId}/reviews`);
+    return this.http.get<any[]>(this.apiService.getBookingsUrl() + `/${bookingId}/reviews`);
   }
 }

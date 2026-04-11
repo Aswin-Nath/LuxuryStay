@@ -1,8 +1,8 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
-import { environment } from '../../environments/environment';
 import { Observable, BehaviorSubject } from 'rxjs';
 import { tap, finalize, map } from 'rxjs/operators';
+import { ApiService } from '../core/services/api.service';
 
 // ===== Authentication Interfaces =====
 export interface TokenResponse {
@@ -97,9 +97,6 @@ export interface AssignPermissionsRequest {
   providedIn: 'root',
 })
 export class AuthenticationService {
-  private readonly baseUrl = `${environment.apiUrl}/auth`;
-  private readonly apiUrl = `${environment.apiUrl}`;
-  
   // Initialize authStateSubject with localStorage value - if token exists, user is logged in
   private authStateSubject = new BehaviorSubject<boolean>(!!localStorage.getItem('access_token'));
   public authState$ = this.authStateSubject.asObservable();
@@ -108,7 +105,7 @@ export class AuthenticationService {
   private userScopes = new BehaviorSubject<Set<string>>(new Set());
   public permissions$ = this.userScopes.asObservable();
 
-  constructor(private http: HttpClient) {
+  constructor(private http: HttpClient, private apiService: ApiService) {
     // Subscribe to ensure we stay in sync with localStorage
     this.authState$.subscribe(state => {
       console.debug('🔐 AuthenticationService: Auth state changed to', state);
@@ -117,7 +114,7 @@ export class AuthenticationService {
 
   // ===== Authentication Methods =====
   fetchUserPermissions(): Observable<string[]> {
-    return this.http.get<any>(`${environment.apiUrl}/roles/me`, {
+    return this.http.get<any>(this.apiService.getUrl('roles/me'), {
       withCredentials: true
     }).pipe(
       tap(res => {
@@ -136,7 +133,7 @@ export class AuthenticationService {
       'Content-Type': 'application/x-www-form-urlencoded',
     });
 
-    return this.http.post<TokenResponse>(`${this.baseUrl}/login`, body.toString(), {
+    return this.http.post<TokenResponse>(this.apiService.getAuthUrl()+'/login', body.toString(), {
       headers,
       withCredentials: true,
     }).pipe(
@@ -162,7 +159,7 @@ export class AuthenticationService {
       'Content-Type': 'application/json',
     });
 
-    return this.http.post<TokenResponse>(`${this.baseUrl}/superadmin/login`, credentials, {
+    return this.http.post<TokenResponse>(this.apiService.getUrl('superadmin/login'), credentials, {
       headers,
       withCredentials: true,
     }).pipe(
@@ -188,7 +185,7 @@ export class AuthenticationService {
       'Content-Type': 'application/json',
     });
 
-    return this.http.post<any>(`${this.baseUrl}/superadmin/signup`, credentials, {
+    return this.http.post<any>(this.apiService.getUrl('superadmin/signup'), credentials, {
       headers,
       withCredentials: true,
     });
@@ -197,19 +194,19 @@ export class AuthenticationService {
   requestOtp(email: string, verificationType: string = 'PASSWORD_RESET') {
     const payload = { email, verification_type: verificationType };
     // Include credentials so HttpOnly refresh cookie is sent when necessary
-    return this.http.post<any>(`${this.baseUrl}/otp/request`, payload, { withCredentials: true });
+    return this.http.post<any>(this.apiService.getUrl('otp/request'), payload, { withCredentials: true });
   }
 
   verifyOtp(email: string, otp: string, verificationType: string = 'PASSWORD_RESET', newPassword?: string) {
     const payload: any = { email, otp, verification_type: verificationType };
     if (newPassword) payload.new_password = newPassword;
     // Include credentials so backend OTP verification/ password reset uses refresh cookie if required
-    return this.http.post<any>(`${this.baseUrl}/otp/verify`, payload, { withCredentials: true });
+    return this.http.post<any>(this.apiService.getUrl('otp/verify'), payload, { withCredentials: true });
   }
 
   refreshToken() {
     // NOTE: refresh token is stored in HttpOnly cookie by server, send credentials so cookie is included
-    return this.http.post<TokenResponse>(`${this.baseUrl}/refresh`, {}, { withCredentials: true }).pipe(
+    return this.http.post<TokenResponse>(this.apiService.getUrl('refresh'), {}, { withCredentials: true }).pipe(
       tap((res) => {
         console.debug('AuthenticationService: refreshToken response', res);
         
@@ -231,7 +228,7 @@ export class AuthenticationService {
     logout() {
       // Ask server to invalidate refresh cookie (return void), include credentials for cookie
       // Use finalize to ensure local state is cleared even if the request errors
-      return this.http.post(`${this.baseUrl}/logout`, {}, { withCredentials: true }).pipe(
+      return this.http.post(this.apiService.getUrl('logout'), {}, { withCredentials: true }).pipe(
         finalize(() => {
           this.clearLocalAuthState();
           this.authStateSubject.next(false);
@@ -279,21 +276,21 @@ export class AuthenticationService {
       }
     });
 
-    return this.http.get<AdminListResponse>(`${this.apiUrl}/users/list`, { params: httpParams });
+    return this.http.get<AdminListResponse>(this.apiService.getUrl('users/list'), { params: httpParams });
   }
 
   /**
    * Create new admin user
    */
   createAdmin(payload: CreateAdminPayload): Observable<AdminUser> {
-    return this.http.post<AdminUser>(`${this.apiUrl}/auth/register`, payload);
+    return this.http.post<AdminUser>(this.apiService.getUrl('auth/register'), payload);
   }
 
   /**
    * Update existing admin user
    */
   updateAdmin(userId: number, payload: UpdateAdminPayload): Observable<AdminUser> {
-    return this.http.put<AdminUser>(`${this.apiUrl}/users/${userId}`, payload);
+    return this.http.put<AdminUser>(this.apiService.getUrl(`users/${userId}`), payload);
   }
 
   /**
@@ -306,10 +303,10 @@ export class AuthenticationService {
         throw new Error('Suspension reason is required');
       }
       const payload = { suspend_reason: reason };
-      return this.http.post(`${this.apiUrl}/users/${userId}/suspend`, payload);
+      return this.http.post(this.apiService.getUrl(`users/${userId}/suspend`), payload);
     } else {
       // Unsuspend user
-      return this.http.post(`${this.apiUrl}/users/${userId}/unsuspend`, {});
+      return this.http.post(this.apiService.getUrl(`users/${userId}/unsuspend`), {});
     }
   }
 
@@ -317,14 +314,14 @@ export class AuthenticationService {
    * Get single admin user details
    */
   getAdmin(userId: number): Observable<AdminUser> {
-    return this.http.get<AdminUser>(`${this.apiUrl}/users/${userId}`);
+    return this.http.get<AdminUser>(this.apiService.getUrl(`users/${userId}`));
   }
 
   /**
    * Check if email is unique (for validation)
    */
   checkEmailUnique(email: string): Observable<{ available: boolean }> {
-    return this.http.get<{ available: boolean }>(`${this.apiUrl}/users/check-email`, {
+    return this.http.get<{ available: boolean }>(this.apiService.getUrl('users/check-email'), {
       params: { email }
     });
   }
@@ -334,7 +331,7 @@ export class AuthenticationService {
    * User signup
    */
   signup(payload: any): Observable<any> {
-    return this.http.post(`${this.baseUrl}/signup`, payload, { withCredentials: true });
+    return this.http.post(this.apiService.getUrl('signup'), payload, { withCredentials: true });
   }
 
   // ===== Permission Service Methods =====
@@ -368,21 +365,21 @@ export class AuthenticationService {
    * Get all roles
    */
   getRoles(): Observable<Role[]> {
-    return this.http.get<Role[]>(`${this.apiUrl}/roles`);
+    return this.http.get<Role[]>(this.apiService.getUrl('roles'));
   }
 
   /**
    * Create a new role
    */
   createRole(roleData: { role_name: string; role_description: string }): Observable<Role> {
-    return this.http.post<Role>(`${this.apiUrl}/roles`, roleData);
+    return this.http.post<Role>(this.apiService.getUrl('roles'), roleData);
   }
 
   /**
    * Get all permissions grouped by resource
    */
   getPermissionsGrouped(): Observable<PermissionGroup[]> {
-    return this.http.get<Permission[]>(`${this.apiUrl}/roles/all-permissions`).pipe(
+    return this.http.get<Permission[]>(this.apiService.getUrl('roles/all-permissions')).pipe(
       // Transform flat permission list to grouped structure
       (source: any) => new Observable(observer => {
         source.subscribe({
@@ -401,7 +398,7 @@ export class AuthenticationService {
    * Get all permissions
    */
   getPermissions(): Observable<Permission[]> {
-    return this.http.get<Permission[]>(`${this.apiUrl}/roles/all-permissions`);
+    return this.http.get<Permission[]>(this.apiService.getUrl('roles/all-permissions'));
   }
 
   /**
@@ -409,7 +406,7 @@ export class AuthenticationService {
    */
   getRolePermissions(roleId: number): Observable<Permission[]> {
     const params = new HttpParams().set('role_id', roleId.toString());
-    return this.http.get<Permission[]>(`${this.apiUrl}/roles/permissions`, { params, withCredentials: true });
+    return this.http.get<Permission[]>(this.apiService.getUrl('roles/permissions'), { params, withCredentials: true });
   }
 
   /**
@@ -420,7 +417,7 @@ export class AuthenticationService {
     permissionIds: number[]
   ): Observable<any> {
     return this.http.post(
-      `${this.apiUrl}/roles/assign`,
+      this.apiService.getUrl('roles/assign'),
       {
         role_id: roleId,
         permission_ids: permissionIds

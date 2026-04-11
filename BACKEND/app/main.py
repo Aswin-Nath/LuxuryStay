@@ -3,7 +3,9 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 import asyncio
-
+import os
+from dotenv import load_dotenv
+load_dotenv()
 from app.middlewares.logging_middleware import LoggingMiddleware
 from app.middlewares.error_handler_middleware import ErrorHandlerMiddleware
 from app.middlewares.logging_middleware import LoggingMiddleware
@@ -80,9 +82,11 @@ app = FastAPI(
 # -------------------------------------------------
 # ✅ Middlewares
 # -------------------------------------------------
+origin=os.getenv("FRONTEND_URL") or "http://localhost:4200"
+print(origin)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4200","http://localhost:63981"],
+    allow_origins=[origin],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
