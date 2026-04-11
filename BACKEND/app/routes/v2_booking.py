@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, and_
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app.database.postgres_connection import get_db
 from app.dependencies.authentication import get_current_user
@@ -90,7 +90,7 @@ async def lock_room(
             detail="check_in must be before check_out"
         )
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     # 1. Get room type details
     rt_result = await db.execute(
@@ -246,7 +246,7 @@ async def get_my_locks(
     """
     Get all non-expired locks for current user.
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     result = await db.execute(
         select(RoomAvailabilityLocks)
@@ -311,7 +311,7 @@ async def search_rooms(
     if check_in_date >= check_out_date:
         raise HTTPException(status_code=400, detail="check_in must be before check_out")
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     # Build room type filters
     room_type_filters = []
@@ -401,7 +401,7 @@ async def get_booking_summary(
     Get booking summary with final calculations.
     Shows all locked rooms and total amount.
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     # Get valid locks with room details
     result = await db.execute(
@@ -476,7 +476,7 @@ async def confirm_booking(
       ]
     }
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     
     # Step 1: Get all locks specified in request
     lock_ids = [gd.lock_id for gd in request.rooms_guest_details]
@@ -668,16 +668,16 @@ async def create_booking_session(
         raise HTTPException(status_code=400, detail="check_in must be before check_out")
 
     # Session expiry = NOW + 15 minutes
-    expiry_time = datetime.utcnow() + timedelta(minutes=15)
+    expiry_time = datetime.now(timezone.utc) + timedelta(minutes=15)
 
     return {
-        "session_id": f"sess_{current_user.user_id}_{int(datetime.utcnow().timestamp())}",
+        "session_id": f"sess_{current_user.user_id}_{int(datetime.now(timezone.utc).timestamp())}",
         "user_id": current_user.user_id,
         "check_in": check_in,
         "check_out": check_out,
         "expiry_time": expiry_time.isoformat() + "Z",
         "remaining_minutes": 15,
-        "created_at": datetime.utcnow().isoformat() + "Z",
+        "created_at": datetime.now(timezone.utc).isoformat() + "Z",
         "status": "active"
     }
 
@@ -718,7 +718,7 @@ async def get_booking_session(
     # Calculate remaining time (max 15 minutes from session creation)
     session_created_at = datetime.fromtimestamp(session_timestamp)
     session_expiry = session_created_at + timedelta(minutes=15)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     remaining_seconds = (session_expiry - now).total_seconds()
     remaining_minutes = max(0, remaining_seconds / 60)
     is_expired = remaining_seconds <= 0
@@ -789,7 +789,7 @@ async def start_payment(
     # Check session not expired
     session_created_at = datetime.fromtimestamp(session_timestamp)
     session_expiry = session_created_at + timedelta(minutes=15)
-    if datetime.utcnow() > session_expiry:
+    if datetime.now(timezone.utc) > session_expiry:
         raise HTTPException(status_code=400, detail="Session expired")
 
     # Verify all locks belong to user
@@ -895,7 +895,7 @@ async def check_offer_availability(
     if check_in_date >= check_out_date:
         raise HTTPException(status_code=400, detail="check_in must be before check_out")
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     # 1. Get offer details
     offer_result = await db.execute(
@@ -1005,7 +1005,7 @@ async def lock_offer_rooms(
     if check_in_date >= check_out_date:
         raise HTTPException(status_code=400, detail="check_in must be before check_out")
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     expiry = now + timedelta(minutes=15)
 
     # 1. Validate offer
@@ -1165,7 +1165,7 @@ async def get_rooms_by_offer_id(
     
     Query: /api/v2/rooms/offer/5/locked-rooms
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     # Get all locks for this offer_id and user
     result = await db.execute(
@@ -1278,7 +1278,7 @@ async def confirm_offer_booking(
       ]
     }
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     
     # Step 1: Get all locks for this offer_id
     lock_ids = [gd.lock_id for gd in request.rooms_guest_details]

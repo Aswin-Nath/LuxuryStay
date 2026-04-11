@@ -18,3 +18,4 @@ pandas
 reportlab
 motor
 cloudinary
+fastapi

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
@@ -20,7 +20,7 @@ class RestoredDataCollection(BaseModel):
     storagePath: Optional[str] = Field(None, description="Location of backup used for restore")
     collectionsRestored: Optional[List[str]] = Field(default_factory=list, description="List of restored entities")
     status: str = Field(..., description="initiated | in_progress | completed | failed")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Restore start time")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Restore start time")
     completedAt: Optional[datetime] = Field(None, description="Completion time")
     details: Optional[RestoreDetails] = None
 

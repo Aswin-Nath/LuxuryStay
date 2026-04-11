@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -186,7 +186,7 @@ async def update_refund_transaction(db: AsyncSession, refund_id: int, payload, a
     # ========== UPDATE STATUS & SET TIMESTAMPS ==========
     if new_status is not None:
         refund_record.status = new_status
-        current_timestamp = datetime.utcnow()
+        current_timestamp = datetime.now(timezone.utc)
         
         if new_status.upper() == "PROCESSED":
             refund_record.processed_at = current_timestamp

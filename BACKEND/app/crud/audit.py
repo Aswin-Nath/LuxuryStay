@@ -1,22 +1,32 @@
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 from bson import ObjectId
+import logging
 
 from app.database.mongo_connnection import get_database
+
+logger = logging.getLogger(__name__)
 
 
 # ==========================================================
 # 🔹 CREATE
 # ==========================================================
 async def insert_audit_log_record(payload: Dict[str, Any]) -> Dict[str, Any]:
-	"""Insert an audit_log document and return the inserted document."""
-	db = get_database()
-	collection = db.audit_log
-	result = await collection.insert_one(payload)
-	inserted = await collection.find_one({"_id": result.inserted_id})
-	if inserted and "_id" in inserted and isinstance(inserted["_id"], ObjectId):
-		inserted["_id"] = str(inserted["_id"])
-	return inserted
+	"""Insert an audit_log document and return the inserted document.
+	
+	Raises exception on MongoDB connection/insertion failures - caller should handle.
+	"""
+	try:
+		db = get_database()
+		collection = db.audit_log
+		result = await collection.insert_one(payload)
+		inserted = await collection.find_one({"_id": result.inserted_id})
+		if inserted and "_id" in inserted and isinstance(inserted["_id"], ObjectId):
+			inserted["_id"] = str(inserted["_id"])
+		return inserted
+	except Exception as e:
+		logger.error(f"MongoDB audit log insertion failed: {str(e)}", exc_info=True)
+		raise  # Re-raise so caller can handle
 
 
 # ==========================================================

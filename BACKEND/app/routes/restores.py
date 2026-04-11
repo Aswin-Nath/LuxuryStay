@@ -2,7 +2,7 @@ import os
 import asyncio
 import subprocess
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from zipfile import ZipFile
 from bson import ObjectId
 from typing import Optional, Dict, List
@@ -13,10 +13,10 @@ from app.dependencies.authentication import check_permission, get_current_user
 from app.models.sqlalchemy_schemas.users import Users
 
 # Mongo Config
-MONGO_URI = os.getenv("MONGO_URI")
+MONGO_URL = os.getenv("MONGO_URL")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME")
 
-mongo_client = AsyncIOMotorClient(MONGO_URI)
+mongo_client = AsyncIOMotorClient(MONGO_URL)
 mongo_db = mongo_client[MONGO_DB_NAME]
 backup_col = mongo_db["backup_data_collections"]
 restore_col = mongo_db["restored_data_collections"]
@@ -85,7 +85,7 @@ async def restore_database_from_backup(
     if not zip_path or not os.path.exists(zip_path):
         raise HTTPException(status_code=404, detail="Backup file missing on disk")
 
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     restore_db_name = f"{PG_DATABASE}_restore_{timestamp}"
     dump_extract_path = zip_path.replace(".zip", ".dump")
 
@@ -136,7 +136,7 @@ async def restore_database_from_backup(
     # Step 5: Compute metadata
     checksum = hashlib.sha256(open(zip_path, "rb").read()).hexdigest()
     size_mb = round(os.path.getsize(zip_path) / (1024 * 1024), 2)
-    completed_at = datetime.utcnow()
+    completed_at = datetime.now(timezone.utc)
 
     # Step 6: Cleanup temp .dump file
     try:

@@ -62,6 +62,31 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class SuperAdminCreate(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+
+    # --- PASSWORD VALIDATION ---
+    @field_validator('password')
+    def password_strength(cls, value: str) -> str:
+        if len(value) < 8:
+            raise ValueError('Password must be at least 8 characters long.')
+        if not any(c.islower() for c in value):
+            raise ValueError('Password must contain at least one lowercase letter.')
+        if not any(c.isupper() for c in value):
+            raise ValueError('Password must contain at least one uppercase letter.')
+        if not any(c.isdigit() for c in value):
+            raise ValueError('Password must contain at least one digit.')
+        if not any(not c.isalnum() for c in value):
+            raise ValueError('Password must contain at least one special character.')
+        return value
+
+    model_config = {
+        "str_strip_whitespace": True,
+        "validate_assignment": True,
+    }
+
+
 class UserResponse(BaseModel):
     user_id: int
     full_name: str

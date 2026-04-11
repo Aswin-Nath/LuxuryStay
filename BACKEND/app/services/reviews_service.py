@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -138,7 +138,7 @@ async def admin_respond_review(db: AsyncSession, review_id: int, admin_user, adm
 
     review_record.admin_id = admin_user.user_id
     review_record.admin_response = admin_response
-    review_record.responded_at = datetime.utcnow()
+    review_record.responded_at = datetime.now(timezone.utc)
     await update_review_record(db, review_record)
     await db.commit()
     return await fetch_review_by_id(db, review_id)

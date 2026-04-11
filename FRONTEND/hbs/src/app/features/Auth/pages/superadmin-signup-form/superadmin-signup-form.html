@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LuxuryStay - Super Admin Signup</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body class="bg-gray-50 font-sans">
+
+<!-- Header -->
+<header class="flex justify-between items-center bg-white shadow-md px-6 py-4 sticky top-0 z-9999">
+  <a routerLink="/" class="flex items-center space-x-2">
+    <img src="/assets/images/Hotel_logo.png" alt="Hotel Logo"
+         class="h-8 sm:h-10 rounded-full border-2 border-green-600 p-1">
+    <h1 class="text-lg sm:text-xl font-bold text-green-700">LuxuryStay - Super Admin</h1>
+  </a>
+</header>
+
+<!-- FULLSCREEN LOADER -->
+<div *ngIf="loading" class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-99999 animate-fadeIn">
+  <div class="bg-white px-7 py-6 rounded-2xl shadow-2xl flex flex-col items-center">
+    <div class="loader mb-3"></div>
+    <p class="text-gray-700 font-semibold text-sm tracking-wide">Creating Super Admin account…</p>
+  </div>
+</div>
+
+<!-- Toast Notification -->
+<div #toast id="toast" class="fixed translate-x-full opacity-0 transition-all duration-300">
+  <span id="toastIcon" class="material-icons"></span>
+  <span id="toastMessage"></span>
+</div>
+
+<div class="flex min-h-[calc(100vh-64px)] animate-fadeStart">
+  <!-- Left Image -->
+  <div class="hidden md:flex w-1/2 bg-cover bg-center relative"
+       style="background-image: url('/assets/images/hotel_luxury.jpg');">
+    <div class="absolute inset-0 bg-linear-to-t from-black/80 via-black/40 to-transparent"></div>
+    <div class="relative z-10 flex flex-col justify-center items-center text-center px-8 text-white">
+      <h2 class="text-4xl font-extrabold mb-4 animate-slideUp">Join as Super Admin</h2>
+      <p class="text-lg text-gray-200 leading-relaxed animate-slideUpDelay">
+        Create a super admin account to manage your luxury hotel operations.<br>
+        Full control over admins, settings, and business intelligence.
+      </p>
+    </div>
+  </div>
+
+  <div class="hidden md:block w-px bg-gray-300"></div>
+
+  <!-- Right Form -->
+  <div class="flex justify-center items-center w-full md:w-1/2 p-6">
+    <div class="relative w-full max-w-xl bg-white rounded-2xl overflow-hidden border-4 border-green-500 shadow-xl hover:shadow-green-300/30 hover:shadow-2xl transition-all duration-500 animate-cardFloat">
+
+      <!-- Back Arrow -->
+      <a routerLink="/"
+        class="absolute top-3 left-3 text-gray-700 hover:text-gray-900 transition cursor-pointer hover:-translate-y-0.5 animate-cardFloat active:scale-95">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+      </a>
+
+      <!-- Top Banner -->
+      <div class="bg-linear-to-r from-green-600 to-green-500 text-white text-center py-6 animate-slideUpSmall">
+        <h2 class="text-2xl font-bold">Create Super Admin Account</h2>
+        <p class="text-sm opacity-90">Email and password only</p>
+      </div>
+
+      <!-- Form -->
+      <form (ngSubmit)="onSubmit()" (reset)="onReset()" class="px-8 py-6 space-y-5" novalidate>
+
+        <!-- Email -->
+        <div class="animate-slideUpSmall">
+          <label class="block text-sm font-medium text-gray-700">
+            Email <span class="text-red-500">*</span>
+          </label>
+          <div class="relative">
+            <input type="email" [(ngModel)]="email" name="email"
+                   (input)="validateEmailFormatOnInput()" (blur)="validateEmailFormatOnInput()"
+                   placeholder="admin@luxurystay.com"
+                   class="w-full mt-1 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition">
+            <span *ngIf="emailError"
+                  class="absolute right-2 top-2 text-[10px] text-red-500 bg-white px-1 rounded">
+              {{ emailError }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Password -->
+        <div class="animate-slideUpSmall delay-150">
+          <label class="block text-sm font-medium text-gray-700">
+            Password <span class="text-red-500">*</span>
+          </label>
+
+          <div class="relative">
+            <input
+              [type]="showPassword ? 'text' : 'password'"
+              [(ngModel)]="password"
+              name="password"
+              [disabled]="passwordDisabled"
+              (input)="validatePasswordOnInput()"
+              placeholder="••••••••"
+              class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+              [ngClass]="{ 'bg-gray-100 cursor-not-allowed': passwordDisabled }"
+            />
+            <span *ngIf="passwordError"
+                  class="absolute right-2 top-2 text-[10px] text-red-500 bg-white px-1 rounded">
+              {{ passwordError }}
+            </span>
+            <button type="button" (click)="togglePassword()" class="absolute right-3 top-2 text-gray-500 hover:text-gray-700 transition">
+              <span class="material-icons text-base">
+                {{ showPassword ? 'visibility' : 'visibility_off' }}
+              </span>
+            </button>
+          </div>
+
+          <!-- Password Requirements -->
+          <div class="mt-3 space-y-1 text-xs">
+            <div [class]="passwordRequirements.length ? 'text-green-600' : 'text-gray-400'">
+              <span class="inline-block w-3">{{ passwordRequirements.length ? '✓' : '✗' }}</span> At least 8 characters
+            </div>
+            <div [class]="passwordRequirements.uppercase ? 'text-green-600' : 'text-gray-400'">
+              <span class="inline-block w-3">{{ passwordRequirements.uppercase ? '✓' : '✗' }}</span> One uppercase letter (A-Z)
+            </div>
+            <div [class]="passwordRequirements.lowercase ? 'text-green-600' : 'text-gray-400'">
+              <span class="inline-block w-3">{{ passwordRequirements.lowercase ? '✓' : '✗' }}</span> One lowercase letter (a-z)
+            </div>
+            <div [class]="passwordRequirements.digit ? 'text-green-600' : 'text-gray-400'">
+              <span class="inline-block w-3">{{ passwordRequirements.digit ? '✓' : '✗' }}</span> One digit (0-9)
+            </div>
+            <div [class]="passwordRequirements.special ? 'text-green-600' : 'text-gray-400'">
+              <span class="inline-block w-3">{{ passwordRequirements.special ? '✓' : '✗' }}</span> One special character (!@#$%^&*)
+            </div>
+          </div>
+        </div>
+
+        <!-- Confirm Password -->
+        <div class="animate-slideUpSmall delay-200">
+          <label class="block text-sm font-medium text-gray-700">
+            Confirm Password <span class="text-red-500">*</span>
+          </label>
+
+          <div class="relative">
+            <input
+              [type]="showConfirmPassword ? 'text' : 'password'"
+              [(ngModel)]="confirmPassword"
+              name="confirmPassword"
+              (input)="validateConfirmPassword()"
+              (blur)="validateConfirmPassword()"
+              placeholder="••••••••"
+              class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+            />
+            <span *ngIf="confirmPasswordError"
+                  class="absolute right-2 top-2 text-[10px] text-red-500 bg-white px-1 rounded">
+              {{ confirmPasswordError }}
+            </span>
+            <button type="button" (click)="toggleConfirmPassword()" class="absolute right-3 top-2 text-gray-500 hover:text-gray-700 transition">
+              <span class="material-icons text-base">
+                {{ showConfirmPassword ? 'visibility' : 'visibility_off' }}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" class="w-full bg-linear-to-r from-green-600 to-green-500 text-white font-semibold py-3 rounded-lg hover:shadow-lg hover:shadow-green-400/50 transition-all duration-300 active:scale-95 animate-slideUpSmall delay-300">
+          Create Super Admin Account
+        </button>
+
+        <!-- Divider -->
+        <div class="relative my-6">
+          <div class="absolute inset-0 flex items-center">
+            <div class="w-full border-t border-gray-300"></div>
+          </div>
+          <div class="relative flex justify-center text-sm">
+            <span class="px-2 bg-white text-gray-500">or</span>
+          </div>
+        </div>
+
+        <!-- Reset Button -->
+        <button type="reset" class="w-full border-2 border-gray-300 text-gray-700 font-semibold py-3 rounded-lg hover:border-gray-400 transition-all duration-300 active:scale-95">
+          Clear Form
+        </button>
+
+        <!-- Already have account -->
+        <div class="text-center text-sm text-gray-600 mt-4">
+          Already have an account? <a routerLink="/superadmin/login" class="text-green-600 font-semibold hover:text-green-800 transition">Login</a>
+        </div>
+
+      </form>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

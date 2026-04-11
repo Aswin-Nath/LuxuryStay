@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, status, Request, Security, Response, Coo
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.postgres_connection import get_db
 from app.models.sqlalchemy_schemas.users import Users
-from app.schemas.pydantic_models.users import UserCreate, UserResponse, TokenResponse
+from app.schemas.pydantic_models.users import UserCreate, UserResponse, TokenResponse, SuperAdminCreate, LoginRequest
 
 from app.services.authentication_usecases import (
     signup as svc_signup,
@@ -14,6 +14,7 @@ from app.services.authentication_usecases import (
     refresh_tokens as svc_refresh_tokens,
     logout_flow as svc_logout_flow,
     register_admin as svc_register_admin,
+    register_super_admin as svc_register_super_admin,
 )
 from fastapi.security import OAuth2PasswordRequestForm
 from app.dependencies.authentication import get_current_user, check_permission
@@ -50,14 +51,29 @@ def _set_refresh_cookie(response: Response, token: str, expires_at: Optional[dat
     """Store the refresh token securely via HttpOnly cookie."""
     max_age = None
     expires_value = None
+    # if expires_at:
+    #     expires_utc = expires_at if expires_at.tzinfo is not None else expires_at.replace(tzinfo=timezone.utc)
+    #     expires_utc = expires_utc.astimezone(timezone.utc)
+    #     time_left = int((expires_utc - datetime.now(tz=timezone.utc)).total_seconds())
+    #     if time_left > 0:
+    #         max_age = time_left
+    #     expires_value = expires_utc
+    from datetime import timezone
+
     if expires_at:
-        expires_utc = expires_at if expires_at.tzinfo is not None else expires_at.replace(tzinfo=timezone.utc)
-        expires_utc = expires_utc.astimezone(timezone.utc)
-        time_left = int((expires_utc - datetime.now(tz=timezone.utc)).total_seconds())
+        if expires_at.tzinfo is None:
+            expires_utc = expires_at.replace(tzinfo=timezone.utc)
+        else:
+            expires_utc = expires_at.astimezone(timezone.utc)
+
+        now_utc = datetime.now(timezone.utc)
+
+        time_left = int((expires_utc - now_utc).total_seconds())
+
         if time_left > 0:
             max_age = time_left
-        expires_value = expires_utc
 
+        expires_value = expires_utc
     response.set_cookie(
         key=REFRESH_COOKIE_NAME,
         value=token,
@@ -427,3 +443,35 @@ async def register_admin(
 
     user_obj = await svc_register_admin(db, payload, current_user.user_id)
     return UserResponse.model_validate(user_obj)
+
+
+# ==============================================================
+# SUPER ADMIN SIGNUP (No authentication required)
+# ==============================================================
+@auth_router.post("/superadmin/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def super_admin_signup(
+    payload: SuperAdminCreate,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Create a new Super Admin user without authentication.
+    
+    Public endpoint to register a super admin user. Only requires email and password.
+    Super admin is assigned role_id 3 and can immediately access super admin features.
+    
+    **Authorization:** None required (public endpoint).
+    
+    Args:
+        payload (SuperAdminCreate): Super admin creation request with email and password.
+        db (AsyncSession): Database session dependency.
+    
+    Returns:
+        UserResponse: Newly created super admin user record with user_id and email.
+    
+    Raises:
+        HTTPException (400): If email format invalid or password weak.
+        HTTPException (409): If email already exists.
+    """
+    user_obj = await svc_register_super_admin(db, payload)
+    return UserResponse.model_validate(user_obj)
+

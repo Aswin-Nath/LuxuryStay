@@ -1,8 +1,12 @@
 import { Routes } from '@angular/router';
-import { Signup } from './features/auth/pages/signup-form/signup-form.component';
-import { Login } from './features/auth/pages/login-form/login-form.component';
-import { ForgotPassword } from './features/auth/pages/forgot-password-form/forgot-password-form.component';
+// import { Signup } from './features/auth/pages/signup-form/signup-form.component';
+import { Signup } from './features/Auth/pages/signup-form/signup-form.component';
+// import { Login } from './features/auth/pages/login-form/login-form.component';
+import { Login } from './features/Auth/pages/login-form/login-form.component';
+import { SuperAdminSignup } from './features/Auth/pages/superadmin-signup-form/superadmin-signup-form.component';
+// import { ForgotPassword } from './features/auth/pages/forgot-password-form/forgot-password-form.component';
 import { HomepageComponent } from './pages/homepage/homepage.page';
+import { ForgotPassword } from './features/Auth/pages/forgot-password-form/forgot-password-form.component';
 import { PermissionGuard } from './core/guards/permission.guard';
 import { PublicGuard } from './core/guards/public.guard';
 import { AuthGuard } from './core/guards/auth.guard';
@@ -74,6 +78,7 @@ export const routes: Routes = [
 	{ path: '', component: HomepageComponent },
 	{ path: 'home', component: HomepageComponent },
 	{ path: 'login', component: Login, canActivate: [PublicGuard] },
+	{ path: 'superadmin/signup', component: SuperAdminSignup, canActivate: [PublicGuard] },
 	{ path: 'forgot-password', component: ForgotPassword, canActivate: [PublicGuard] },
 	{ path: 'signup', component: Signup, canActivate: [PublicGuard] },
 	// Public pages (no auth required)
