@@ -600,16 +600,8 @@ async def confirm_booking(
     db.add(payment)
     await db.flush()
 
-    # Step 7: Delete locks
-    await db.execute(
-        delete(RoomAvailabilityLocks).where(
-            RoomAvailabilityLocks.lock_id.in_(lock_ids)
-        )
-    )
-
-    await db.commit()
-
-    # Get payment method name
+    # Build the response before commit so no expired ORM attributes are read
+    # after the async SQLAlchemy transaction is committed.
     payment_methods = {
         1: "Credit Card",
         2: "Debit Card",
@@ -617,14 +609,18 @@ async def confirm_booking(
         4: "Net Banking",
     }
     payment_method_name = payment_methods.get(request.payment_method_id, "Unknown")
+    total_nights = sum(
+        (lock.check_out.date() if isinstance(lock.check_out, datetime) else lock.check_out)
+        - (lock.check_in.date() if isinstance(lock.check_in, datetime) else lock.check_in)
+        for lock, _, _ in rows
+    )
 
-    # Return comprehensive confirmation
-    return PaymentConfirmationResponse(
+    response = PaymentConfirmationResponse(
         booking_id=booking.booking_id,
         user_id=current_user.user_id,
         check_in=check_in_date,
         check_out=check_out_date,
-        total_nights=sum((lock.check_out - lock.check_in).days for lock, _, _ in rows),
+        total_nights=total_nights,
         booking_status="CONFIRMED",
         created_at=now,
         rooms=[
@@ -655,6 +651,16 @@ async def confirm_booking(
         transaction_reference=transaction_reference,
         transaction_date=now
     )
+
+    # Delete locks and commit only after the response has validated successfully.
+    await db.execute(
+        delete(RoomAvailabilityLocks).where(
+            RoomAvailabilityLocks.lock_id.in_(lock_ids)
+        )
+    )
+    await db.commit()
+
+    return response
 
 
 # ==========================================================
