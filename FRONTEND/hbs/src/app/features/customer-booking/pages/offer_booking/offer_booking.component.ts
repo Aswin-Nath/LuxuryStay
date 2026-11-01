@@ -427,7 +427,7 @@ export class OfferBookingComponent implements OnInit, OnDestroy {
    * Check if payment can be processed
    */
   canProcessPayment(): boolean {
-    return this.areAllGuestDetailsFilled() && (this.selectedPaymentMethod === 1 || this.selectedPaymentMethod === 3 || (this.selectedPaymentMethod === 2 && this.isValidUPI(this.upiId)));
+    return this.areAllGuestDetailsFilled() && (this.selectedPaymentMethod === 1 || this.selectedPaymentMethod === 4 || (this.selectedPaymentMethod === 3 && this.isValidUPI(this.upiId)));
   }
 
   /**
@@ -440,7 +440,7 @@ export class OfferBookingComponent implements OnInit, OnDestroy {
     if (!this.selectedPaymentMethod) {
       return 'Select a payment method';
     }
-    if (this.selectedPaymentMethod === 2 && !this.isValidUPI(this.upiId)) {
+    if (this.selectedPaymentMethod === 3 && !this.isValidUPI(this.upiId)) {
       return 'Enter a valid UPI ID';
     }
     return '';

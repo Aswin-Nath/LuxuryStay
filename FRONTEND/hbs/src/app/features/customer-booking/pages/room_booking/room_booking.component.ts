@@ -1651,8 +1651,8 @@ export class BookingComponent implements OnInit, OnDestroy {
     // Map payment method to backend ID
     const paymentMethodMap: { [key: string]: number } = {
       card: 1,
-      upi: 2,
-      netbanking: 3
+      upi: 3,
+      netbanking: 4
     };
 
     const paymentMethodId = paymentMethodMap[this.selectedPaymentMethod!];

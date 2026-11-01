@@ -10,6 +10,7 @@ from app.models.sqlalchemy_schemas.rooms import Rooms, RoomAvailabilityLocks, Ro
 from app.models.sqlalchemy_schemas.bookings import Bookings, BookingRoomMap
 from app.models.sqlalchemy_schemas.offers import Offers
 from app.models.sqlalchemy_schemas.payments import Payments
+from app.models.sqlalchemy_schemas.payment_method import PaymentMethodUtility
 from app.crud.bookings import create_payment
 import uuid
 
@@ -477,6 +478,17 @@ async def confirm_booking(
     }
     """
     now = datetime.now(timezone.utc)
+
+    payment_method_result = await db.execute(
+        select(PaymentMethodUtility).where(
+            PaymentMethodUtility.method_id == request.payment_method_id
+        )
+    )
+    if payment_method_result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid payment method id: {request.payment_method_id}"
+        )
     
     # Step 1: Get all locks specified in request
     lock_ids = [gd.lock_id for gd in request.rooms_guest_details]
@@ -506,11 +518,13 @@ async def confirm_booking(
     # Step 3: Create booking entry
     # Get check_in and check_out from first lock
     first_lock = rows[0][0]
+    check_in_date = first_lock.check_in.date() if isinstance(first_lock.check_in, datetime) else first_lock.check_in
+    check_out_date = first_lock.check_out.date() if isinstance(first_lock.check_out, datetime) else first_lock.check_out
     booking = Bookings(
         user_id=current_user.user_id,
         room_count=len(rows),
-        check_in=first_lock.check_in,
-        check_out=first_lock.check_out,
+        check_in=check_in_date,
+        check_out=check_out_date,
         total_price=0,  # Will update after calculating
         status="Confirmed",
         created_at=now,
@@ -553,8 +567,8 @@ async def confirm_booking(
             "room_id": room.room_id,
             "room_no": room.room_no,
             "type_name": room_type.type_name,
-            "check_in": lock.check_in,
-            "check_out": lock.check_out,
+            "check_in": lock.check_in.date() if isinstance(lock.check_in, datetime) else lock.check_in,
+            "check_out": lock.check_out.date() if isinstance(lock.check_out, datetime) else lock.check_out,
             "nights": nights,
             "price_per_night": float(room_type.price_per_night),
             "total_price": price,
@@ -596,15 +610,20 @@ async def confirm_booking(
     await db.commit()
 
     # Get payment method name
-    payment_methods = {1: "Credit/Debit Card", 2: "UPI", 3: "Net Banking"}
+    payment_methods = {
+        1: "Credit Card",
+        2: "Debit Card",
+        3: "UPI",
+        4: "Net Banking",
+    }
     payment_method_name = payment_methods.get(request.payment_method_id, "Unknown")
 
     # Return comprehensive confirmation
     return PaymentConfirmationResponse(
         booking_id=booking.booking_id,
         user_id=current_user.user_id,
-        check_in=first_lock.check_in,
-        check_out=first_lock.check_out,
+        check_in=check_in_date,
+        check_out=check_out_date,
         total_nights=sum((lock.check_out - lock.check_in).days for lock, _, _ in rows),
         booking_status="CONFIRMED",
         created_at=now,
@@ -716,7 +735,7 @@ async def get_booking_session(
     locks = result.scalars().all()
 
     # Calculate remaining time (max 15 minutes from session creation)
-    session_created_at = datetime.fromtimestamp(session_timestamp)
+    session_created_at = datetime.fromtimestamp(session_timestamp, tz=timezone.utc)
     session_expiry = session_created_at + timedelta(minutes=15)
     now = datetime.now(timezone.utc)
     remaining_seconds = (session_expiry - now).total_seconds()
@@ -787,7 +806,7 @@ async def start_payment(
         raise HTTPException(status_code=403, detail="Cannot access other user's sessions")
 
     # Check session not expired
-    session_created_at = datetime.fromtimestamp(session_timestamp)
+    session_created_at = datetime.fromtimestamp(session_timestamp, tz=timezone.utc)
     session_expiry = session_created_at + timedelta(minutes=15)
     if datetime.now(timezone.utc) > session_expiry:
         raise HTTPException(status_code=400, detail="Session expired")
@@ -1279,6 +1298,17 @@ async def confirm_offer_booking(
     }
     """
     now = datetime.now(timezone.utc)
+
+    payment_method_result = await db.execute(
+        select(PaymentMethodUtility).where(
+            PaymentMethodUtility.method_id == request.payment_method_id
+        )
+    )
+    if payment_method_result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid payment method id: {request.payment_method_id}"
+        )
     
     # Step 1: Get all locks for this offer_id
     lock_ids = [gd.lock_id for gd in request.rooms_guest_details]
@@ -1313,13 +1343,15 @@ async def confirm_offer_booking(
 
     # Step 2: Create booking entry
     first_lock = rows[0][0]
+    check_in_date = first_lock.check_in.date() if isinstance(first_lock.check_in, datetime) else first_lock.check_in
+    check_out_date = first_lock.check_out.date() if isinstance(first_lock.check_out, datetime) else first_lock.check_out
     user = current_user
     
     booking = Bookings(
         user_id=current_user.user_id,
         room_count=len(rows),
-        check_in=first_lock.check_in,
-        check_out=first_lock.check_out,
+        check_in=check_in_date,
+        check_out=check_out_date,
         total_price=0,  # Will update after calculating
         status="Confirmed",
         created_at=now,
@@ -1371,8 +1403,8 @@ async def confirm_offer_booking(
             "room_id": room.room_id,
             "room_no": room.room_no,
             "type_name": room_type.type_name,
-            "check_in": lock.check_in,
-            "check_out": lock.check_out,
+            "check_in": lock.check_in.date() if isinstance(lock.check_in, datetime) else lock.check_in,
+            "check_out": lock.check_out.date() if isinstance(lock.check_out, datetime) else lock.check_out,
             "nights": nights,
             "original_price_per_night": float(room_type.price_per_night),
             "discount_percent": discount_percent,
@@ -1416,15 +1448,20 @@ async def confirm_offer_booking(
     await db.commit()
 
     # Get payment method name
-    payment_methods = {1: "Credit/Debit Card", 2: "UPI", 3: "Net Banking"}
+    payment_methods = {
+        1: "Credit Card",
+        2: "Debit Card",
+        3: "UPI",
+        4: "Net Banking",
+    }
     payment_method_name = payment_methods.get(request.payment_method_id, "Unknown")
 
     # Return confirmation
     return PaymentConfirmationResponse(
         booking_id=booking.booking_id,
         user_id=current_user.user_id,
-        check_in=first_lock.check_in,
-        check_out=first_lock.check_out,
+        check_in=check_in_date,
+        check_out=check_out_date,
         total_nights=sum((lock.check_out - lock.check_in).days for lock, _, _ in rows),
         booking_status="CONFIRMED",
         created_at=now,
