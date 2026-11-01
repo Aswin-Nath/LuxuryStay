@@ -8,8 +8,6 @@ import { takeUntil } from 'rxjs/operators';
 import { RoomsService } from '../../../../services/room-management.service';
 import { AdminNavbarComponent } from '../../../../layout/Admin/admin-navbar/admin-navbar.component';
 import { AdminSidebarComponent } from '../../../../layout/Admin/admin-sidebar/admin-sidebar.component';
-// import { EditRoomComponent } from '../edit-room/edit-room';
-import { EditRoomComponent } from '../../../rooms-management/pages/edit-room/edit-room';
 import { EditAmenityComponent } from '../edit-amenity/edit-amenity';
 import { AddAmenityComponent } from '../add-amenity/add-amenity';
 import { AddRoomComponent } from '../../../rooms-management/pages/add-room/add-room';
@@ -20,7 +18,7 @@ import { AddRoomTypeComponent } from '../../../rooms-management/pages/add-room-t
 @Component({
   selector: 'app-room-types-amenities-management',
   standalone: true,
-  imports: [CommonModule, HttpClientModule, FormsModule, AdminNavbarComponent, AdminSidebarComponent, EditRoomComponent, EditAmenityComponent, AddAmenityComponent, AddRoomComponent, AddRoomTypeComponent],
+  imports: [CommonModule, HttpClientModule, FormsModule, AdminNavbarComponent, AdminSidebarComponent, EditAmenityComponent, AddAmenityComponent, AddRoomComponent, AddRoomTypeComponent],
   templateUrl: './amenity-details.html',
   styleUrl: './amenity-details.css',
   providers: [RoomsService]
@@ -60,8 +58,6 @@ export class RoomTypesAmenitiesManagementComponent implements OnInit, OnDestroy 
   amenityRooms: any[] = [];
 
   // Modal states
-  showEditRoomModal = false;
-  editingRoomId: number | null = null;
   showEditAmenityModal = false;
   editingAmenityId: number | null = null;
   editingAmenityName: string = '';
@@ -280,25 +276,6 @@ export class RoomTypesAmenitiesManagementComponent implements OnInit, OnDestroy 
     }
   }
 
-  // Edit room modal handlers
-  openEditRoomModal(roomId: number): void {
-    this.editingRoomId = roomId;
-    this.showEditRoomModal = true;
-  }
-
-  closeEditRoomModal(): void {
-    this.showEditRoomModal = false;
-    this.editingRoomId = null;
-  }
-
-  onRoomSaved(): void {
-    this.closeEditRoomModal();
-    // Reload amenity rooms if viewing them
-    if (this.selectedAmenityForRooms) {
-      this.showAmenityRooms(this.selectedAmenityForRooms);
-    }
-  }
-
   // Edit amenity modal handlers
   openEditAmenityModal(amenity: any): void {
     this.editingAmenityId = amenity.amenity_id;
@@ -325,12 +302,6 @@ export class RoomTypesAmenitiesManagementComponent implements OnInit, OnDestroy 
   // Navigate to edit room type
   editRoomType(roomTypeId: number): void {
     this.router.navigate(['/admin/edit-room-type', roomTypeId]);
-  }
-
-  // Open edit room modal from amenity rooms list
-  openEditRoomFromAmenity(room: any): void {
-    this.editingRoomId = room.room_id;
-    this.showEditRoomModal = true;
   }
 
   // Add amenity modal handlers

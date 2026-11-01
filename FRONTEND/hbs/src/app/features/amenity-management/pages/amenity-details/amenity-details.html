@@ -375,10 +375,6 @@
                     </td>
                     <td class="px-3 py-2 text-center">
                       <div class="flex gap-1 justify-center flex-wrap">
-                        <button (click)="openEditRoomFromAmenity(room)" class="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition text-xs">
-                          <span class="material-icons text-sm">edit</span>
-                          <span class="hidden sm:inline">Edit</span>
-                        </button>
                         <button (click)="unmapAmenity(selectedAmenityForRooms.amenity_id, room.room_id)" class="inline-flex items-center gap-1 px-2 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100 transition text-xs">
                           <span class="material-icons text-sm">link_off</span>
                           <span class="hidden sm:inline">Unmap</span>
@@ -392,14 +388,6 @@
           </div>
         </div>
       </div>
-
-      <!-- Edit Room Modal -->
-      <app-edit-room 
-        [isOpen]="showEditRoomModal" 
-        [roomId]="editingRoomId"
-        (close)="closeEditRoomModal()"
-        (saved)="onRoomSaved()"
-      ></app-edit-room>
 
       <!-- Edit Amenity Modal -->
       <app-edit-amenity 
