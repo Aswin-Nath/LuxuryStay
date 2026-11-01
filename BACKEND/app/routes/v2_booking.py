@@ -675,9 +675,9 @@ async def create_booking_session(
         "user_id": current_user.user_id,
         "check_in": check_in,
         "check_out": check_out,
-        "expiry_time": expiry_time.isoformat() + "Z",
+        "expiry_time": expiry_time.isoformat(),
         "remaining_minutes": 15,
-        "created_at": datetime.now(timezone.utc).isoformat() + "Z",
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "status": "active"
     }
 
@@ -736,7 +736,7 @@ async def get_booking_session(
         "is_expired": is_expired,
         "locked_rooms_count": len(active_locks),
         "total_locks": len(locks),
-        "expiry_time": session_expiry.isoformat() + "Z",
+        "expiry_time": session_expiry.isoformat(),
         "status": "expired" if is_expired else "active"
     }
 
@@ -821,7 +821,7 @@ async def start_payment(
         "amount": final_amount,
         "status": "pending",
         "message": "Payment initialized. Please complete within 15 minutes.",
-        "expires_at": session_expiry.isoformat() + "Z"
+        "expires_at": session_expiry.isoformat()
     }
 
 
